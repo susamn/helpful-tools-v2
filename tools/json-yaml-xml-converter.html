@@ -541,11 +541,11 @@ Example XML:
             // Include the converter class inline to avoid external file issues
             class JsonYamlXmlConverter {
                 constructor() {
+                    this.toolName = 'json-yaml-xml-converter';
                     this.yamlIndentSize = 2;
                     this.currentInputFormat = 'unknown';
                     this.currentOutputFormat = 'unknown';
-                    this.history = [];
-                    this.maxHistoryItems = 40;
+                    this.lastInputData = '';
                     
                     this.examples = {
                         json: `{
@@ -702,6 +702,8 @@ metadata:
 
                         if (inputFormat !== targetFormat) {
                             this.updateStatus(`Converted ${inputFormat.toUpperCase()} to ${targetFormat.toUpperCase()}`);
+                            // Save to history only on actual conversions
+                            this.saveToHistoryIfChanged(input, `${inputFormat}-to-${targetFormat}`);
                         }
 
                     } catch (error) {
@@ -997,21 +999,181 @@ metadata:
                 toggleHistory() {
                     const popup = document.getElementById('historyPopup');
                     popup.classList.toggle('show');
+                    if (popup.classList.contains('show')) {
+                        this.loadHistory();
+                    }
                 }
 
                 toggleGlobalHistory() {
                     const popup = document.getElementById('globalHistoryPopup');
                     popup.classList.toggle('show');
-                }
-
-                // History management (simplified)
-                loadHistory() {
-                    // Load from localStorage if available
+                    if (popup.classList.contains('show')) {
+                        this.loadGlobalHistory();
+                    }
                 }
 
                 clearHistory() {
-                    this.history = [];
                     this.updateStatus('History cleared');
+                    document.getElementById('historyList').innerHTML = '<div class="history-item">No conversion history available</div>';
+                }
+
+                // History API Methods
+                async saveToHistoryIfChanged(data, operation) {
+                    // Only save if the data is different from the last saved data
+                    if (data !== this.lastInputData) {
+                        this.lastInputData = data;
+                        await this.saveToHistory(data, operation);
+                    }
+                }
+
+                async saveToHistory(data, operation) {
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                data: data,
+                                operation: operation
+                            })
+                        });
+
+                        if (response.ok) {
+                            this.loadHistory(); // Refresh history display
+                        }
+                    } catch (error) {
+                        console.error('Error saving history:', error);
+                    }
+                }
+
+                async loadHistory() {
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}?limit=20`);
+                        const result = await response.json();
+                        
+                        this.displayHistory(result.history || []);
+                    } catch (error) {
+                        console.error('Error loading history:', error);
+                        document.getElementById('historyList').innerHTML = '<div class="history-item">Failed to load history</div>';
+                    }
+                }
+
+                displayHistory(history) {
+                    const historyList = document.getElementById('historyList');
+                    
+                    if (history.length === 0) {
+                        historyList.innerHTML = '<div class="history-item">No conversion history available</div>';
+                        return;
+                    }
+
+                    const historyHtml = history.map(item => `
+                        <div class="history-item" data-id="${item.id}">
+                            <div class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</div>
+                            <div class="history-preview">${item.preview}</div>
+                        </div>
+                    `).join('');
+
+                    historyList.innerHTML = historyHtml;
+
+                    // Add click listeners to history items
+                    historyList.querySelectorAll('.history-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const entryId = item.dataset.id;
+                            this.loadHistoryEntry(entryId);
+                        });
+                    });
+                }
+
+                async loadHistoryEntry(entryId) {
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}/${entryId}`);
+                        const entry = await response.json();
+                        
+                        if (entry && entry.data) {
+                            document.getElementById('inputArea').value = entry.data;
+                            this.updateCharCount();
+                            this.autoDetectFormat();
+                            this.toggleHistory(); // Close history popup
+                            this.updateStatus('History entry loaded');
+                        }
+                    } catch (error) {
+                        console.error('Error loading history entry:', error);
+                        this.updateStatus('Failed to load history entry');
+                    }
+                }
+
+                // Global History Methods
+                async loadGlobalHistory() {
+                    try {
+                        const response = await fetch(`/api/global-history?limit=50`);
+                        const result = await response.json();
+                        
+                        this.displayGlobalHistory(result.history || []);
+                    } catch (error) {
+                        console.error('Error loading global history:', error);
+                        document.getElementById('globalHistoryList').innerHTML = '<div class="global-history-item">Failed to load global history</div>';
+                    }
+                }
+
+                displayGlobalHistory(history) {
+                    const historyList = document.getElementById('globalHistoryList');
+                    
+                    if (history.length === 0) {
+                        historyList.innerHTML = '<div class="global-history-item">No global history available</div>';
+                        return;
+                    }
+
+                    const historyHtml = history.map(item => `
+                        <div class="global-history-item" data-id="${item.id}" data-tool="${item.tool_name}">
+                            <div class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.tool_name} - ${item.operation}</div>
+                            <div class="history-preview">${item.preview}</div>
+                        </div>
+                    `).join('');
+
+                    historyList.innerHTML = historyHtml;
+
+                    // Add click listeners to global history items
+                    historyList.querySelectorAll('.global-history-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const entryId = item.dataset.id;
+                            const toolName = item.dataset.tool;
+                            if (toolName === this.toolName) {
+                                this.loadGlobalHistoryEntry(entryId);
+                            } else {
+                                this.updateStatus(`This entry is from ${toolName}, cannot load into converter`);
+                            }
+                        });
+                    });
+                }
+
+                async loadGlobalHistoryEntry(entryId) {
+                    try {
+                        const response = await fetch(`/api/global-history/${entryId}`);
+                        const entry = await response.json();
+                        
+                        if (entry && entry.data) {
+                            document.getElementById('inputArea').value = entry.data;
+                            this.updateCharCount();
+                            this.autoDetectFormat();
+                            this.toggleGlobalHistory(); // Close global history popup
+                            this.updateStatus('Global history entry loaded');
+                        }
+                    } catch (error) {
+                        console.error('Error loading global history entry:', error);
+                        this.updateStatus('Failed to load global history entry');
+                    }
+                }
+
+                formatTimestamp(timestamp) {
+                    const date = new Date(timestamp);
+                    return date.toLocaleString('en-US', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
                 }
             }
 
