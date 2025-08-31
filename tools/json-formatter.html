@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Formatter - Helpful Tools v2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            font-size: 13px;
+        }
+        .header {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        .header a {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            text-decoration: none;
+        }
+        .header a:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .toolbar button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .toolbar button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar button:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .toolbar button.primary {
+            background: linear-gradient(to bottom, #4a90e2, #357abd);
+            color: white;
+            border: 1px solid #2968a3;
+        }
+        .toolbar button.primary:hover {
+            background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
+        }
+        .separator {
+            width: 1px;
+            height: 16px;
+            background: #c0c0c0;
+            margin: 0 2px;
+        }
+        .history-container {
+            position: relative;
+        }
+        .history-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .history-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .history-popup {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #a0a0a0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            width: 300px;
+            max-height: 400px;
+            z-index: 1000;
+            display: none;
+            margin-top: 2px;
+        }
+        .history-popup.show {
+            display: block;
+        }
+        .history-tabs {
+            display: flex;
+            border-bottom: 1px solid #c0c0c0;
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+        }
+        .history-tab {
+            flex: 1;
+            padding: 4px 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            color: #555;
+        }
+        .history-tab.active {
+            background: white;
+            border-bottom: 1px solid white;
+            color: #333;
+        }
+        .history-content {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .history-item {
+            padding: 6px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .history-item:hover {
+            background: #f8f8f8;
+        }
+        .history-date {
+            color: #666;
+            font-size: 10px;
+            margin-bottom: 2px;
+        }
+        .history-preview {
+            color: #333;
+            font-family: 'Consolas', 'Monaco', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .main-container {
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+        }
+        .panels-container {
+            flex: 1;
+            display: flex;
+        }
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #c0c0c0;
+        }
+        .panel:last-child {
+            border-right: none;
+        }
+        .panel-header {
+            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-content {
+            flex: 1;
+            position: relative;
+            background: #ffffff;
+        }
+        .panel-textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            resize: none;
+            background: white;
+        }
+        .panel-textarea::placeholder {
+            color: #999;
+            font-style: italic;
+        }
+        .status-bar {
+            background: linear-gradient(to bottom, #e8e8e8, #d8d8d8);
+            border-top: 1px solid #c0c0c0;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: #555;
+            display: flex;
+            gap: 16px;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-messages {
+            position: fixed;
+            top: 60px;
+            right: 16px;
+            z-index: 2000;
+            max-width: 300px;
+        }
+        .status-message {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            font-size: 11px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-success {
+            border-color: #4CAF50;
+            color: #2E7D32;
+            background: #E8F5E8;
+        }
+        .status-error {
+            border-color: #F44336;
+            color: #C62828;
+            background: #FFEBEE;
+        }
+        .status-warning {
+            border-color: #FF9800;
+            color: #F57C00;
+            background: #FFF8E1;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 11px;
+            padding: 2px 4px;
+        }
+        .copy-btn:hover {
+            color: #333;
+            background: rgba(0,0,0,0.05);
+        }
+        
+        /* Enhanced styling for new controls */
+        .indent-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .indent-controls label {
+            color: #555;
+        }
+        .indent-controls select {
+            font-size: 11px;
+            padding: 2px 4px;
+            border: 1px solid #a0a0a0;
+            background: white;
+        }
+        
+        .search-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .search-controls label {
+            color: #555;
+        }
+        .search-controls input {
+            width: 200px;
+            padding: 3px 6px;
+            font-size: 11px;
+            border: 1px solid #a0a0a0;
+            background: white;
+        }
+        
+        /* JSON syntax highlighting */
+        .json-string { color: #008000; }
+        .json-number { color: #0000ff; }
+        .json-boolean { color: #800080; }
+        .json-null { color: #808080; }
+        .json-key { color: #000080; font-weight: bold; }
+        .json-punctuation { color: #000000; }
+        
+        /* Collapsible elements */
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+        .collapsible:hover {
+            background-color: #f0f0f0;
+        }
+        .expand-collapse-btn {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            line-height: 10px;
+            text-align: center;
+            background: #e8e8e8;
+            border: 1px solid #c0c0c0;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 4px;
+            cursor: pointer;
+            color: #666;
+        }
+        .expand-collapse-btn:hover {
+            background: #d0d0d0;
+        }
+        .collapsed-content {
+            display: none;
+        }
+        .collapsed-indicator {
+            color: #888;
+            font-style: italic;
+        }
+        
+        /* JSONPath search highlighting */
+        .search-match {
+            background-color: #ffff00 !important;
+            border: 1px solid #ff8800;
+            padding: 1px 2px;
+            margin: -1px -2px;
+        }
+        .search-path {
+            background-color: #e6f3ff !important;
+            border-left: 3px solid #0066cc;
+            padding-left: 8px;
+        }
+        
+        /* Enhanced panel content for markup */
+        .formatted-output {
+            width: 100%;
+            height: 100%;
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            background: white;
+            overflow: auto;
+            white-space: pre;
+            border: none;
+        }
+        
+        .error-display {
+            background: #fff0f0;
+            color: #cc0000;
+            padding: 8px;
+            border-left: 4px solid #cc0000;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+        }
+        
+        /* Enhanced history styles */
+        .history-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+        
+        .history-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        
+        .history-meta {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .history-id {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 10px;
+            color: #666;
+            background: #f5f5f5;
+            padding: 1px 4px;
+            border-radius: 2px;
+            display: inline-block;
+            width: fit-content;
+        }
+        
+        .history-date {
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .history-selection-info {
+            font-size: 11px;
+            color: #333;
+        }
+        
+        /* Header actions styling */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .global-history-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        
+        .global-history-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        
+        /* Global history popup */
+        .global-history-popup {
+            position: fixed;
+            top: 50px;
+            right: 16px;
+            background: white;
+            border: 1px solid #a0a0a0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            width: 400px;
+            max-height: 500px;
+            z-index: 2000;
+            display: none;
+            margin-top: 2px;
+        }
+        
+        .global-history-popup.show {
+            display: block;
+        }
+        
+        .global-history-header {
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .global-history-content {
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        
+        .global-history-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        
+        .global-history-item:hover {
+            background: #f8f8f8;
+        }
+        
+        .global-history-item-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .global-history-item-meta {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .global-history-id-tool {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .global-history-tool-label {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .global-history-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>JSON Formatter</h1>
+        <div class="header-actions">
+            <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
+            <a href="/">← Back to Tools</a>
+        </div>
+    </div>
+    
+    <div class="toolbar">
+        <button class="primary" id="formatBtn">Format</button>
+        <button id="minifyBtn">Minify</button>
+        <button id="stringifyBtn">Stringify</button>
+        <div class="separator"></div>
+        <button id="clearBtn">Clear</button>
+        <button id="copyFormattedBtn">Copy Formatted</button>
+        <div class="separator"></div>
+        <button id="expandAllBtn">Expand All</button>
+        <button id="collapseAllBtn">Collapse All</button>
+        <div class="separator"></div>
+        <button id="toggleMarkupBtn">Remove Markup</button>
+        <div class="separator"></div>
+        <div class="indent-controls">
+            <label>Indent:</label>
+            <select id="indentType">
+                <option value="spaces">Spaces</option>
+                <option value="tabs">Tabs</option>
+            </select>
+            <select id="indentSize">
+                <option value="2" selected>2</option>
+                <option value="4">4</option>
+                <option value="6">6</option>
+                <option value="8">8</option>
+            </select>
+        </div>
+        <div class="separator"></div>
+        <div class="search-controls">
+            <label>JSONPath:</label>
+            <input type="text" id="jsonPathInput" placeholder="e.g., $.users[0].name or //name">
+            <button id="clearSearchBtn">Clear</button>
+        </div>
+        <div class="separator"></div>
+        <div class="history-container">
+            <button class="history-btn" id="historyBtn">📋 History</button>
+            <div class="history-popup" id="historyPopup">
+                <div class="history-tabs">
+                    <button class="history-tab active" data-tab="history">History</button>
+                    <button class="history-tab" data-tab="copy">Copy</button>
+                </div>
+                <div class="history-content" id="historyContent">
+                    <div class="tab-content active" id="historyTab">
+                        <div id="historyList">
+                            <div class="history-item">No history available</div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="copyTab" style="display: none;">
+                        <div class="history-item">Copy features coming soon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="panels-container">
+            <div class="panel">
+                <div class="panel-header">
+                    Input JSON
+                </div>
+                <div class="panel-content">
+                    <textarea 
+                        class="panel-textarea" 
+                        id="jsonInput" 
+                        placeholder='Paste your JSON data here...
+Example:
+{
+  "name": "John Doe",
+  "age": 30,
+  "city": "New York"
+}'
+                    ></textarea>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">
+                    Formatted Output
+                    <button class="copy-btn" id="copyBtn">📋 Copy</button>
+                </div>
+                <div class="panel-content">
+                    <textarea 
+                        class="panel-textarea" 
+                        id="jsonOutput" 
+                        readonly
+                        placeholder="Formatted JSON will appear here..."
+                        style="display: block;"
+                    ></textarea>
+                    <div 
+                        class="formatted-output" 
+                        id="jsonOutputFormatted"
+                        style="display: none;"
+                    ></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <strong>Status:</strong>
+                <span id="jsonStatus">Ready</span>
+            </div>
+            <div class="status-item">
+                <strong>Size:</strong>
+                <span id="jsonSize">0 chars</span>
+            </div>
+            <div class="status-item">
+                <strong>Lines:</strong>
+                <span id="jsonLines">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Objects:</strong>
+                <span id="jsonObjects">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Arrays:</strong>
+                <span id="jsonArrays">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Properties:</strong>
+                <span id="jsonProperties">0</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-messages" id="statusMessages"></div>
+
+    <!-- Global History Popup -->
+    <div class="global-history-popup" id="globalHistoryPopup">
+        <div class="global-history-header">
+            <span>Global History - All Tools</span>
+            <button onclick="window.jsonFormatter?.toggleGlobalHistory()" style="background: none; border: none; cursor: pointer; font-size: 16px;">×</button>
+        </div>
+        <div class="global-history-content">
+            <div id="globalHistoryList">
+                <div class="global-history-item">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/json-formatter.js"></script>
+</body>
+</html>
