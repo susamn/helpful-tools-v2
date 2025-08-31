@@ -227,6 +227,52 @@ class HistoryManager:
         
         return None
     
+    def delete_history_entry(self, tool_name: str, entry_id: str) -> bool:
+        """Delete specific history entry for a tool and from global history"""
+        if tool_name not in self.history_data:
+            return False
+        
+        # Delete from local history
+        original_local_count = len(self.history_data[tool_name])
+        self.history_data[tool_name] = [
+            entry for entry in self.history_data[tool_name] 
+            if entry["id"] != entry_id
+        ]
+        
+        # Delete from global history (same ID)
+        original_global_count = len(self.global_history)
+        self.global_history = [
+            entry for entry in self.global_history 
+            if entry["id"] != entry_id
+        ]
+        
+        # Return True if an entry was actually deleted from either location
+        return (len(self.history_data[tool_name]) < original_local_count or 
+                len(self.global_history) < original_global_count)
+    
+    def delete_global_history_entry(self, entry_id: str) -> bool:
+        """Delete specific global history entry and from all local histories"""
+        # Delete from global history
+        original_global_count = len(self.global_history)
+        self.global_history = [
+            entry for entry in self.global_history 
+            if entry["id"] != entry_id
+        ]
+        
+        # Delete from all local histories (same ID might exist in any tool)
+        deleted_from_local = False
+        for tool_name in self.history_data:
+            original_local_count = len(self.history_data[tool_name])
+            self.history_data[tool_name] = [
+                entry for entry in self.history_data[tool_name] 
+                if entry["id"] != entry_id
+            ]
+            if len(self.history_data[tool_name]) < original_local_count:
+                deleted_from_local = True
+        
+        # Return True if an entry was actually deleted from either location
+        return (len(self.global_history) < original_global_count or deleted_from_local)
+
     def clear_global_history(self) -> Dict[str, Any]:
         """Clear all global history"""
         self.global_history = []

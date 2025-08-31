@@ -97,6 +97,26 @@
         .history-btn:hover {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
         }
+        .history-toggle-btn {
+            background: linear-gradient(to bottom, #f0f8ff, #d1e7ff);
+            border: 1px solid #4a90e2;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #1565c0;
+        }
+        .history-toggle-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        }
+        .history-toggle-btn.disabled {
+            background: linear-gradient(to bottom, #fff0f0, #fdd8d8);
+            border-color: #dc3545;
+            color: #c82333;
+        }
+        .history-toggle-btn.disabled:hover {
+            background: linear-gradient(to bottom, #fff5f5, #ffe0e0);
+        }
         .history-popup {
             position: absolute;
             top: 100%;
@@ -520,12 +540,41 @@
             margin-top: 2px;
             cursor: pointer;
         }
+        
+        .history-delete-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 2px;
+            padding: 2px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            margin-left: 8px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        
+        .history-delete-btn:hover {
+            opacity: 1;
+            background: #cc3333;
+        }
+        
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .history-item-content {
+            flex: 1;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>JSON Formatter</h1>
         <div class="header-actions">
+            <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
             <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
             <a href="/">← Back to Tools</a>
         </div>

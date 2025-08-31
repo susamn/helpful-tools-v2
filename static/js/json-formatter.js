@@ -11,9 +11,11 @@ class JsonFormatter {
         this.originalOutputData = null;  // Store original data before JSONPath filtering
         this.markupEnabled = true;
         this.indentPrefs = { type: 'spaces', size: 2 };
+        this.historyEnabled = localStorage.getItem(`${this.toolName}-historyEnabled`) !== 'false';
         this.initializeElements();
         this.attachEventListeners();
         this.loadHistory();
+        this.initializeHistoryToggle();
     }
 
     initializeElements() {
@@ -44,6 +46,7 @@ class JsonFormatter {
             
             // History
             historyBtn: document.getElementById('historyBtn'),
+            historyToggleBtn: document.getElementById('historyToggleBtn'),
             historyPopup: document.getElementById('historyPopup'),
             historyList: document.getElementById('historyList'),
             
@@ -88,6 +91,7 @@ class JsonFormatter {
 
         // History functionality
         this.elements.historyBtn.addEventListener('click', () => this.toggleHistory());
+        this.elements.historyToggleBtn.addEventListener('click', () => this.toggleHistoryEnabled());
         this.elements.globalHistoryBtn.addEventListener('click', () => this.toggleGlobalHistory());
         document.addEventListener('click', (e) => this.handleOutsideClick(e));
 
@@ -1080,6 +1084,10 @@ class JsonFormatter {
      * Save input to history via API
      */
     async saveToHistory(data, operation) {
+        if (!this.historyEnabled) {
+            return; // Skip saving if history is disabled
+        }
+        
         try {
             const response = await fetch(`/api/history/${this.toolName}`, {
                 method: 'POST',
@@ -1126,12 +1134,15 @@ class JsonFormatter {
 
         const historyHtml = history.map(item => `
             <div class="history-item" data-id="${item.id}">
-                <div class="history-header">
-                    <input type="checkbox" class="history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
-                    <div class="history-meta">
-                        <span class="history-id">ID: ${item.id}</span>
-                        <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
+                <div class="history-item-header">
+                    <div class="history-item-content">
+                        <input type="checkbox" class="history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
+                        <div class="history-meta">
+                            <span class="history-id">ID: ${item.id}</span>
+                            <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
+                        </div>
                     </div>
+                    <button class="history-delete-btn" onclick="window.jsonFormatter.deleteHistoryItem('${item.id}'); event.stopPropagation();">×</button>
                 </div>
                 <div class="history-preview">${item.preview}</div>
             </div>
@@ -1275,6 +1286,43 @@ class JsonFormatter {
     }
 
     /**
+     * Toggle history enabled/disabled state
+     */
+    toggleHistoryEnabled() {
+        this.historyEnabled = !this.historyEnabled;
+        localStorage.setItem(`${this.toolName}-historyEnabled`, this.historyEnabled.toString());
+        
+        const btn = this.elements.historyToggleBtn;
+        if (this.historyEnabled) {
+            btn.textContent = '📝 History On';
+            btn.classList.remove('disabled');
+            btn.title = 'History Enabled - Click to Disable';
+            this.showMessage('History enabled', 'success');
+        } else {
+            btn.textContent = '📝 History Off';
+            btn.classList.add('disabled');
+            btn.title = 'History Disabled - Click to Enable';
+            this.showMessage('History disabled - operations will not be saved', 'warning');
+        }
+    }
+
+    /**
+     * Initialize history toggle button state
+     */
+    initializeHistoryToggle() {
+        const btn = this.elements.historyToggleBtn;
+        if (this.historyEnabled) {
+            btn.textContent = '📝 History On';
+            btn.classList.remove('disabled');
+            btn.title = 'History Enabled - Click to Disable';
+        } else {
+            btn.textContent = '📝 History Off';
+            btn.classList.add('disabled');
+            btn.title = 'History Disabled - Click to Enable';
+        }
+    }
+
+    /**
      * Handle clicks outside history popup
      */
     handleOutsideClick(event) {
@@ -1358,10 +1406,11 @@ class JsonFormatter {
                     <div class="global-history-item-meta">
                         <div class="global-history-id-tool">
                             <span class="history-id">ID: ${item.id}</span>
-                            <span class="global-history-tool-label" style="background-color: ${item.tool_color}">${item.tool_name}</span>
+                            <span class="global-history-tool-label" style="background-color: ${this.getToolColor(item.tool_name)}">${item.tool_name}</span>
                         </div>
                         <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
                     </div>
+                    <button class="history-delete-btn" onclick="window.jsonFormatter.deleteGlobalHistoryItem('${item.id}'); event.stopPropagation();">×</button>
                 </div>
                 <div class="history-preview">${item.preview}</div>
             </div>
@@ -1369,7 +1418,7 @@ class JsonFormatter {
 
         this.elements.globalHistoryList.innerHTML = historyHtml;
 
-        // Add click listeners to global history items
+        // Add click listeners to global history items (allow cross-tool loading)
         this.elements.globalHistoryList.querySelectorAll('.global-history-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 if (e.target.type !== 'checkbox') {
@@ -1388,20 +1437,79 @@ class JsonFormatter {
             const entry = await response.json();
             
             if (entry.data) {
-                // Only load if it's from the same tool
+                this.elements.jsonInput.value = entry.data;
+                this.lastInputData = entry.data;
+                this.updateJsonStats();
+                this.toggleGlobalHistory(); // Close popup
+                
                 if (toolName === this.toolName) {
-                    this.elements.jsonInput.value = entry.data;
-                    this.lastInputData = entry.data;
-                    this.updateJsonStats();
-                    this.toggleGlobalHistory(); // Close popup
                     this.showMessage('Global history entry loaded!', 'success');
                 } else {
-                    this.showMessage(`This entry is from ${toolName}. Cannot load into ${this.toolName}.`, 'warning');
+                    this.showMessage(`Loaded ${toolName} data into JSON formatter`, 'success');
                 }
             }
         } catch (error) {
             console.error('Error loading global history entry:', error);
             this.showMessage('Failed to load global history entry', 'error');
+        }
+    }
+
+    /**
+     * Get tool-specific color for global history items
+     */
+    getToolColor(toolName) {
+        const colors = {
+            'json-formatter': '#2196F3',
+            'json-yaml-xml-converter': '#4CAF50',
+            'base64-encoder-decoder': '#FF9800',
+            'url-encoder-decoder': '#9C27B0',
+            'hash-generator': '#F44336',
+            'qr-code-generator': '#607D8B'
+        };
+        return colors[toolName] || '#757575';
+    }
+
+    /**
+     * Delete individual global history item
+     */
+    async deleteGlobalHistoryItem(entryId) {
+        try {
+            const response = await fetch(`/api/global-history/${entryId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                this.showMessage('History item deleted', 'success');
+                this.loadHistory(); // Refresh local history list
+                this.loadGlobalHistory(); // Refresh global history list
+            } else {
+                this.showMessage('Failed to delete history item', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting global history item:', error);
+            this.showMessage('Failed to delete history item', 'error');
+        }
+    }
+
+    /**
+     * Delete individual local history item
+     */
+    async deleteHistoryItem(entryId) {
+        try {
+            const response = await fetch(`/api/history/${this.toolName}/${entryId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                this.showMessage('History item deleted', 'success');
+                this.loadHistory(); // Refresh local history list
+                this.loadGlobalHistory(); // Refresh global history list
+            } else {
+                this.showMessage('Failed to delete history item', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting history item:', error);
+            this.showMessage('Failed to delete history item', 'error');
         }
     }
 

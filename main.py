@@ -329,6 +329,20 @@ def get_history_entry(tool_name, entry_id):
     
     return jsonify(entry)
 
+@app.route('/api/history/<tool_name>/<entry_id>', methods=['DELETE'])
+def delete_history_entry(tool_name, entry_id):
+    if not validate_tool_name(tool_name):
+        return jsonify({'error': 'Invalid tool name'}), 400
+    
+    try:
+        success = history_manager.delete_history_entry(tool_name, entry_id)
+        if success:
+            return jsonify({'success': True, 'message': 'History entry deleted'})
+        else:
+            return jsonify({'error': 'History entry not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/history/<tool_name>', methods=['DELETE'])
 def clear_history(tool_name):
     if not validate_tool_name(tool_name):
@@ -367,6 +381,18 @@ def get_global_history_entry(entry_id):
         return jsonify({"error": "Entry not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/global-history/<entry_id>', methods=['DELETE'])
+def delete_global_history_entry(entry_id):
+    """Delete specific global history entry"""
+    try:
+        success = history_manager.delete_global_history_entry(entry_id)
+        if success:
+            return jsonify({'success': True, 'message': 'Global history entry deleted'})
+        else:
+            return jsonify({'error': 'Global history entry not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/global-history', methods=['POST'])
 def add_global_history():

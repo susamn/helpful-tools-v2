@@ -346,7 +346,7 @@
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
         
         .global-history-btn {
@@ -361,6 +361,30 @@
         
         .global-history-btn:hover {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        
+        .history-toggle-btn {
+            background: linear-gradient(to bottom, #f0f8ff, #d1e7ff);
+            border: 1px solid #4a90e2;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #1565c0;
+        }
+        
+        .history-toggle-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        }
+        
+        .history-toggle-btn.disabled {
+            background: linear-gradient(to bottom, #fff0f0, #fdd8d8);
+            border-color: #dc3545;
+            color: #c82333;
+        }
+        
+        .history-toggle-btn.disabled:hover {
+            background: linear-gradient(to bottom, #fff5f5, #ffe0e0);
         }
         
         /* Global history popup */
@@ -409,12 +433,98 @@
         .global-history-item:hover {
             background: #f8f8f8;
         }
+        
+        .global-history-item-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .global-history-item-meta {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .global-history-id-tool {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .global-history-tool-label {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .global-history-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        
+        .history-delete-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 2px;
+            padding: 2px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            margin-left: 8px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        
+        .history-delete-btn:hover {
+            opacity: 1;
+            background: #cc3333;
+        }
+        
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 4px;
+        }
+        
+        .history-item-content {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        
+        .history-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .history-id {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 9px;
+            color: #666;
+            font-weight: bold;
+        }
+        
+        .history-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>JSON-YAML-XML Converter</h1>
         <div class="header-actions">
+            <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
             <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
             <a href="/">← Back to Tools</a>
         </div>
@@ -448,7 +558,7 @@
             <div class="history-popup" id="historyPopup">
                 <div class="history-tabs">
                     <button class="history-tab active" data-tab="history">History</button>
-                    <button class="history-tab" data-tab="clear">Clear</button>
+                    <button class="history-tab" data-tab="copy">Copy</button>
                 </div>
                 <div class="history-content" id="historyContent">
                     <div class="tab-content active" id="historyTab">
@@ -456,8 +566,8 @@
                             <div class="history-item">No conversion history available</div>
                         </div>
                     </div>
-                    <div class="tab-content" id="clearTab" style="display: none;">
-                        <div class="history-item" onclick="converter.clearHistory()">Clear All History</div>
+                    <div class="tab-content" id="copyTab" style="display: none;">
+                        <div class="history-item">Copy features coming soon</div>
                     </div>
                 </div>
             </div>
@@ -600,6 +710,7 @@ metadata:
                     
                     this.init();
                     this.loadHistory();
+                    this.initHistoryToggle();
                 }
 
                 init() {
@@ -638,6 +749,15 @@ metadata:
                     // History buttons
                     document.getElementById('historyBtn').addEventListener('click', () => this.toggleHistory());
                     document.getElementById('globalHistoryBtn').addEventListener('click', () => this.toggleGlobalHistory());
+                    document.getElementById('historyToggleBtn').addEventListener('click', () => this.toggleHistoryEnabled());
+                    
+                    // Handle outside clicks to close popups
+                    document.addEventListener('click', (e) => this.handleOutsideClick(e));
+
+                    // History tabs
+                    document.querySelectorAll('.history-tab').forEach(tab => {
+                        tab.addEventListener('click', (e) => this.switchHistoryTab(e));
+                    });
                 }
 
                 loadExample(format) {
@@ -1069,20 +1189,140 @@ metadata:
 
                     const historyHtml = history.map(item => `
                         <div class="history-item" data-id="${item.id}">
-                            <div class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</div>
+                            <div class="history-item-header">
+                                <div class="history-item-content">
+                                    <input type="checkbox" class="history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
+                                    <div class="history-meta">
+                                        <span class="history-id">ID: ${item.id}</span>
+                                        <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
+                                    </div>
+                                </div>
+                                <button class="history-delete-btn" onclick="converter.deleteHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                            </div>
                             <div class="history-preview">${item.preview}</div>
                         </div>
                     `).join('');
 
                     historyList.innerHTML = historyHtml;
 
-                    // Add click listeners to history items
+                    // Add click listeners to history items (excluding checkbox clicks)
                     historyList.querySelectorAll('.history-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            const entryId = item.dataset.id;
-                            this.loadHistoryEntry(entryId);
+                        item.addEventListener('click', (e) => {
+                            if (e.target.type !== 'checkbox') {
+                                const entryId = item.dataset.id;
+                                this.loadHistoryEntry(entryId);
+                            }
                         });
                     });
+
+                    // Add checkbox event listeners
+                    historyList.querySelectorAll('.history-checkbox').forEach(checkbox => {
+                        checkbox.addEventListener('change', (e) => {
+                            this.handleHistorySelection(e.target.dataset.id, e.target.checked);
+                        });
+                    });
+                }
+
+                /**
+                 * Handle history item selection
+                 */
+                handleHistorySelection(entryId, isSelected) {
+                    if (!this.selectedHistoryItems) {
+                        this.selectedHistoryItems = new Set();
+                    }
+                    
+                    if (isSelected) {
+                        this.selectedHistoryItems.add(entryId);
+                    } else {
+                        this.selectedHistoryItems.delete(entryId);
+                    }
+                    
+                    // Update selection UI or enable/disable bulk actions
+                    this.updateHistorySelectionUI();
+                }
+
+                /**
+                 * Update UI based on history selections
+                 */
+                updateHistorySelectionUI() {
+                    const selectedCount = this.selectedHistoryItems ? this.selectedHistoryItems.size : 0;
+                    
+                    // Add/update selection counter and action buttons if needed
+                    let selectionInfo = document.querySelector('.history-selection-info');
+                    const historyPopup = document.getElementById('historyPopup');
+                    if (!selectionInfo) {
+                        selectionInfo = document.createElement('div');
+                        selectionInfo.className = 'history-selection-info';
+                        historyPopup.insertBefore(selectionInfo, historyPopup.firstChild);
+                    }
+                    
+                    if (selectedCount > 0) {
+                        selectionInfo.innerHTML = `
+                            <div style="padding: 8px; background: #e3f2fd; border-bottom: 1px solid #90caf9; font-size: 11px;">
+                                ${selectedCount} item${selectedCount > 1 ? 's' : ''} selected
+                                <button onclick="converter.clearHistorySelection()" style="float: right; background: none; border: none; color: #1976d2; cursor: pointer;">Clear</button>
+                            </div>
+                        `;
+                    } else {
+                        selectionInfo.innerHTML = '';
+                    }
+                }
+
+                /**
+                 * Clear history selection
+                 */
+                clearHistorySelection() {
+                    this.selectedHistoryItems?.clear();
+                    // Uncheck all checkboxes
+                    document.getElementById('historyList').querySelectorAll('.history-checkbox').forEach(checkbox => {
+                        checkbox.checked = false;
+                    });
+                    this.updateHistorySelectionUI();
+                }
+
+                /**
+                 * Handle clicks outside history popups to close them
+                 */
+                handleOutsideClick(event) {
+                    const historyPopup = document.getElementById('historyPopup');
+                    const historyBtn = document.getElementById('historyBtn');
+                    const globalHistoryPopup = document.getElementById('globalHistoryPopup');
+                    const globalHistoryBtn = document.getElementById('globalHistoryBtn');
+                    
+                    // Close local history popup if clicking outside
+                    if (historyPopup && historyPopup.classList.contains('show') &&
+                        !historyPopup.contains(event.target) && !historyBtn.contains(event.target)) {
+                        historyPopup.classList.remove('show');
+                    }
+                    
+                    // Close global history popup if clicking outside  
+                    if (globalHistoryPopup && globalHistoryPopup.classList.contains('show') &&
+                        !globalHistoryPopup.contains(event.target) && !globalHistoryBtn.contains(event.target)) {
+                        globalHistoryPopup.classList.remove('show');
+                    }
+                }
+
+                /**
+                 * Switch between history tabs
+                 */
+                switchHistoryTab(event) {
+                    const clickedTab = event.target;
+                    const targetTab = clickedTab.dataset.tab;
+                    
+                    // Remove active class from all tabs and content
+                    document.querySelectorAll('.history-tab').forEach(tab => tab.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                        content.style.display = 'none';
+                    });
+                    
+                    // Activate clicked tab and corresponding content
+                    clickedTab.classList.add('active');
+                    const targetContent = document.getElementById(targetTab + 'Tab');
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                        targetContent.style.display = 'block';
+                    }
                 }
 
                 async loadHistoryEntry(entryId) {
@@ -1126,28 +1366,34 @@ metadata:
 
                     const historyHtml = history.map(item => `
                         <div class="global-history-item" data-id="${item.id}" data-tool="${item.tool_name}">
-                            <div class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.tool_name} - ${item.operation}</div>
+                            <div class="global-history-item-header">
+                                <input type="checkbox" class="global-history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
+                                <div class="global-history-item-meta">
+                                    <div class="global-history-id-tool">
+                                        <span class="history-id">ID: ${item.id}</span>
+                                        <span class="global-history-tool-label" style="background-color: ${this.getToolColor(item.tool_name)}">${item.tool_name}</span>
+                                    </div>
+                                    <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
+                                </div>
+                                <button class="history-delete-btn" onclick="converter.deleteGlobalHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                            </div>
                             <div class="history-preview">${item.preview}</div>
                         </div>
                     `).join('');
 
                     historyList.innerHTML = historyHtml;
 
-                    // Add click listeners to global history items
+                    // Add click listeners to global history items (allow cross-tool loading)
                     historyList.querySelectorAll('.global-history-item').forEach(item => {
                         item.addEventListener('click', () => {
                             const entryId = item.dataset.id;
                             const toolName = item.dataset.tool;
-                            if (toolName === this.toolName) {
-                                this.loadGlobalHistoryEntry(entryId);
-                            } else {
-                                this.updateStatus(`This entry is from ${toolName}, cannot load into converter`);
-                            }
+                            this.loadGlobalHistoryEntry(entryId, toolName);
                         });
                     });
                 }
 
-                async loadGlobalHistoryEntry(entryId) {
+                async loadGlobalHistoryEntry(entryId, toolName) {
                     try {
                         const response = await fetch(`/api/global-history/${entryId}`);
                         const entry = await response.json();
@@ -1157,7 +1403,12 @@ metadata:
                             this.updateCharCount();
                             this.autoDetectFormat();
                             this.toggleGlobalHistory(); // Close global history popup
-                            this.updateStatus('Global history entry loaded');
+                            
+                            if (toolName === this.toolName) {
+                                this.updateStatus('Global history entry loaded');
+                            } else {
+                                this.updateStatus(`Loaded ${toolName} data into converter - auto-detecting format`);
+                            }
                         }
                     } catch (error) {
                         console.error('Error loading global history entry:', error);
@@ -1174,6 +1425,98 @@ metadata:
                         minute: '2-digit',
                         second: '2-digit'
                     });
+                }
+
+                // Tool color mapping for global history
+                getToolColor(toolName) {
+                    const colors = {
+                        'json-formatter': '#2196F3',
+                        'json-yaml-xml-converter': '#4CAF50',
+                        'base64-encoder-decoder': '#FF9800',
+                        'url-encoder-decoder': '#9C27B0',
+                        'hash-generator': '#F44336',
+                        'qr-code-generator': '#607D8B'
+                    };
+                    return colors[toolName] || '#757575';
+                }
+
+                // History deletion methods
+                async deleteHistoryItem(entryId) {
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}/${entryId}`, {
+                            method: 'DELETE'
+                        });
+
+                        if (response.ok) {
+                            this.loadHistory(); // Refresh local history display
+                            this.loadGlobalHistory(); // Refresh global history display
+                            this.updateStatus('History item deleted');
+                        } else {
+                            this.updateStatus('Failed to delete history item');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting history item:', error);
+                        this.updateStatus('Error deleting history item');
+                    }
+                }
+
+                async deleteGlobalHistoryItem(entryId) {
+                    try {
+                        const response = await fetch(`/api/global-history/${entryId}`, {
+                            method: 'DELETE'
+                        });
+
+                        if (response.ok) {
+                            this.loadHistory(); // Refresh local history display
+                            this.loadGlobalHistory(); // Refresh global history display
+                            this.updateStatus('Global history item deleted');
+                        } else {
+                            this.updateStatus('Failed to delete global history item');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting global history item:', error);
+                        this.updateStatus('Error deleting global history item');
+                    }
+                }
+
+                // History enable/disable functionality
+                initHistoryToggle() {
+                    const saved = localStorage.getItem(`${this.toolName}_historyEnabled`);
+                    this.historyEnabled = saved !== null ? JSON.parse(saved) : true;
+                    this.updateHistoryToggleUI();
+                }
+
+                toggleHistoryEnabled() {
+                    this.historyEnabled = !this.historyEnabled;
+                    localStorage.setItem(`${this.toolName}_historyEnabled`, JSON.stringify(this.historyEnabled));
+                    this.updateHistoryToggleUI();
+                    
+                    const status = this.historyEnabled ? 'enabled' : 'disabled';
+                    this.updateStatus(`History ${status}`);
+                }
+
+                updateHistoryToggleUI() {
+                    const btn = document.getElementById('historyToggleBtn');
+                    if (this.historyEnabled) {
+                        btn.textContent = '📝 History On';
+                        btn.classList.remove('disabled');
+                    } else {
+                        btn.textContent = '📝 History Off';
+                        btn.classList.add('disabled');
+                    }
+                }
+
+                // Override saveToHistoryIfChanged to check if history is enabled
+                async saveToHistoryIfChanged(data, operation) {
+                    if (!this.historyEnabled) {
+                        return; // Skip saving if history is disabled
+                    }
+                    
+                    // Only save if the data is different from the last saved data
+                    if (data !== this.lastInputData) {
+                        this.lastInputData = data;
+                        await this.saveToHistory(data, operation);
+                    }
                 }
             }
 
