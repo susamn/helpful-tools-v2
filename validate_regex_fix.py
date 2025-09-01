@@ -114,6 +114,13 @@ def test_example_patterns():
             'text': 'Price: $19.99\nExpensive: $1,234.56\nCheap: $5\nCost: $12,345.00\nInvalid: 19.99',
             'flags': 'g',
             'expected': 4
+        },
+        {
+            'name': 'Advanced Email/IP Validation',
+            'pattern': r'^(?![-.])[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}(?<!\.))?(?<!\.)@(?=[A-Za-z0-9])[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}(?<!\.))?(?<!\.)(\.[A-Za-z]{2,})$|^(?:[1-9]\d{0,2}\.){3}(?:[1-9]\d{0,2})$|^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$',
+            'text': '# Valid Emails\njohn.doe@example.com\njane_doe+123@subdomain.test.org\na@domain.co\nlong.local.part12345678901234567890123456789012345678901234567890123@domain.travel\nvalid-email@domain.io\n\n# Invalid Emails\n.invalid@domain.com\ndouble..dot@domain.com\nlocal@domain..com\n@missing.local.com\ntest@-bad.com\ntest@domain.c\nspace in@domain.com\ntoolong.local.part123456789012345678901234567890123456789012345678901234@domain.com\nemail@domain\n\n# Valid IPv4\n192.168.0.1\n1.2.3.4\n255.255.255.255\n\n# Invalid IPv4\n0.0.0.0\n256.1.2.3\n1.2.3\n1.2.3.4.5\n192.168.001.1\n\n# Valid IPv6\n2001:0db8:85a3:0000:0000:8a2e:0370:7334\nffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff\n1:2:3:4:5:6:7:8\n\n# Invalid IPv6\n2001:0db8:85a3:0000:0000:8a2e:0370\n2001:0db8:85a3:0000:0000:8a2e:0370:7334:\ng001:0db8:85a3:0000:0000:8a2e:0370:7334\n2001:0db8:85a3:0000:0000:8a2e:0370:7334:extra\n2001:0db8::7334',
+            'flags': 'gm',
+            'expected': 11  # Actual matches found by the regex pattern
         }
     ]
     

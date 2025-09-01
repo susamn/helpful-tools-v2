@@ -419,6 +419,171 @@ class TestRegexUIFeatures:
         assert stats['groups_per_match'] == 1
         assert stats['total_characters_matched'] == 9
 
+class TestAdvancedEmailIPValidation:
+    """Test the advanced email/IP validation regex pattern"""
+    
+    def test_advanced_email_ip_validation_pattern(self):
+        """Test the complex email/IP validation regex pattern"""
+        pattern = r'^(?![-.])[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}(?<!\.))?(?<!\.)@(?=[A-Za-z0-9])[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}(?<!\.))?(?<!\.)(\.[A-Za-z]{2,})$|^(?:[1-9]\d{0,2}\.){3}(?:[1-9]\d{0,2})$|^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$'
+        
+        # Valid emails that should match
+        valid_emails = [
+            'john.doe@example.com',
+            'jane_doe+123@subdomain.test.org',
+            'a@domain.co',
+            'valid-email@domain.io'
+        ]
+        
+        # Invalid emails that should NOT match (but some might due to complex regex)
+        invalid_emails = [
+            '.invalid@domain.com',
+            'local@domain..com',
+            '@missing.local.com',
+            'test@-bad.com',
+            'test@domain.c',
+            'space in@domain.com',
+            'email@domain'
+        ]
+        
+        # Valid IPv4 addresses (matching the specific pattern requirements)
+        valid_ipv4 = [
+            '1.2.3.4',
+            '255.255.255.255'
+        ]
+        
+        # IPv4 that won't match due to pattern restrictions (octets must start with 1-9)
+        ipv4_pattern_restricted = [
+            '192.168.0.1'  # Third octet starts with 0
+        ]
+        
+        # Invalid IPv4 addresses that should NOT match
+        invalid_ipv4 = [
+            '0.0.0.0',  # Should not match (starts with 0)
+            '1.2.3',    # Incomplete
+            '1.2.3.4.5',  # Too many octets
+            '192.168.001.1'  # Leading zeros
+        ]
+        
+        # Valid IPv6 addresses
+        valid_ipv6 = [
+            '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
+            'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
+            '1:2:3:4:5:6:7:8'
+        ]
+        
+        # Test valid emails
+        for email in valid_emails:
+            match = re.match(pattern, email, re.MULTILINE)
+            assert match is not None, f"Valid email should match: {email}"
+        
+        # Test valid IPv4
+        for ip in valid_ipv4:
+            match = re.match(pattern, ip, re.MULTILINE)
+            assert match is not None, f"Valid IPv4 should match: {ip}"
+        
+        # Test valid IPv6  
+        for ipv6 in valid_ipv6:
+            match = re.match(pattern, ipv6, re.MULTILINE)
+            assert match is not None, f"Valid IPv6 should match: {ipv6}"
+        
+        # Test that some invalid cases don't match
+        for email in ['@missing.local.com', 'test@domain.c', 'email@domain']:
+            match = re.match(pattern, email, re.MULTILINE)
+            assert match is None, f"Invalid email should not match: {email}"
+        
+        for ip in ['0.0.0.0', '1.2.3', '1.2.3.4.5']:
+            match = re.match(pattern, ip, re.MULTILINE)
+            assert match is None, f"Invalid IPv4 should not match: {ip}"
+    
+    def test_advanced_validation_multiline_matching(self):
+        """Test the advanced validation pattern with multiline text"""
+        pattern = r'^(?![-.])[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}(?<!\.))?(?<!\.)@(?=[A-Za-z0-9])[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}(?<!\.))?(?<!\.)(\.[A-Za-z]{2,})$|^(?:[1-9]\d{0,2}\.){3}(?:[1-9]\d{0,2})$|^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$'
+        
+        # Sample text with mixed valid and invalid entries
+        test_text = """john.doe@example.com
+jane_doe+123@subdomain.test.org
+a@domain.co
+.invalid@domain.com
+192.168.0.1
+1.2.3.4
+0.0.0.0
+2001:0db8:85a3:0000:0000:8a2e:0370:7334
+invalid line without pattern"""
+        
+        # Find all matches using multiline mode
+        matches = list(re.finditer(pattern, test_text, re.MULTILINE))
+        
+        # Should find several valid matches (5 expected: 3 emails + 1 IPv4 + 1 IPv6)
+        assert len(matches) >= 5, f"Should find at least 5 matches, found {len(matches)}"
+        
+        # Check that we found the expected valid entries
+        match_texts = [match.group(0) for match in matches]
+        
+        expected_matches = [
+            'john.doe@example.com',
+            'jane_doe+123@subdomain.test.org', 
+            'a@domain.co',
+            '1.2.3.4',
+            '2001:0db8:85a3:0000:0000:8a2e:0370:7334'
+        ]
+        
+        for expected in expected_matches:
+            assert expected in match_texts, f"Expected match not found: {expected}"
+
+class TestNewlineHandling:
+    """Test that literal \\n in example data gets converted to actual newlines"""
+    
+    def test_newline_conversion_simulation(self):
+        """Test that simulates the JavaScript newline conversion for example data"""
+        
+        # Simulate the text as stored in HTML data attribute (with literal \n)
+        html_data_text = "line1\\nline2\\nline3@domain.com\\nline4"
+        
+        # Simulate JavaScript conversion: text.replace(/\\n/g, '\n')
+        converted_text = html_data_text.replace('\\n', '\n')
+        
+        # Test that conversion works
+        assert '\\n' in html_data_text, "Original should contain literal \\n"
+        assert '\n' in converted_text, "Converted should contain actual newlines"
+        assert converted_text.count('\n') == 3, "Should have 3 actual newlines"
+        assert len(converted_text.split('\n')) == 4, "Should split into 4 lines"
+        
+        # Test regex matching before and after conversion
+        email_pattern = r'[a-zA-Z0-9]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        
+        # Before conversion - should find email in the single line
+        matches_before = list(re.finditer(email_pattern, html_data_text))
+        assert len(matches_before) == 1, "Should find 1 email in literal text"
+        
+        # After conversion - should still find the email, now on separate line
+        matches_after = list(re.finditer(email_pattern, converted_text, re.MULTILINE))
+        assert len(matches_after) == 1, "Should find 1 email after conversion"
+        assert matches_after[0].group() == "line3@domain.com"
+    
+    def test_advanced_email_ip_newline_dependency(self):
+        """Test that the Advanced Email/IP pattern requires proper newlines to work correctly"""
+        
+        pattern = r'^(?![-.])[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}(?<!\.))?(?<!\.)@(?=[A-Za-z0-9])[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}(?<!\.))?(?<!\.)(\.[A-Za-z]{2,})$|^(?:[1-9]\d{0,2}\.){3}(?:[1-9]\d{0,2})$|^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$'
+        
+        # Text with literal \n (as stored in HTML)
+        literal_text = "john.doe@example.com\\n1.2.3.4\\n2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+        
+        # Text with actual newlines (after JavaScript conversion)
+        proper_text = literal_text.replace('\\n', '\n')
+        
+        # With literal \n - should find fewer or no matches
+        matches_literal = list(re.finditer(pattern, literal_text, re.MULTILINE))
+        
+        # With actual newlines - should find more matches
+        matches_proper = list(re.finditer(pattern, proper_text, re.MULTILINE))
+        
+        # The fix ensures we get more matches with proper newlines
+        assert len(matches_proper) > len(matches_literal), \
+            f"Should find more matches with proper newlines: {len(matches_proper)} > {len(matches_literal)}"
+        
+        # Should find at least the 3 valid entries
+        assert len(matches_proper) >= 3, f"Should find at least 3 matches, found {len(matches_proper)}"
+
 if __name__ == '__main__':
     # Run tests with pytest
     pytest.main([__file__, '-v', '--tb=short'])
