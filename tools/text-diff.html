@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Diff Tool - Helpful Tools v2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            font-size: 13px;
+        }
+        .header {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-actions button,
+        .header-actions a {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            text-decoration: none;
+        }
+        .header-actions button:hover,
+        .header-actions a:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .history-toggle-btn {
+            background: linear-gradient(to bottom, #f0f8ff, #d1e7ff);
+            border: 1px solid #4a90e2;
+            color: #1565c0;
+        }
+        .history-toggle-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        }
+        .history-toggle-btn.disabled {
+            background: linear-gradient(to bottom, #fff0f0, #fdd8d8);
+            border-color: #dc3545;
+            color: #c82333;
+        }
+        .history-toggle-btn.disabled:hover {
+            background: linear-gradient(to bottom, #fff5f5, #ffe0e0);
+        }
+        .global-history-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            color: #333;
+        }
+        .global-history-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 41px;
+            z-index: 99;
+        }
+        .collapse-btn {
+            background: linear-gradient(to bottom, #fff8dc, #f0e68c);
+            border: 1px solid #daa520;
+            color: #8b6914;
+        }
+        .collapse-btn:hover {
+            background: linear-gradient(to bottom, #fffacd, #f5deb3);
+        }
+        .navigation-controls {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .nav-btn {
+            background: linear-gradient(to bottom, #e6f3ff, #b3d9ff);
+            border: 1px solid #4a90e2;
+            color: #1565c0;
+            width: 28px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .nav-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #d9eaff);
+        }
+        .nav-btn:disabled {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border-color: #a0a0a0;
+            color: #999;
+            cursor: not-allowed;
+        }
+        .diff-counter {
+            font-size: 10px;
+            color: #666;
+            margin: 0 4px;
+        }
+        .toolbar button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .toolbar button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar button:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .toolbar button.primary {
+            background: linear-gradient(to bottom, #4a90e2, #357abd);
+            color: white;
+            border: 1px solid #2968a3;
+        }
+        .toolbar button.primary:hover {
+            background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
+        }
+        .separator {
+            width: 1px;
+            height: 16px;
+            background: #c0c0c0;
+            margin: 0 2px;
+        }
+        .main-container {
+            display: flex;
+            height: calc(100vh - 140px);
+            overflow: hidden;
+        }
+        .text-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #c0c0c0;
+        }
+        .text-panel:last-child {
+            border-right: none;
+        }
+        .panel-header {
+            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .text-input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            padding: 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            background: #ffffff;
+            color: #000;
+            resize: none;
+            outline: none;
+            border-bottom: 1px solid #c0c0c0;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+        .input-section {
+            transition: height 0.3s ease;
+            overflow: hidden;
+            height: 200px;
+        }
+        .input-section.collapsed {
+            height: 0px !important;
+            border: none;
+        }
+        .input-section.collapsed .text-input {
+            height: 0px;
+            padding: 0;
+            border: none;
+        }
+        .text-input:focus {
+            background: #fafafa;
+            border-color: #4a90e2;
+        }
+        .diff-display {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: #ffffff;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            border-top: 1px solid #e0e0e0;
+            scroll-behavior: smooth;
+            min-height: 0;
+        }
+        .diff-line {
+            display: flex;
+            min-height: 18px;
+            line-height: 18px;
+            border-bottom: 1px solid #f8f8f8;
+        }
+        .line-number {
+            min-width: 40px;
+            padding: 0 6px;
+            background: linear-gradient(to bottom, #f8f8f8, #f0f0f0);
+            color: #666;
+            text-align: right;
+            border-right: 1px solid #e0e0e0;
+            user-select: none;
+            font-size: 10px;
+        }
+        .line-content {
+            flex: 1;
+            padding: 0 8px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        /* Diff line types */
+        .diff-line.equal {
+            background: #ffffff;
+        }
+        .diff-line.delete {
+            background: #ffe6e6;
+            border-left: 3px solid #ff6666;
+        }
+        .diff-line.insert {
+            background: #e6ffe6;
+            border-left: 3px solid #66cc66;
+        }
+        .diff-line.modify {
+            background: #fff0e6;
+            border-left: 3px solid #ff9933;
+        }
+        .diff-line.current-diff {
+            background: #ffffcc !important;
+            border-left: 3px solid #ff6600 !important;
+            box-shadow: 0 0 3px rgba(255, 102, 0, 0.3);
+        }
+        .diff-line.empty {
+            background: #f8f8f8;
+            color: #999;
+        }
+        /* Character-level diff styles */
+        .char-delete {
+            background: #ffb3b3 !important;
+            color: #990000;
+            text-decoration: line-through;
+            border-radius: 2px;
+            padding: 1px 2px;
+            margin: 0 1px;
+        }
+        .char-insert {
+            background: #b3ffb3 !important;
+            color: #006600;
+            border-radius: 2px;
+            padding: 1px 2px;
+            margin: 0 1px;
+        }
+        .status-bar {
+            background: linear-gradient(to bottom, #e8e8e8, #d0d0d0);
+            border-top: 1px solid #c0c0c0;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            bottom: 0;
+            z-index: 98;
+        }
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100px;
+            color: #999;
+            font-style: italic;
+            background: #fafafa;
+        }
+        .stats-info {
+            display: flex;
+            gap: 16px;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .stat-added { color: #006600; }
+        .stat-deleted { color: #990000; }
+        .stat-modified { color: #cc6600; }
+        .stat-equal { color: #666; }
+        
+        /* History popup styles matching other tools */
+        .history-container {
+            position: relative;
+        }
+        .history-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .history-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .history-popup {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #a0a0a0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            width: 350px;
+            max-height: 400px;
+            z-index: 1000;
+            display: none;
+            margin-top: 2px;
+        }
+        .history-popup.show {
+            display: block;
+        }
+        .history-tabs {
+            display: flex;
+            border-bottom: 1px solid #c0c0c0;
+        }
+        .history-tab {
+            flex: 1;
+            padding: 8px;
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            color: #666;
+        }
+        .history-tab.active {
+            background: white;
+            color: #333;
+            border-bottom: 2px solid #4a90e2;
+        }
+        .history-content {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .history-item {
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .history-item:hover {
+            background: #f8f8f8;
+        }
+        .history-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 4px;
+        }
+        .history-item-content {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        .history-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .history-id {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 9px;
+            color: #666;
+            font-weight: bold;
+        }
+        .history-date {
+            color: #999;
+            font-size: 10px;
+        }
+        .history-preview {
+            color: #666;
+            font-size: 10px;
+            max-height: 40px;
+            overflow: hidden;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            line-height: 1.3;
+        }
+        .history-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        .history-delete-btn {
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 2px;
+            padding: 2px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            margin-left: 8px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .history-delete-btn:hover {
+            opacity: 1;
+            background: #cc3333;
+        }
+        
+        /* Global history popup */
+        .global-history-popup {
+            position: fixed;
+            top: 50px;
+            right: 16px;
+            background: white;
+            border: 1px solid #a0a0a0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            width: 400px;
+            max-height: 500px;
+            z-index: 2000;
+            display: none;
+        }
+        .global-history-popup.show {
+            display: block;
+        }
+        .global-history-header {
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .global-history-content {
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        .global-history-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .global-history-item:hover {
+            background: #f8f8f8;
+        }
+        .global-history-item-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .global-history-item-meta {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .global-history-id-tool {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .global-history-tool-label {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .global-history-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Text Diff Tool</h1>
+        <div class="header-actions">
+            <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
+            <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
+            <a href="/">← Back to Tools</a>
+        </div>
+    </div>
+    
+    <div class="toolbar">
+        <button class="primary" id="compareBtn">Compare</button>
+        <div class="separator"></div>
+        <button id="clearBtn">Clear</button>
+        <button id="swapBtn">Swap</button>
+        <div class="separator"></div>
+        <button id="copyLeftBtn">Copy Left</button>
+        <button id="copyRightBtn">Copy Right</button>
+        <button class="collapse-btn" id="collapseBtn">▲ Collapse Inputs</button>
+        <div class="separator"></div>
+        <div class="navigation-controls">
+            <button class="nav-btn" id="prevDiffBtn" title="Previous difference">▲</button>
+            <span class="diff-counter" id="diffCounter">0/0</span>
+            <button class="nav-btn" id="nextDiffBtn" title="Next difference">▼</button>
+        </div>
+        <div class="separator"></div>
+        <div class="history-container">
+            <button class="history-btn" id="historyBtn">📋 History</button>
+            <div class="history-popup" id="historyPopup">
+                <div class="history-tabs">
+                    <button class="history-tab active" data-tab="history">History</button>
+                    <button class="history-tab" data-tab="copy">Copy</button>
+                </div>
+                <div class="history-content" id="historyContent">
+                    <div class="tab-content active" id="historyTab">
+                        <div id="historyList">
+                            <div class="history-item">No comparison history available</div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="copyTab" style="display: none;">
+                        <div class="history-item">Copy features coming soon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="text-panel">
+            <div class="panel-header">
+                <span>Text 1 (Original)</span>
+                <span id="leftStats">0 lines</span>
+            </div>
+            <div class="panel-body">
+                <div class="input-section" id="inputSection1">
+                    <textarea class="text-input" id="text1" placeholder="Enter or paste first text here..."></textarea>
+                </div>
+                <div class="diff-display" id="leftDiff">
+                    <div class="loading">Enter text above and click Compare to see differences</div>
+                </div>
+            </div>
+        </div>
+        <div class="text-panel">
+            <div class="panel-header">
+                <span>Text 2 (Comparison)</span>
+                <span id="rightStats">0 lines</span>
+            </div>
+            <div class="panel-body">
+                <div class="input-section" id="inputSection2">
+                    <textarea class="text-input" id="text2" placeholder="Enter or paste second text here..."></textarea>
+                </div>
+                <div class="diff-display" id="rightDiff">
+                    <div class="loading">Enter text above and click Compare to see differences</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        <div id="statusText">Ready to compare texts</div>
+        <div class="stats-info" id="diffStats" style="display: none;">
+            <div class="stat-item stat-equal">
+                <span>Equal:</span> <span id="equalCount">0</span>
+            </div>
+            <div class="stat-item stat-added">
+                <span>Added:</span> <span id="addedCount">0</span>
+            </div>
+            <div class="stat-item stat-deleted">
+                <span>Deleted:</span> <span id="deletedCount">0</span>
+            </div>
+            <div class="stat-item stat-modified">
+                <span>Modified:</span> <span id="modifiedCount">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global History Popup -->
+    <div class="global-history-popup" id="globalHistoryPopup">
+        <div class="global-history-header">
+            <span>Global History - All Tools</span>
+            <button onclick="window.textDiffTool?.toggleGlobalHistory()" style="background: none; border: none; cursor: pointer; font-size: 16px;">×</button>
+        </div>
+        <div class="global-history-content">
+            <div id="globalHistoryList">
+                <div class="global-history-item">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize text diff tool when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            class TextDiffTool {
+                constructor() {
+                    this.toolName = 'text-diff';
+                    this.historyEnabled = localStorage.getItem(`${this.toolName}-historyEnabled`) !== 'false';
+                    this.lastInputData = '';
+                    this.initializeElements();
+                    this.attachEventListeners();
+                    this.loadHistory();
+                    this.initializeHistoryToggle();
+                }
+
+                initializeElements() {
+                    this.elements = {
+                        text1: document.getElementById('text1'),
+                        text2: document.getElementById('text2'),
+                        leftDiff: document.getElementById('leftDiff'),
+                        rightDiff: document.getElementById('rightDiff'),
+                        statusText: document.getElementById('statusText'),
+                        diffStats: document.getElementById('diffStats'),
+                        leftStats: document.getElementById('leftStats'),
+                        rightStats: document.getElementById('rightStats'),
+                        equalCount: document.getElementById('equalCount'),
+                        addedCount: document.getElementById('addedCount'),
+                        deletedCount: document.getElementById('deletedCount'),
+                        modifiedCount: document.getElementById('modifiedCount'),
+                        
+                        // Buttons
+                        compareBtn: document.getElementById('compareBtn'),
+                        clearBtn: document.getElementById('clearBtn'),
+                        swapBtn: document.getElementById('swapBtn'),
+                        copyLeftBtn: document.getElementById('copyLeftBtn'),
+                        copyRightBtn: document.getElementById('copyRightBtn'),
+                        collapseBtn: document.getElementById('collapseBtn'),
+                        prevDiffBtn: document.getElementById('prevDiffBtn'),
+                        nextDiffBtn: document.getElementById('nextDiffBtn'),
+                        diffCounter: document.getElementById('diffCounter'),
+                        inputSection1: document.getElementById('inputSection1'),
+                        inputSection2: document.getElementById('inputSection2'),
+                        
+                        // History
+                        historyBtn: document.getElementById('historyBtn'),
+                        historyToggleBtn: document.getElementById('historyToggleBtn'),
+                        historyPopup: document.getElementById('historyPopup'),
+                        historyList: document.getElementById('historyList'),
+                        
+                        // Global History
+                        globalHistoryBtn: document.getElementById('globalHistoryBtn'),
+                        globalHistoryPopup: document.getElementById('globalHistoryPopup'),
+                        globalHistoryList: document.getElementById('globalHistoryList')
+                    };
+                    
+                    this.inputsCollapsed = false;
+                    this.diffLines = [];
+                    this.currentDiffIndex = -1;
+                    this.diffCount = 0;
+                    this.syncingScroll = false;
+                }
+
+                attachEventListeners() {
+                    // Main functionality
+                    this.elements.compareBtn.addEventListener('click', () => this.compareTexts());
+                    this.elements.clearBtn.addEventListener('click', () => this.clearAll());
+                    this.elements.swapBtn.addEventListener('click', () => this.swapTexts());
+                    this.elements.copyLeftBtn.addEventListener('click', () => this.copyToClipboard(this.elements.text1.value));
+                    this.elements.copyRightBtn.addEventListener('click', () => this.copyToClipboard(this.elements.text2.value));
+                    
+                    // New functionality
+                    this.elements.collapseBtn.addEventListener('click', () => this.toggleInputCollapse());
+                    this.elements.prevDiffBtn.addEventListener('click', () => this.navigateToPreviousDiff());
+                    this.elements.nextDiffBtn.addEventListener('click', () => this.navigateToNextDiff());
+                    
+                    // History functionality
+                    this.elements.historyBtn.addEventListener('click', () => this.toggleHistory());
+                    this.elements.historyToggleBtn.addEventListener('click', () => this.toggleHistoryEnabled());
+                    this.elements.globalHistoryBtn.addEventListener('click', () => this.toggleGlobalHistory());
+                    
+                    // Text input listeners
+                    this.elements.text1.addEventListener('input', () => this.updateLineCount());
+                    this.elements.text2.addEventListener('input', () => this.updateLineCount());
+                    
+                    // Synchronized scrolling between diff panels
+                    this.elements.leftDiff.addEventListener('scroll', (e) => this.syncScroll('left', e));
+                    this.elements.rightDiff.addEventListener('scroll', (e) => this.syncScroll('right', e));
+                    
+                    // History tabs
+                    document.querySelectorAll('.history-tab').forEach(tab => {
+                        tab.addEventListener('click', (e) => this.switchHistoryTab(e));
+                    });
+                    
+                    // Outside click handler
+                    document.addEventListener('click', (e) => this.handleOutsideClick(e));
+                    
+                    // Keyboard shortcuts
+                    document.addEventListener('keydown', (e) => this.handleKeydown(e));
+                }
+
+                async compareTexts() {
+                    const text1 = this.elements.text1.value;
+                    const text2 = this.elements.text2.value;
+                    
+                    if (!text1 && !text2) {
+                        this.updateStatus('Please enter text in at least one field');
+                        return;
+                    }
+
+                    this.elements.leftDiff.innerHTML = '<div class="loading">Comparing texts...</div>';
+                    this.elements.rightDiff.innerHTML = '<div class="loading">Comparing texts...</div>';
+                    this.updateStatus('Comparing texts...');
+
+                    try {
+                        const response = await fetch('/api/text-diff/compare', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ text1, text2 })
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            this.displayDiff(result.diff, result.stats);
+                            await this.saveToHistoryIfChanged(text1, text2, 'compare');
+                        } else {
+                            this.updateStatus('Error: ' + result.error);
+                            this.elements.leftDiff.innerHTML = '<div class="loading">Error occurred</div>';
+                            this.elements.rightDiff.innerHTML = '<div class="loading">Error occurred</div>';
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.updateStatus('Network error occurred');
+                        this.elements.leftDiff.innerHTML = '<div class="loading">Network error</div>';
+                        this.elements.rightDiff.innerHTML = '<div class="loading">Network error</div>';
+                    }
+                }
+
+                displayDiff(diffData, stats) {
+                    this.elements.leftDiff.innerHTML = '';
+                    this.elements.rightDiff.innerHTML = '';
+                    this.diffLines = [];
+                    this.currentDiffIndex = -1;
+
+                    diffData.forEach((item, index) => {
+                        const leftLine = this.createDiffLine(item, 'left', index);
+                        const rightLine = this.createDiffLine(item, 'right', index);
+                        
+                        this.elements.leftDiff.appendChild(leftLine);
+                        this.elements.rightDiff.appendChild(rightLine);
+                        
+                        // Track diff lines for navigation
+                        if (item.type !== 'equal') {
+                            this.diffLines.push({
+                                index: index,
+                                leftLine: leftLine,
+                                rightLine: rightLine,
+                                type: item.type
+                            });
+                        }
+                    });
+
+                    this.diffCount = this.diffLines.length;
+                    this.updateNavigationState();
+                    
+                    // Jump to first diff if any exist
+                    if (this.diffCount > 0) {
+                        this.currentDiffIndex = 0;
+                        this.highlightCurrentDiff();
+                    }
+                    
+                    this.updateDiffStats(stats);
+                    this.updateStatus(`Comparison complete - ${diffData.length} lines compared, ${this.diffCount} differences found`);
+                }
+
+                createDiffLine(item, side, index) {
+                    const line = document.createElement('div');
+                    line.className = `diff-line ${item.type}`;
+                    line.dataset.diffIndex = index;
+                    
+                    const lineNumber = document.createElement('div');
+                    lineNumber.className = 'line-number';
+                    
+                    const content = document.createElement('div');
+                    content.className = 'line-content';
+                    
+                    if (item.type === 'equal') {
+                        const num = side === 'left' ? item.line_num_1 : item.line_num_2;
+                        lineNumber.textContent = num || '';
+                        content.textContent = item.content;
+                    } else if (item.type === 'delete') {
+                        if (side === 'left') {
+                            lineNumber.textContent = item.line_num_1 || '';
+                            content.textContent = item.content;
+                        } else {
+                            lineNumber.textContent = '';
+                            content.innerHTML = '<em>--- deleted ---</em>';
+                            line.classList.add('empty');
+                        }
+                    } else if (item.type === 'insert') {
+                        if (side === 'left') {
+                            lineNumber.textContent = '';
+                            content.innerHTML = '<em>--- added ---</em>';
+                            line.classList.add('empty');
+                        } else {
+                            lineNumber.textContent = item.line_num_2 || '';
+                            content.textContent = item.content;
+                        }
+                    } else if (item.type === 'modify') {
+                        const num = side === 'left' ? item.line_num_1 : item.line_num_2;
+                        const charDiff = side === 'left' ? item.char_diff_1 : item.char_diff_2;
+                        lineNumber.textContent = num || '';
+                        content.innerHTML = charDiff || (side === 'left' ? item.content_1 : item.content_2);
+                    }
+                    
+                    line.appendChild(lineNumber);
+                    line.appendChild(content);
+                    return line;
+                }
+
+                updateDiffStats(stats) {
+                    this.elements.equalCount.textContent = stats.equal || 0;
+                    this.elements.addedCount.textContent = stats.additions || 0;
+                    this.elements.deletedCount.textContent = stats.deletions || 0;
+                    this.elements.modifiedCount.textContent = stats.modifications || 0;
+                    this.elements.diffStats.style.display = 'flex';
+                }
+
+                updateLineCount() {
+                    const lines1 = this.elements.text1.value.split('\\n').length;
+                    const lines2 = this.elements.text2.value.split('\\n').length;
+                    this.elements.leftStats.textContent = `${lines1} lines`;
+                    this.elements.rightStats.textContent = `${lines2} lines`;
+                }
+
+                updateStatus(message) {
+                    this.elements.statusText.textContent = message;
+                }
+
+                clearAll() {
+                    this.elements.text1.value = '';
+                    this.elements.text2.value = '';
+                    this.elements.leftDiff.innerHTML = '<div class="loading">Enter text above and click Compare to see differences</div>';
+                    this.elements.rightDiff.innerHTML = '<div class="loading">Enter text above and click Compare to see differences</div>';
+                    this.elements.diffStats.style.display = 'none';
+                    this.updateLineCount();
+                    this.updateStatus('Ready to compare texts');
+                }
+
+                swapTexts() {
+                    const temp = this.elements.text1.value;
+                    this.elements.text1.value = this.elements.text2.value;
+                    this.elements.text2.value = temp;
+                    this.updateLineCount();
+                    this.updateStatus('Texts swapped');
+                }
+
+                async copyToClipboard(text) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        this.updateStatus('Text copied to clipboard');
+                    } catch (err) {
+                        console.error('Failed to copy text: ', err);
+                        this.updateStatus('Failed to copy text');
+                    }
+                }
+
+                // History functionality (matching other tools)
+                async saveToHistoryIfChanged(text1, text2, operation) {
+                    if (!this.historyEnabled) {
+                        return;
+                    }
+
+                    const currentData = JSON.stringify({ text1, text2 });
+                    if (currentData !== this.lastInputData) {
+                        this.lastInputData = currentData;
+                        await this.saveToHistory({ text1, text2 }, operation);
+                    }
+                }
+
+                async saveToHistory(data, operation) {
+                    if (!this.historyEnabled) return;
+
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                data: JSON.stringify(data),
+                                operation: operation
+                            })
+                        });
+
+                        if (response.ok) {
+                            this.loadHistory();
+                        }
+                    } catch (error) {
+                        console.error('Error saving history:', error);
+                    }
+                }
+
+                async loadHistory() {
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}?limit=20`);
+                        const result = await response.json();
+                        
+                        this.displayHistory(result.history || []);
+                    } catch (error) {
+                        console.error('Error loading history:', error);
+                        this.elements.historyList.innerHTML = '<div class="history-item">Failed to load history</div>';
+                    }
+                }
+
+                displayHistory(history) {
+                    if (history.length === 0) {
+                        this.elements.historyList.innerHTML = '<div class="history-item">No comparison history available</div>';
+                        return;
+                    }
+
+                    const historyHtml = history.map(item => `
+                        <div class="history-item" data-id="${item.id}">
+                            <div class="history-item-header">
+                                <div class="history-item-content">
+                                    <input type="checkbox" class="history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
+                                    <div class="history-meta">
+                                        <span class="history-id">ID: ${item.id}</span>
+                                        <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
+                                    </div>
+                                </div>
+                                <button class="history-delete-btn" onclick="window.textDiffTool.deleteHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                            </div>
+                            <div class="history-preview">${item.preview}</div>
+                        </div>
+                    `).join('');
+
+                    this.elements.historyList.innerHTML = historyHtml;
+
+                    this.elements.historyList.querySelectorAll('.history-item').forEach(item => {
+                        item.addEventListener('click', (e) => {
+                            if (e.target.type !== 'checkbox') {
+                                this.loadHistoryEntry(item.dataset.id);
+                            }
+                        });
+                    });
+
+                    this.elements.historyList.querySelectorAll('.history-checkbox').forEach(checkbox => {
+                        checkbox.addEventListener('change', (e) => {
+                            this.handleHistorySelection(e.target.dataset.id, e.target.checked);
+                        });
+                    });
+                }
+
+                async loadHistoryEntry(entryId) {
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}/${entryId}`);
+                        const entry = await response.json();
+                        
+                        if (entry && entry.data) {
+                            const data = JSON.parse(entry.data);
+                            this.elements.text1.value = data.text1 || '';
+                            this.elements.text2.value = data.text2 || '';
+                            this.updateLineCount();
+                            this.toggleHistory(); // Close history popup
+                            this.updateStatus('History entry loaded');
+                        }
+                    } catch (error) {
+                        console.error('Error loading history entry:', error);
+                        this.updateStatus('Failed to load history entry');
+                    }
+                }
+
+                formatTimestamp(isoTimestamp) {
+                    try {
+                        const date = new Date(isoTimestamp);
+                        const now = new Date();
+                        const diffMs = now - date;
+                        const diffMins = Math.floor(diffMs / 60000);
+                        const diffHours = Math.floor(diffMs / 3600000);
+                        const diffDays = Math.floor(diffMs / 86400000);
+                        
+                        if (diffDays > 0) {
+                            return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                        } else if (diffHours > 0) {
+                            return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                        } else if (diffMins > 0) {
+                            return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+                        } else {
+                            return 'Just now';
+                        }
+                    } catch {
+                        return 'Unknown time';
+                    }
+                }
+
+                toggleHistory() {
+                    this.elements.historyPopup.classList.toggle('show');
+                    if (this.elements.historyPopup.classList.contains('show')) {
+                        this.loadHistory();
+                    }
+                }
+
+                toggleHistoryEnabled() {
+                    this.historyEnabled = !this.historyEnabled;
+                    localStorage.setItem(`${this.toolName}-historyEnabled`, this.historyEnabled.toString());
+                    
+                    const btn = this.elements.historyToggleBtn;
+                    if (this.historyEnabled) {
+                        btn.textContent = '📝 History On';
+                        btn.classList.remove('disabled');
+                        btn.title = 'History Enabled - Click to Disable';
+                        this.updateStatus('History enabled');
+                    } else {
+                        btn.textContent = '📝 History Off';
+                        btn.classList.add('disabled');
+                        btn.title = 'History Disabled - Click to Enable';
+                        this.updateStatus('History disabled - comparisons will not be saved');
+                    }
+                }
+
+                initializeHistoryToggle() {
+                    const btn = this.elements.historyToggleBtn;
+                    if (this.historyEnabled) {
+                        btn.textContent = '📝 History On';
+                        btn.classList.remove('disabled');
+                        btn.title = 'History Enabled - Click to Disable';
+                    } else {
+                        btn.textContent = '📝 History Off';
+                        btn.classList.add('disabled');
+                        btn.title = 'History Disabled - Click to Enable';
+                    }
+                }
+
+                async loadGlobalHistory() {
+                    try {
+                        const response = await fetch(`/api/global-history?limit=50`);
+                        const result = await response.json();
+                        
+                        this.displayGlobalHistory(result.history || []);
+                    } catch (error) {
+                        console.error('Error loading global history:', error);
+                        this.elements.globalHistoryList.innerHTML = '<div class="global-history-item">Failed to load global history</div>';
+                    }
+                }
+
+                displayGlobalHistory(history) {
+                    if (history.length === 0) {
+                        this.elements.globalHistoryList.innerHTML = '<div class="global-history-item">No global history available</div>';
+                        return;
+                    }
+
+                    const historyHtml = history.map(item => `
+                        <div class="global-history-item" data-id="${item.id}" data-tool="${item.tool_name}">
+                            <div class="global-history-item-header">
+                                <input type="checkbox" class="global-history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
+                                <div class="global-history-item-meta">
+                                    <div class="global-history-id-tool">
+                                        <span class="history-id">ID: ${item.id}</span>
+                                        <span class="global-history-tool-label" style="background-color: ${this.getToolColor(item.tool_name)}">${item.tool_name}</span>
+                                    </div>
+                                    <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
+                                </div>
+                                <button class="history-delete-btn" onclick="window.textDiffTool.deleteGlobalHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                            </div>
+                            <div class="history-preview">${item.preview}</div>
+                        </div>
+                    `).join('');
+
+                    this.elements.globalHistoryList.innerHTML = historyHtml;
+
+                    this.elements.globalHistoryList.querySelectorAll('.global-history-item').forEach(item => {
+                        item.addEventListener('click', (e) => {
+                            if (e.target.type !== 'checkbox') {
+                                this.loadGlobalHistoryEntry(item.dataset.id, item.dataset.tool);
+                            }
+                        });
+                    });
+                }
+
+                async loadGlobalHistoryEntry(entryId, toolName) {
+                    try {
+                        const response = await fetch(`/api/global-history/${entryId}`);
+                        const entry = await response.json();
+                        
+                        if (entry && entry.data) {
+                            if (toolName === this.toolName) {
+                                const data = JSON.parse(entry.data);
+                                this.elements.text1.value = data.text1 || '';
+                                this.elements.text2.value = data.text2 || '';
+                                this.updateLineCount();
+                                this.toggleGlobalHistory(); // Close popup
+                                this.updateStatus('Global history entry loaded');
+                            } else {
+                                // Cross-tool loading - try to parse as text
+                                this.elements.text1.value = entry.data;
+                                this.elements.text2.value = '';
+                                this.updateLineCount();
+                                this.toggleGlobalHistory(); // Close popup
+                                this.updateStatus(`Loaded ${toolName} data into text diff tool`);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error loading global history entry:', error);
+                        this.updateStatus('Failed to load global history entry');
+                    }
+                }
+
+                toggleGlobalHistory() {
+                    this.elements.globalHistoryPopup.classList.toggle('show');
+                    if (this.elements.globalHistoryPopup.classList.contains('show')) {
+                        this.loadGlobalHistory();
+                    }
+                }
+
+                getToolColor(toolName) {
+                    const colors = {
+                        'json-formatter': '#2196F3',
+                        'json-yaml-xml-converter': '#4CAF50', 
+                        'text-diff': '#FF5722',
+                        'base64-encoder-decoder': '#FF9800',
+                        'url-encoder-decoder': '#9C27B0',
+                        'hash-generator': '#F44336',
+                        'qr-code-generator': '#607D8B'
+                    };
+                    return colors[toolName] || '#757575';
+                }
+
+                async deleteHistoryItem(entryId) {
+                    try {
+                        const response = await fetch(`/api/history/${this.toolName}/${entryId}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            this.updateStatus('History item deleted');
+                            this.loadHistory();
+                            this.loadGlobalHistory();
+                        } else {
+                            this.updateStatus('Failed to delete history item');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting history item:', error);
+                        this.updateStatus('Failed to delete history item');
+                    }
+                }
+
+                async deleteGlobalHistoryItem(entryId) {
+                    try {
+                        const response = await fetch(`/api/global-history/${entryId}`, {
+                            method: 'DELETE'
+                        });
+                        
+                        if (response.ok) {
+                            this.updateStatus('History item deleted');
+                            this.loadHistory();
+                            this.loadGlobalHistory();
+                        } else {
+                            this.updateStatus('Failed to delete history item');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting global history item:', error);
+                        this.updateStatus('Failed to delete history item');
+                    }
+                }
+
+                switchHistoryTab(event) {
+                    const clickedTab = event.target;
+                    const targetTab = clickedTab.dataset.tab;
+                    
+                    document.querySelectorAll('.history-tab').forEach(tab => tab.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.remove('active');
+                        content.style.display = 'none';
+                    });
+                    
+                    clickedTab.classList.add('active');
+                    const targetContent = document.getElementById(targetTab + 'Tab');
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                        targetContent.style.display = 'block';
+                    }
+                }
+
+                handleHistorySelection(entryId, isSelected) {
+                    // Implementation for history selection (similar to other tools)
+                    console.log('History selection:', entryId, isSelected);
+                }
+
+                handleOutsideClick(event) {
+                    const historyPopup = this.elements.historyPopup;
+                    const historyBtn = this.elements.historyBtn;
+                    const globalHistoryPopup = this.elements.globalHistoryPopup;
+                    const globalHistoryBtn = this.elements.globalHistoryBtn;
+                    
+                    if (historyPopup && historyPopup.classList.contains('show') &&
+                        !historyPopup.contains(event.target) && !historyBtn.contains(event.target)) {
+                        historyPopup.classList.remove('show');
+                    }
+                    
+                    if (globalHistoryPopup && globalHistoryPopup.classList.contains('show') &&
+                        !globalHistoryPopup.contains(event.target) && !globalHistoryBtn.contains(event.target)) {
+                        globalHistoryPopup.classList.remove('show');
+                    }
+                }
+                
+                // New functionality methods
+                toggleInputCollapse() {
+                    this.inputsCollapsed = !this.inputsCollapsed;
+                    
+                    if (this.inputsCollapsed) {
+                        this.elements.inputSection1.classList.add('collapsed');
+                        this.elements.inputSection2.classList.add('collapsed');
+                        this.elements.collapseBtn.innerHTML = '▼ Expand Inputs';
+                        this.elements.collapseBtn.title = 'Show input boxes';
+                    } else {
+                        this.elements.inputSection1.classList.remove('collapsed');
+                        this.elements.inputSection2.classList.remove('collapsed');
+                        this.elements.collapseBtn.innerHTML = '▲ Collapse Inputs';
+                        this.elements.collapseBtn.title = 'Hide input boxes';
+                    }
+                }
+                
+                navigateToPreviousDiff() {
+                    if (this.diffLines.length === 0) return;
+                    
+                    if (this.currentDiffIndex > 0) {
+                        this.currentDiffIndex--;
+                    } else {
+                        this.currentDiffIndex = this.diffLines.length - 1; // Wrap to last
+                    }
+                    
+                    this.highlightCurrentDiff();
+                    this.updateNavigationState();
+                }
+                
+                navigateToNextDiff() {
+                    if (this.diffLines.length === 0) return;
+                    
+                    if (this.currentDiffIndex < this.diffLines.length - 1) {
+                        this.currentDiffIndex++;
+                    } else {
+                        this.currentDiffIndex = 0; // Wrap to first
+                    }
+                    
+                    this.highlightCurrentDiff();
+                    this.updateNavigationState();
+                }
+                
+                highlightCurrentDiff() {
+                    // Remove previous highlight
+                    document.querySelectorAll('.diff-line.current-diff').forEach(line => {
+                        line.classList.remove('current-diff');
+                    });
+                    
+                    if (this.currentDiffIndex >= 0 && this.currentDiffIndex < this.diffLines.length) {
+                        const currentDiff = this.diffLines[this.currentDiffIndex];
+                        currentDiff.leftLine.classList.add('current-diff');
+                        currentDiff.rightLine.classList.add('current-diff');
+                        
+                        // Scroll to show the highlighted difference
+                        this.scrollToLine(currentDiff.leftLine);
+                    }
+                }
+                
+                scrollToLine(line) {
+                    const leftContainer = this.elements.leftDiff;
+                    const rightContainer = this.elements.rightDiff;
+                    
+                    // Calculate the position within the container
+                    const lineTop = line.offsetTop;
+                    const containerHeight = leftContainer.clientHeight;
+                    
+                    // Center the line in the view
+                    const scrollTop = lineTop - (containerHeight / 2) + (line.offsetHeight / 2);
+                    
+                    // Disable sync temporarily to avoid infinite loop
+                    this.syncingScroll = true;
+                    
+                    leftContainer.scrollTo({
+                        top: Math.max(0, scrollTop),
+                        behavior: 'smooth'
+                    });
+                    
+                    rightContainer.scrollTo({
+                        top: Math.max(0, scrollTop),
+                        behavior: 'smooth'
+                    });
+                    
+                    // Re-enable sync after animation
+                    setTimeout(() => {
+                        this.syncingScroll = false;
+                    }, 500);
+                }
+                
+                syncScroll(source, event) {
+                    if (this.syncingScroll) return;
+                    
+                    const sourceContainer = event.target;
+                    const targetContainer = source === 'left' ? this.elements.rightDiff : this.elements.leftDiff;
+                    
+                    // Disable sync temporarily to avoid infinite loop
+                    this.syncingScroll = true;
+                    
+                    targetContainer.scrollTop = sourceContainer.scrollTop;
+                    
+                    // Re-enable sync immediately for manual scrolling
+                    setTimeout(() => {
+                        this.syncingScroll = false;
+                    }, 50);
+                }
+                
+                updateNavigationState() {
+                    const prevBtn = this.elements.prevDiffBtn;
+                    const nextBtn = this.elements.nextDiffBtn;
+                    const counter = this.elements.diffCounter;
+                    
+                    if (this.diffCount === 0) {
+                        prevBtn.disabled = true;
+                        nextBtn.disabled = true;
+                        counter.textContent = '0/0';
+                    } else {
+                        prevBtn.disabled = false;
+                        nextBtn.disabled = false;
+                        counter.textContent = `${this.currentDiffIndex + 1}/${this.diffCount}`;
+                    }
+                }
+                
+                handleKeydown(e) {
+                    // Only handle navigation when not typing in text areas
+                    if (document.activeElement === this.elements.text1 || 
+                        document.activeElement === this.elements.text2) {
+                        return;
+                    }
+                    
+                    switch(e.key) {
+                        case 'ArrowUp':
+                            e.preventDefault();
+                            this.navigateToPreviousDiff();
+                            break;
+                        case 'ArrowDown':
+                            e.preventDefault();
+                            this.navigateToNextDiff();
+                            break;
+                        case 'c':
+                        case 'C':
+                            if (e.ctrlKey || e.metaKey) return; // Don't interfere with copy
+                            e.preventDefault();
+                            this.toggleInputCollapse();
+                            break;
+                        case 'Enter':
+                            if (e.ctrlKey) {
+                                e.preventDefault();
+                                this.compareTexts();
+                            }
+                            break;
+                    }
+                }
+            }
+
+            // Initialize the text diff tool
+            window.textDiffTool = new TextDiffTool();
+        });
+    </script>
+</body>
+</html>
