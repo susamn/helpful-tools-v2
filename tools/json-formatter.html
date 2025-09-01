@@ -191,6 +191,8 @@
             display: flex;
             flex-direction: column;
             border-right: 1px solid #c0c0c0;
+            min-width: 0;
+            overflow: hidden;
         }
         .panel:last-child {
             border-right: none;
@@ -210,6 +212,8 @@
             flex: 1;
             position: relative;
             background: #ffffff;
+            overflow: hidden;
+            min-width: 0;
         }
         .panel-textarea {
             width: 100%;
@@ -222,6 +226,10 @@
             line-height: 1.4;
             resize: none;
             background: white;
+            overflow: auto;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            box-sizing: border-box;
         }
         .panel-textarea::placeholder {
             color: #999;
@@ -383,8 +391,11 @@
             line-height: 1.4;
             background: white;
             overflow: auto;
-            white-space: pre;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            word-break: break-all;
             border: none;
+            box-sizing: border-box;
         }
         
         .error-display {
