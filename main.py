@@ -40,6 +40,13 @@ TOOLS = [
         "path": "/tools/text-diff",
         "tags": ["diff", "compare", "text", "files"],
         "has_history": True
+    },
+    {
+        "name": "Regex Tester",
+        "description": "Interactive regex testing tool with live highlighting, group visualization, and match details",
+        "path": "/tools/regex-tester",
+        "tags": ["regex", "pattern", "match", "test", "validation"],
+        "has_history": True
     }
 ]
 
@@ -566,7 +573,9 @@ def generate_character_diff(text1: str, text2: str) -> Dict[str, str]:
 # Tool Routes
 @app.route('/tools/<tool_name>')
 def serve_tool(tool_name):
-    tool_file = Path(f"tools/{tool_name}.html")
+    # Get the directory where main.py is located
+    app_dir = Path(__file__).parent
+    tool_file = app_dir / "tools" / f"{tool_name}.html"
     if not tool_file.exists():
         abort(404)
     
