@@ -34,7 +34,7 @@ class TextDiffFrontendTest(unittest.TestCase):
             # Fallback to Firefox if Chrome not available
             cls.driver = webdriver.Firefox()
         
-        cls.base_url = "http://localhost:5000"  # Adjust port as needed
+        cls.base_url = "http://localhost:8000"  # Adjust port as needed
         cls.wait = WebDriverWait(cls.driver, 10)
     
     @classmethod
@@ -45,7 +45,7 @@ class TextDiffFrontendTest(unittest.TestCase):
     def setUp(self):
         """Navigate to text diff tool before each test"""
         self.driver.get(f"{self.base_url}/tools/text-diff")
-        time.sleep(1)  # Allow page to load
+        self.wait.until(EC.presence_of_element_located((By.ID, "text1")))
     
     def test_page_loads_correctly(self):
         """Test that the text diff page loads with all elements"""
@@ -55,9 +55,9 @@ class TextDiffFrontendTest(unittest.TestCase):
         # Check main elements are present
         text1_input = self.driver.find_element(By.ID, "text1")
         text2_input = self.driver.find_element(By.ID, "text2")
-        compare_btn = self.driver.find_element(By.ID, "compare-btn")
-        clear_btn = self.driver.find_element(By.ID, "clear-btn")
-        swap_btn = self.driver.find_element(By.ID, "swap-btn")
+        compare_btn = self.driver.find_element(By.ID, "compareBtn")
+        clear_btn = self.driver.find_element(By.ID, "clearBtn")
+        swap_btn = self.driver.find_element(By.ID, "swapBtn")
         
         self.assertTrue(text1_input.is_displayed())
         self.assertTrue(text2_input.is_displayed())
@@ -75,7 +75,7 @@ class TextDiffFrontendTest(unittest.TestCase):
         text2_input.send_keys("Hello universe\nThis is line 2")
         
         # Click compare
-        compare_btn = self.driver.find_element(By.ID, "compare-btn")
+        compare_btn = self.driver.find_element(By.ID, "compareBtn")
         compare_btn.click()
         
         # Wait for results
@@ -103,18 +103,18 @@ class TextDiffFrontendTest(unittest.TestCase):
         text2_input.send_keys(same_text)
         
         # Click compare
-        compare_btn = self.driver.find_element(By.ID, "compare-btn")
+        compare_btn = self.driver.find_element(By.ID, "compareBtn")
         compare_btn.click()
         
         # Wait for results
-        self.wait.until(EC.text_to_be_present_in_element((By.ID, "stats"), "equal"))
+        self.wait.until(EC.text_to_be_present_in_element((By.ID, "diffStats"), "equal"))
         
         # Check stats show all equal
-        stats_element = self.driver.find_element(By.ID, "stats")
+        stats_element = self.driver.find_element(By.ID, "diffStats")
         stats_text = stats_element.text
-        self.assertIn("3 equal", stats_text)
-        self.assertIn("0 deleted", stats_text)
-        self.assertIn("0 inserted", stats_text)
+        self.assertIn("3", self.driver.find_element(By.ID, "equalCount").text)
+        self.assertIn("0", self.driver.find_element(By.ID, "deletedCount").text)
+        self.assertIn("0", self.driver.find_element(By.ID, "addedCount").text)
     
     def test_clear_functionality(self):
         """Test clear button functionality"""
@@ -126,7 +126,7 @@ class TextDiffFrontendTest(unittest.TestCase):
         text2_input.send_keys("Other text")
         
         # Click clear
-        clear_btn = self.driver.find_element(By.ID, "clear-btn")
+        clear_btn = self.driver.find_element(By.ID, "clearBtn")
         clear_btn.click()
         
         # Check that inputs are cleared
@@ -134,8 +134,8 @@ class TextDiffFrontendTest(unittest.TestCase):
         self.assertEqual(text2_input.get_attribute("value"), "")
         
         # Check that diff display is reset
-        left_diff = self.driver.find_element(By.ID, "left-diff-display")
-        right_diff = self.driver.find_element(By.ID, "right-diff-display")
+        left_diff = self.driver.find_element(By.ID, "leftDiff")
+        right_diff = self.driver.find_element(By.ID, "rightDiff")
         
         # Should show initial placeholder messages
         self.assertTrue("Enter text" in left_diff.text or left_diff.text == "")
@@ -154,7 +154,7 @@ class TextDiffFrontendTest(unittest.TestCase):
         text2_input.send_keys(original_text2)
         
         # Click swap
-        swap_btn = self.driver.find_element(By.ID, "swap-btn")
+        swap_btn = self.driver.find_element(By.ID, "swapBtn")
         swap_btn.click()
         
         # Check that texts are swapped
@@ -171,20 +171,20 @@ class TextDiffFrontendTest(unittest.TestCase):
         text2_input.send_keys("Hello universe")
         
         # Compare
-        compare_btn = self.driver.find_element(By.ID, "compare-btn")
+        compare_btn = self.driver.find_element(By.ID, "compareBtn")
         compare_btn.click()
         
         # Wait for results
         self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "diff-line")))
         
         # Click copy button
-        copy_btn = self.driver.find_element(By.ID, "copy-diff-btn")
+        copy_btn = self.driver.find_element(By.ID, "copyLeftBtn")
         copy_btn.click()
         
         # Wait for feedback message
-        self.wait.until(EC.text_to_be_present_in_element((By.ID, "feedback"), "copied"))
+        self.wait.until(EC.text_to_be_present_in_element((By.ID, "statusText"), "copied"))
         
-        feedback = self.driver.find_element(By.ID, "feedback")
+        feedback = self.driver.find_element(By.ID, "statusText")
         self.assertIn("copied", feedback.text.lower())
     
     def test_keyboard_shortcuts(self):
@@ -197,7 +197,7 @@ class TextDiffFrontendTest(unittest.TestCase):
         text2_input.send_keys("Test text modified")
         
         # Test Ctrl+Enter for compare
-        text1_input.send_keys(Keys.CONTROL + Keys.RETURN)
+        text1_input.send_keys(Keys.CONTROL, Keys.RETURN)
         
         # Wait for results
         self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "diff-line")))
@@ -219,22 +219,22 @@ class TextDiffFrontendTest(unittest.TestCase):
         text2_input.send_keys(original_text2)
         
         # Compare to save to history
-        compare_btn = self.driver.find_element(By.ID, "compare-btn")
+        compare_btn = self.driver.find_element(By.ID, "compareBtn")
         compare_btn.click()
         
         # Wait for results
         self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "diff-line")))
         
         # Clear inputs
-        clear_btn = self.driver.find_element(By.ID, "clear-btn")
+        clear_btn = self.driver.find_element(By.ID, "clearBtn")
         clear_btn.click()
         
         # Toggle history panel
-        history_toggle = self.driver.find_element(By.ID, "history-toggle")
+        history_toggle = self.driver.find_element(By.ID, "historyBtn")
         history_toggle.click()
         
         # Wait for history panel to appear
-        self.wait.until(EC.visibility_of_element_located((By.ID, "history-panel")))
+        self.wait.until(EC.visibility_of_element_located((By.ID, "historyPopup")))
         
         # Check that history item exists
         history_items = self.driver.find_elements(By.CLASS_NAME, "history-item")
@@ -270,13 +270,13 @@ class TextDiffFrontendTest(unittest.TestCase):
         """)
         
         # Try to compare
-        compare_btn = self.driver.find_element(By.ID, "compare-btn")
+        compare_btn = self.driver.find_element(By.ID, "compareBtn")
         compare_btn.click()
         
         # Wait for error message
-        self.wait.until(EC.text_to_be_present_in_element((By.ID, "stats"), "error"))
+        self.wait.until(EC.text_to_be_present_in_element((By.ID, "statusText"), "error"))
         
-        stats_element = self.driver.find_element(By.ID, "stats")
+        stats_element = self.driver.find_element(By.ID, "statusText")
         self.assertIn("error", stats_element.text.lower())
         
         # Restore original fetch
@@ -306,7 +306,7 @@ class TextDiffFrontendTest(unittest.TestCase):
         time.sleep(0.5)
         
         # Elements should still be functional
-        compare_btn = self.driver.find_element(By.ID, "compare-btn")
+        compare_btn = self.driver.find_element(By.ID, "compareBtn")
         self.assertTrue(compare_btn.is_displayed())
 
 
@@ -317,7 +317,7 @@ if __name__ == '__main__':
     print("Prerequisites:")
     print("1. Install selenium: pip install selenium")
     print("2. Install ChromeDriver or GeckoDriver")
-    print("3. Start the Flask application on localhost:5000")
+    print("3. Start the Flask application on localhost:8000")
     print("4. Run: python test_text_diff_frontend.py")
     print()
     print("Note: These tests require a running server and browser driver.")

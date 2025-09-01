@@ -162,8 +162,12 @@ class RegexTesterFrontendTest(unittest.TestCase):
         self.assertNotEqual(regex_input.get_attribute("value"), "")
         self.assertNotEqual(test_text.get_attribute("value"), "")
         
+        # Explicitly click the test button
+        test_btn = self.driver.find_element(By.ID, "testBtn")
+        test_btn.click()
+
         # Check that matches are displayed
-        time.sleep(1)  # Allow time for auto-test
+        self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "regex-match")))
         matches = self.driver.find_elements(By.CLASS_NAME, "regex-match")
         self.assertTrue(len(matches) > 0)
     
@@ -268,6 +272,7 @@ class RegexTesterFrontendTest(unittest.TestCase):
         copy_btn.click()
         
         # Check status message
+        time.sleep(1)
         status_text = self.driver.find_element(By.ID, "statusText")
         self.wait.until(lambda d: "copied" in status_text.text.lower())
     
@@ -280,7 +285,7 @@ class RegexTesterFrontendTest(unittest.TestCase):
         test_text.send_keys('Find 123 here')
         
         # Test Ctrl+Enter for testing
-        test_text.send_keys(Keys.CONTROL + Keys.RETURN)
+        test_text.send_keys(Keys.CONTROL, Keys.RETURN)
         
         # Wait for results
         self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "regex-match")))
@@ -325,10 +330,13 @@ class RegexTesterFrontendTest(unittest.TestCase):
         
         # Click on first history item to load it
         if history_items:
+            history_items = self.driver.find_elements(By.CLASS_NAME, "history-item")
             history_items[0].click()
-            time.sleep(0.5)  # Wait for load
+            time.sleep(1)  # Wait for load
             
             # Check that pattern and text are restored
+            regex_input = self.driver.find_element(By.ID, "regexInput")
+            test_text = self.driver.find_element(By.ID, "testText")
             self.assertEqual(regex_input.get_attribute("value"), original_pattern)
             self.assertEqual(test_text.get_attribute("value"), original_text)
     
@@ -418,7 +426,7 @@ if __name__ == '__main__':
     print("Prerequisites:")
     print("1. Install selenium: pip install selenium")
     print("2. Install ChromeDriver or GeckoDriver")
-    print("3. Start the Flask application on localhost:5000")
+    print("3. Start the Flask application on localhost:8000")
     print("4. Run: python test_regex_tester_frontend.py")
     print()
     print("Note: These tests require a running server and browser driver.")

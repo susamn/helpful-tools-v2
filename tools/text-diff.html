@@ -849,7 +849,7 @@
                         }
                     } else if (item.type === 'modify') {
                         const num = side === 'left' ? item.line_num_1 : item.line_num_2;
-                        const charDiff = side === 'left' ? item.char_diff_1 : item.char_diff_2;
+                        const charDiff = item.char_diff_html;
                         lineNumber.textContent = num || '';
                         content.innerHTML = charDiff || (side === 'left' ? item.content_1 : item.content_2);
                     }

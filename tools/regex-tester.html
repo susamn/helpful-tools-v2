@@ -599,7 +599,7 @@
     <div class="regex-section">
         <div class="regex-input-group">
             <span class="regex-delimiters">/</span>
-            <input type="text" class="regex-input" id="regexInput" placeholder="Enter your regular expression..." />
+            <input type="text" class="regex-input" id="regexInput" placeholder="Enter your regular expression...">
             <span class="regex-delimiters">/</span>
         </div>
 
@@ -631,11 +631,11 @@
 
         <div class="quick-examples">
             <span style="color: #555;">Quick examples:</span>
-            <button class="example-btn" data-pattern="\\(?([0-9]{3})\\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})" data-text="Call me at (555) 123-4567\nOr try 555-123-4567\nAlso 555.123.4567\nInvalid: 12-345-6789">USA Phone</button>
-            <button class="example-btn" data-pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$" data-text="Password123!\nweakpass\nSTRONG456#\nAbc123\nMyP@ssw0rd" data-flags="gm">Strong Password</button>
-            <button class="example-btn" data-pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}" data-text="Contact: john@example.com\nsupport@company.org\nInvalid: not-email\nuser@test.co.uk">Email</button>
-            <button class="example-btn" data-pattern="\\d{4}-\\d{2}-\\d{2}" data-text="Today: 2024-03-15\nBirthday: 1990-12-25\nInvalid: 2024/03/15\nAlso: 2023-01-01">ISO Date</button>
-            <button class="example-btn" data-pattern="\\$([0-9]{1,3}(,[0-9]{3})*|[0-9]+)(\\.[0-9]{2})?" data-text="Price: $19.99\nExpensive: $1,234.56\nCheap: $5\nCost: $12,345.00\nInvalid: 19.99">US Dollar</button>
+            <button class="example-btn" data-pattern="\(([0-9]{3})\)[-. ]?([0-9]{3})[-. ]?([0-9]{4})" data-text="Call me at (555) 123-4567\nOr try 555-123-4567\nAlso 555.123.4567\nInvalid: 12-345-6789">USA Phone</button>
+            <button class="example-btn" data-pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$" data-text="Password123!\nweakpass\nSTRONG456#\nAbc123\nMyP@ssw0rd" data-flags="gm">Strong Password</button>
+            <button class="example-btn" data-pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}" data-text="Contact: john@example.com\nsupport@company.org\nInvalid: not-email\nuser@test.co.uk">Email</button>
+            <button class="example-btn" data-pattern="\d{4}-\d{2}-\d{2}" data-text="Today: 2024-03-15\nBirthday: 1990-12-25\nInvalid: 2024/03/15\nAlso: 2023-01-01">ISO Date</button>
+            <button class="example-btn" data-pattern="\$([0-9]{1,3}(,[0-9]{3})*|[0-9]+)(\.[0-9]{2})?" data-text="Price: $19.99\nExpensive: $1,234.56\nCheap: $5\nCost: $12,345.00\nInvalid: 19.99">US Dollar</button>
         </div>
     </div>
 
@@ -838,64 +838,33 @@
             findMatches(regex, text, flags, pattern) {
                 const matches = [];
                 let match;
-                
-                // Check if pattern has line anchors (^ or $) and handle multiline correctly
-                const hasLineAnchors = pattern.includes('^') || pattern.includes('$');
-                const isMultilineText = text.includes('\n');
-                
-                if (hasLineAnchors && isMultilineText && !flags.includes('m')) {
-                    // For patterns with line anchors on multiline text, test each line separately
-                    const lines = text.split('\n');
-                    let globalOffset = 0;
-                    
-                    lines.forEach((line, lineIndex) => {
-                        try {
-                            const lineRegex = new RegExp(pattern, flags.replace('g', '')); // Remove global for individual line testing
-                            const lineMatch = lineRegex.exec(line);
-                            
-                            if (lineMatch) {
-                                matches.push({
-                                    match: lineMatch[0],
-                                    index: globalOffset + lineMatch.index,
-                                    endIndex: globalOffset + lineMatch.index + lineMatch[0].length,
-                                    groups: lineMatch.slice(1),
-                                    fullMatch: lineMatch
-                                });
-                            }
-                        } catch (e) {
-                            // Skip invalid patterns for individual lines
-                        }
+
+                // Standard matching logic
+                if (flags.includes('g')) {
+                    while ((match = regex.exec(text)) !== null) {
+                        matches.push({
+                            match: match[0],
+                            index: match.index,
+                            endIndex: match.index + match[0].length,
+                            groups: match.slice(1),
+                            fullMatch: match
+                        });
                         
-                        globalOffset += line.length + 1; // +1 for the newline character
-                    });
+                        // Prevent infinite loop on zero-length matches
+                        if (match.index === regex.lastIndex) {
+                            regex.lastIndex++;
+                        }
+                    }
                 } else {
-                    // Standard matching logic
-                    if (flags.includes('g')) {
-                        while ((match = regex.exec(text)) !== null) {
-                            matches.push({
-                                match: match[0],
-                                index: match.index,
-                                endIndex: match.index + match[0].length,
-                                groups: match.slice(1),
-                                fullMatch: match
-                            });
-                            
-                            // Prevent infinite loop on zero-length matches
-                            if (match.index === regex.lastIndex) {
-                                regex.lastIndex++;
-                            }
-                        }
-                    } else {
-                        match = regex.exec(text);
-                        if (match) {
-                            matches.push({
-                                match: match[0],
-                                index: match.index,
-                                endIndex: match.index + match[0].length,
-                                groups: match.slice(1),
-                                fullMatch: match
-                            });
-                        }
+                    match = regex.exec(text);
+                    if (match) {
+                        matches.push({
+                            match: match[0],
+                            index: match.index,
+                            endIndex: match.index + match[0].length,
+                            groups: match.slice(1),
+                            fullMatch: match
+                        });
                     }
                 }
                 
@@ -1106,7 +1075,7 @@
                 }
                 
                 const matchesText = this.currentMatches.map((match, index) => 
-                    `Match ${index + 1}: "${match.match}" at ${match.index}-${match.endIndex}${
+                    `Match ${index + 1}: "${match.match}" at ${match.index}-${match.endIndex}${ 
                         match.groups.length > 0 ? 
                         '\n  Groups: ' + match.groups.map((g, i) => `$${i+1}: "${g}"`).join(', ') : 
                         ''

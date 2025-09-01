@@ -460,6 +460,27 @@ def compare_texts():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+def generate_character_diff_html(text1: str, text2: str) -> (str, str):
+    """Generate character-level diff as an HTML string."""
+    res1 = []
+    res2 = []
+    i = 0
+    j = 0
+    while i < len(text1) or j < len(text2):
+        if i < len(text1) and j < len(text2) and text1[i] == text2[j]:
+            res1.append(text1[i])
+            res2.append(text2[j])
+            i += 1
+            j += 1
+        else:
+            if i < len(text1):
+                res1.append(f'<span class="char-delete">{text1[i]}</span>')
+                i += 1
+            if j < len(text2):
+                res2.append(f'<span class="char-insert">{text2[j]}</span>')
+                j += 1
+    return "".join(res1), "".join(res2)
+
 def generate_diff(text1: str, text2: str) -> Dict[str, Any]:
     """Generate unified diff with character-level highlighting"""
     lines1 = text1.splitlines()
@@ -469,7 +490,7 @@ def generate_diff(text1: str, text2: str) -> Dict[str, Any]:
     matcher = difflib.SequenceMatcher(None, lines1, lines2)
     
     result_lines = []
-    stats = {'additions': 0, 'deletions': 0, 'modifications': 0, 'equal': 0}
+    stats = {'additions': 0, 'deletions': 0, 'equal': 0, 'modifications': 0}
     
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == 'equal':
@@ -506,69 +527,64 @@ def generate_diff(text1: str, text2: str) -> Dict[str, Any]:
                 stats['additions'] += 1
                 
         elif tag == 'replace':
-            # Lines that are different - show character-level diff
-            for i in range(max(i2 - i1, j2 - j1)):
-                line1 = lines1[i1 + i] if i1 + i < i2 else ""
-                line2 = lines2[j1 + i] if j1 + i < j2 else ""
-                
-                if i1 + i < i2 and j1 + i < j2:
-                    # Both lines exist - show character diff
-                    char_diff = generate_character_diff(line1, line2)
-                    result_lines.append({
-                        'type': 'modify',
-                        'content_1': line1,
-                        'content_2': line2,
-                        'char_diff_1': char_diff['text1_highlighted'],
-                        'char_diff_2': char_diff['text2_highlighted'],
-                        'line_num_1': i1 + i + 1,
-                        'line_num_2': j1 + i + 1
-                    })
-                    stats['modifications'] += 1
-                elif i1 + i < i2:
-                    # Only line1 exists (deletion)
+            # Lines that are different
+            len1 = i2 - i1
+            len2 = j2 - j1
+            stats['modifications'] += min(len1, len2)
+
+            for i in range(min(len1, len2)):
+                line1 = lines1[i1 + i]
+                line2 = lines2[j1 + i]
+                char_diff_1, char_diff_2 = generate_character_diff_html(line1, line2)
+                result_lines.append({
+                    'type': 'modify',
+                    'content_1': line1,
+                    'content_2': line2,
+                    'char_diff_1': char_diff_1,
+                    'char_diff_2': char_diff_2,
+                    'line_num_1': i1 + i + 1,
+                    'line_num_2': j1 + i + 1
+                })
+            
+            if len1 > len2:
+                for i in range(len2, len1):
                     result_lines.append({
                         'type': 'delete',
-                        'content': line1,
+                        'content': lines1[i1 + i],
                         'line_num_1': i1 + i + 1,
                         'line_num_2': None
                     })
                     stats['deletions'] += 1
-                else:
-                    # Only line2 exists (addition)
+            elif len2 > len1:
+                for i in range(len1, len2):
                     result_lines.append({
                         'type': 'insert',
-                        'content': line2,
+                        'content': lines2[j1 + i],
                         'line_num_1': None,
                         'line_num_2': j1 + i + 1
                     })
                     stats['additions'] += 1
-    
+
     return {'lines': result_lines, 'stats': stats}
 
-def generate_character_diff(text1: str, text2: str) -> Dict[str, str]:
-    """Generate character-level diff highlighting"""
+def generate_character_diff(text1: str, text2: str) -> List[Dict[str, Any]]:
+    """Generate character-level diff as a list of dictionaries."""
     matcher = difflib.SequenceMatcher(None, text1, text2)
     
-    text1_highlighted = ""
-    text2_highlighted = ""
+    result = []
     
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == 'equal':
-            # Characters that are the same
-            text1_highlighted += text1[i1:i2]
-            text2_highlighted += text2[j1:j2]
+            result.append({'type': 'equal', 'content': text1[i1:i2]})
         elif tag == 'delete':
-            # Characters deleted from text1
-            text1_highlighted += f'<span class="char-delete">{text1[i1:i2]}</span>'
+            result.append({'type': 'delete', 'content': text1[i1:i2]})
         elif tag == 'insert':
-            # Characters inserted in text2
-            text2_highlighted += f'<span class="char-insert">{text2[j1:j2]}</span>'
+            result.append({'type': 'insert', 'content': text2[j1:j2]})
         elif tag == 'replace':
-            # Characters replaced
-            text1_highlighted += f'<span class="char-delete">{text1[i1:i2]}</span>'
-            text2_highlighted += f'<span class="char-insert">{text2[j1:j2]}</span>'
-    
-    return {'text1_highlighted': text1_highlighted, 'text2_highlighted': text2_highlighted}
+            result.append({'type': 'delete', 'content': text1[i1:i2]})
+            result.append({'type': 'insert', 'content': text2[j1:j2]})
+            
+    return result
 
 # Tool Routes
 @app.route('/tools/<tool_name>')
