@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cron Parser - Helpful Tools v2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            font-size: 13px;
+        }
+        .header {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .global-history-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .global-history-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .header a {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            text-decoration: none;
+        }
+        .header a:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .toolbar button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .toolbar button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar button:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .toolbar button.primary {
+            background: linear-gradient(to bottom, #4a90e2, #357abd);
+            color: white;
+            border: 1px solid #2968a3;
+        }
+        .toolbar button.primary:hover {
+            background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
+        }
+        .separator {
+            width: 1px;
+            height: 16px;
+            background: #c0c0c0;
+            margin: 0 2px;
+        }
+        .history-container {
+            position: relative;
+        }
+        .history-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .history-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .history-toggle-btn {
+            background: linear-gradient(to bottom, #f0f8ff, #d1e7ff);
+            border: 1px solid #4a90e2;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #1565c0;
+        }
+        .history-toggle-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        }
+        .history-toggle-btn.disabled {
+            background: linear-gradient(to bottom, #fff0f0, #fdd8d8);
+            border-color: #dc3545;
+            color: #c82333;
+        }
+        .history-toggle-btn.disabled:hover {
+            background: linear-gradient(to bottom, #fff5f5, #ffe0e0);
+        }
+        .history-popup {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #a0a0a0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            width: 300px;
+            max-height: 400px;
+            z-index: 1000;
+            display: none;
+            margin-top: 2px;
+        }
+        .history-popup.show {
+            display: block;
+        }
+        .history-tabs {
+            display: flex;
+            border-bottom: 1px solid #c0c0c0;
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+        }
+        .history-tab {
+            flex: 1;
+            padding: 4px 8px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            color: #555;
+        }
+        .history-tab.active {
+            background: white;
+            border-bottom: 1px solid white;
+            color: #333;
+        }
+        .history-content {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+        .history-item {
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .history-item:hover {
+            background: #f8f8f8;
+        }
+        .history-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            background: #fafafa;
+        }
+        .history-item-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+        .history-checkbox {
+            margin: 0;
+            cursor: pointer;
+        }
+        .history-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .history-id {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 10px;
+            color: #666;
+        }
+        .history-date {
+            color: #888;
+            font-size: 10px;
+        }
+        .history-delete-btn {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        .history-delete-btn:hover {
+            background: #ff6b6b;
+            color: white;
+        }
+        .history-preview {
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11px;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+        .global-history-item {
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .global-history-item:hover {
+            background: #f8f8f8;
+        }
+        .global-history-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px;
+            background: #fafafa;
+        }
+        .global-history-item-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+            margin-left: 8px;
+        }
+        .global-history-id-tool {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .global-history-tool-label {
+            color: white;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .global-history-checkbox {
+            margin: 0;
+            cursor: pointer;
+        }
+        .tool-label {
+            display: inline-block;
+            padding: 1px 4px;
+            border-radius: 2px;
+            font-size: 9px;
+            font-weight: bold;
+            color: white;
+            margin-right: 4px;
+        }
+        .global-history-popup {
+            position: fixed;
+            top: 50px;
+            right: 16px;
+            background: white;
+            border: 1px solid #a0a0a0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            width: 400px;
+            max-height: 500px;
+            z-index: 2000;
+            display: none;
+            margin-top: 2px;
+        }
+        .global-history-popup.show {
+            display: block;
+        }
+        .global-history-header {
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .global-history-close {
+            background: none;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .global-history-close:hover {
+            background: #e0e0e0;
+            border-radius: 2px;
+        }
+        .global-history-content {
+            max-height: 450px;
+            overflow-y: auto;
+        }
+        .main-container {
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+        }
+        .input-section {
+            background: #ffffff;
+            border-bottom: 1px solid #c0c0c0;
+            padding: 12px;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .input-label {
+            min-width: 100px;
+            font-weight: 500;
+            font-size: 12px;
+        }
+        .cron-input {
+            flex: 1;
+            padding: 6px 8px;
+            border: 1px solid #c0c0c0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            background: white;
+            border-radius: 2px;
+        }
+        .cron-input:focus {
+            outline: none;
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+        .cron-input.error {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+        }
+        .cron-input.valid {
+            border-color: #28a745;
+            box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.2);
+        }
+        .format-hint {
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+        .examples-section {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .examples-label {
+            font-weight: 500;
+            font-size: 11px;
+            color: #555;
+        }
+        .example-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+            border: 1px solid #a0a0a0;
+            padding: 3px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .example-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+        }
+        .error-message {
+            background: #fff5f5;
+            border: 1px solid #ff6b6b;
+            color: #d63031;
+            padding: 6px 8px;
+            margin-top: 8px;
+            font-size: 11px;
+            border-radius: 2px;
+            display: none;
+        }
+        .fields-section {
+            background: #fafafa;
+            border-bottom: 1px solid #c0c0c0;
+            padding: 12px;
+        }
+        .fields-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+        }
+        .field-card {
+            background: white;
+            border: 1px solid #d0d0d0;
+            border-radius: 3px;
+            padding: 8px;
+            text-align: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .field-header {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+        .field-value {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-weight: bold;
+            color: #4a90e2;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .field-desc {
+            font-size: 10px;
+            color: #888;
+        }
+        .panels-container {
+            flex: 1;
+            display: flex;
+        }
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #c0c0c0;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .panel:last-child {
+            border-right: none;
+        }
+        .panel-header {
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .status-badge {
+            background: #6c757d;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: normal;
+        }
+        .status-badge.valid {
+            background: #28a745;
+        }
+        .status-badge.invalid {
+            background: #dc3545;
+        }
+        .panel-content {
+            flex: 1;
+            padding: 12px;
+            background: white;
+            overflow-y: auto;
+        }
+        .description-box {
+            background: linear-gradient(to bottom, #f0f8ff, #e3f2fd);
+            border: 1px solid #90caf9;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #1565c0;
+        }
+        .next-runs-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .next-run-item {
+            padding: 6px 8px;
+            border-bottom: 1px solid #f0f0f0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .next-run-item:hover {
+            background: #f8f8f8;
+        }
+        .run-datetime {
+            color: #4a90e2;
+            font-weight: 500;
+        }
+        .run-relative {
+            color: #666;
+            font-size: 10px;
+        }
+        .empty-state {
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            padding: 24px 16px;
+            font-size: 12px;
+        }
+        .timezone-info {
+            color: #666;
+            font-size: 10px;
+        }
+        .empty-message {
+            color: #999;
+            font-style: italic;
+            text-align: center;
+            padding: 16px;
+            font-size: 12px;
+        }
+        @media (max-width: 768px) {
+            .fields-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            .panels-container {
+                flex-direction: column;
+            }
+            .panel {
+                border-right: none;
+                border-bottom: 1px solid #c0c0c0;
+            }
+            .panel:last-child {
+                border-bottom: none;
+            }
+            .examples-section {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .history-popup {
+                width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Cron Parser</h1>
+        <div class="header-actions">
+            <button class="global-history-btn" id="globalHistoryBtn">Global History</button>
+            <a href="/">← Back to Tools</a>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <button class="primary" onclick="cronParser.parseCron()">Parse Expression</button>
+        <div class="separator"></div>
+        <button onclick="cronParser.clearAll()">Clear All</button>
+        <button onclick="cronParser.loadSample()">Load Sample</button>
+        <div class="separator"></div>
+        <button onclick="cronParser.copyNextRuns()">Copy Next Runs</button>
+        <div class="separator"></div>
+        <div class="history-container">
+            <button class="history-toggle-btn" id="historyToggle">History</button>
+            <div class="history-popup" id="historyPopup">
+                <div class="history-content" id="historyContent">
+                    <div class="empty-message">No history available</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="input-section">
+            <div class="format-hint">Format: minute hour day month weekday (e.g., "0 9 * * 1-5" = weekdays at 9 AM)</div>
+            <div class="input-group">
+                <span class="input-label">Cron Expression:</span>
+                <input type="text" class="cron-input" id="cronInput" placeholder="Enter cron expression..." />
+            </div>
+            <div class="error-message" id="errorMessage"></div>
+            <div class="examples-section">
+                <span class="examples-label">Quick Examples:</span>
+                <button class="example-btn" onclick="cronParser.loadExample('0 9 * * 1-5')">9 AM weekdays</button>
+                <button class="example-btn" onclick="cronParser.loadExample('0 0 * * 0')">Midnight Sundays</button>
+                <button class="example-btn" onclick="cronParser.loadExample('*/15 * * * *')">Every 15 min</button>
+                <button class="example-btn" onclick="cronParser.loadExample('0 */2 * * *')">Every 2 hours</button>
+                <button class="example-btn" onclick="cronParser.loadExample('0 0 1 * *')">1st of month</button>
+                <button class="example-btn" onclick="cronParser.loadExample('30 14 * * 1,3,5')">2:30 PM Mon/Wed/Fri</button>
+                <button class="example-btn" onclick="cronParser.loadExample('0 6 * * MON-FRI')">6 AM weekdays</button>
+                <button class="example-btn" onclick="cronParser.loadExample('0 0 */2 * *')">Every 2 days</button>
+                <button class="example-btn" onclick="cronParser.loadExample('0 3 1 JAN,JUL *')">Jan 1st & July 1st at 3 AM</button>
+            </div>
+        </div>
+
+        <div class="fields-section">
+            <div class="fields-grid">
+                <div class="field-card">
+                    <div class="field-header">Minute</div>
+                    <div class="field-value" id="minuteValue">-</div>
+                    <div class="field-desc" id="minuteDesc">0-59</div>
+                </div>
+                <div class="field-card">
+                    <div class="field-header">Hour</div>
+                    <div class="field-value" id="hourValue">-</div>
+                    <div class="field-desc" id="hourDesc">0-23</div>
+                </div>
+                <div class="field-card">
+                    <div class="field-header">Day</div>
+                    <div class="field-value" id="dayValue">-</div>
+                    <div class="field-desc" id="dayDesc">1-31</div>
+                </div>
+                <div class="field-card">
+                    <div class="field-header">Month</div>
+                    <div class="field-value" id="monthValue">-</div>
+                    <div class="field-desc" id="monthDesc">1-12</div>
+                </div>
+                <div class="field-card">
+                    <div class="field-header">Weekday</div>
+                    <div class="field-value" id="weekdayValue">-</div>
+                    <div class="field-desc" id="weekdayDesc">0-7 (Sun=0,7)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panels-container">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>Description</span>
+                    <span class="status-badge" id="cronStatus">WAITING</span>
+                </div>
+                <div class="panel-content">
+                    <div id="cronDescription" class="empty-state">
+                        Enter a cron expression above to see its human-readable description
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span>Next 10 Execution Times</span>
+                    <span class="timezone-info" id="timezone">UTC</span>
+                </div>
+                <div class="panel-content">
+                    <ul id="nextRunsList" class="next-runs-list">
+                        <li class="empty-state">Enter a valid cron expression to see upcoming execution times</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global History Popup -->
+    <div class="global-history-popup" id="globalHistoryPopup">
+        <div class="global-history-header">
+            <span>Global History</span>
+            <button class="global-history-close" id="globalHistoryClose">×</button>
+        </div>
+        <div class="global-history-content" id="globalHistoryContent">
+            <div class="empty-message">No global history available</div>
+        </div>
+    </div>
+
+    <script>
+        class CronParser {
+            constructor() {
+                this.monthNames = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+                this.dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                this.fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                
+                this.elements = {
+                    cronInput: document.getElementById('cronInput'),
+                    errorMessage: document.getElementById('errorMessage'),
+                    cronStatus: document.getElementById('cronStatus'),
+                    minuteValue: document.getElementById('minuteValue'),
+                    hourValue: document.getElementById('hourValue'),
+                    dayValue: document.getElementById('dayValue'),
+                    monthValue: document.getElementById('monthValue'),
+                    weekdayValue: document.getElementById('weekdayValue'),
+                    minuteDesc: document.getElementById('minuteDesc'),
+                    hourDesc: document.getElementById('hourDesc'),
+                    dayDesc: document.getElementById('dayDesc'),
+                    monthDesc: document.getElementById('monthDesc'),
+                    weekdayDesc: document.getElementById('weekdayDesc'),
+                    cronDescription: document.getElementById('cronDescription'),
+                    nextRunsList: document.getElementById('nextRunsList'),
+                    timezone: document.getElementById('timezone'),
+                    historyToggle: document.getElementById('historyToggle'),
+                    historyPopup: document.getElementById('historyPopup'),
+                    historyContent: document.getElementById('historyContent'),
+                    globalHistoryBtn: document.getElementById('globalHistoryBtn'),
+                    globalHistoryPopup: document.getElementById('globalHistoryPopup'),
+                    globalHistoryContent: document.getElementById('globalHistoryContent'),
+                    globalHistoryClose: document.getElementById('globalHistoryClose')
+                };
+                
+                this.initializeEventListeners();
+                this.initializeTimezone();
+            }
+
+            initializeEventListeners() {
+                // Auto-parse on input
+                this.elements.cronInput.addEventListener('input', () => {
+                    clearTimeout(this.parseTimer);
+                    this.parseTimer = setTimeout(() => this.parseCron(), 500);
+                });
+
+                // Local history functionality
+                this.elements.historyToggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleLocalHistory();
+                });
+
+                // Global history functionality
+                this.elements.globalHistoryBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toggleGlobalHistory();
+                });
+
+                this.elements.globalHistoryClose.addEventListener('click', () => {
+                    this.elements.globalHistoryPopup.classList.remove('show');
+                });
+
+                // Close popups when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!this.elements.historyPopup.contains(e.target) && !this.elements.historyToggle.contains(e.target)) {
+                        this.elements.historyPopup.classList.remove('show');
+                    }
+                    if (!this.elements.globalHistoryPopup.contains(e.target) && !this.elements.globalHistoryBtn.contains(e.target)) {
+                        this.elements.globalHistoryPopup.classList.remove('show');
+                    }
+                });
+            }
+
+            initializeTimezone() {
+                this.elements.timezone.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+            }
+
+            parseCronField(field, min, max, names = null) {
+                // Handle named values
+                if (names && typeof field === 'string') {
+                    const upperField = field.toUpperCase();
+                    for (let i = 0; i < names.length; i++) {
+                        if (upperField === names[i]) {
+                            field = (min === 0) ? i : i + 1;
+                            break;
+                        }
+                    }
+                    if (field.includes('-')) {
+                        const [start, end] = field.split('-');
+                        let startIdx = names.indexOf(start.toUpperCase());
+                        let endIdx = names.indexOf(end.toUpperCase());
+                        if (startIdx !== -1 && endIdx !== -1) {
+                            startIdx = min === 0 ? startIdx : startIdx + 1;
+                            endIdx = min === 0 ? endIdx : endIdx + 1;
+                            field = `${startIdx}-${endIdx}`;
+                        }
+                    }
+                }
+
+                if (field === '*') {
+                    return { type: 'all', values: null, description: 'every' };
+                }
+
+                if (field.includes('/')) {
+                    const [range, step] = field.split('/');
+                    const stepNum = parseInt(step);
+                    if (range === '*') {
+                        return { type: 'step', values: stepNum, description: `every ${stepNum}` };
+                    } else {
+                        return { type: 'range_step', values: [range, stepNum], description: `every ${stepNum} in range ${range}` };
+                    }
+                }
+
+                if (field.includes('-')) {
+                    const [start, end] = field.split('-').map(v => parseInt(v));
+                    return { type: 'range', values: [start, end], description: `${start}-${end}` };
+                }
+
+                if (field.includes(',')) {
+                    const values = field.split(',').map(v => {
+                        const num = parseInt(v);
+                        return names && names[num - (min === 0 ? 0 : 1)] ? `${num} (${names[num - (min === 0 ? 0 : 1)]})` : num;
+                    });
+                    return { type: 'list', values: field.split(',').map(v => parseInt(v)), description: values.join(', ') };
+                }
+
+                const num = parseInt(field);
+                if (isNaN(num) || num < min || num > max) {
+                    throw new Error(`Invalid value ${field} for range ${min}-${max}`);
+                }
+
+                const displayValue = names && names[num - (min === 0 ? 0 : 1)] ? `${num} (${names[num - (min === 0 ? 0 : 1)]})` : num;
+                return { type: 'specific', values: num, description: displayValue };
+            }
+
+            parseCron(cronExpression = null) {
+                const expression = cronExpression || this.elements.cronInput.value.trim();
+                
+                // Clear previous state
+                this.elements.errorMessage.style.display = 'none';
+                this.elements.cronInput.classList.remove('error', 'valid');
+
+                if (!expression) {
+                    this.clearResults();
+                    this.updateStatus('WAITING');
+                    return;
+                }
+
+                try {
+                    const parts = expression.trim().split(/\s+/);
+                    if (parts.length !== 5) {
+                        throw new Error('Cron expression must have exactly 5 fields: minute hour day month weekday');
+                    }
+
+                    const [minute, hour, day, month, weekday] = parts;
+                    const parsed = {
+                        minute: this.parseCronField(minute, 0, 59),
+                        hour: this.parseCronField(hour, 0, 23),
+                        day: this.parseCronField(day, 1, 31),
+                        month: this.parseCronField(month, 1, 12, this.monthNames),
+                        weekday: this.parseCronField(weekday, 0, 7, this.fullDayNames)
+                    };
+
+                    // Update UI with parsed results
+                    this.elements.cronInput.classList.add('valid');
+                    this.updateStatus('VALID');
+                    this.updateFieldDisplays(parsed);
+                    this.updateDescription(this.generateDescription(parsed));
+                    this.updateNextRuns(this.getNextRuns(expression));
+
+                    // Save to history
+                    this.saveToHistory(expression);
+
+                } catch (error) {
+                    this.elements.cronInput.classList.add('error');
+                    this.elements.errorMessage.textContent = error.message;
+                    this.elements.errorMessage.style.display = 'block';
+                    this.updateStatus('INVALID');
+                    this.clearResults();
+                }
+            }
+
+            generateDescription(parsed) {
+                const { minute, hour, day, month, weekday } = parsed;
+                let desc = 'Runs ';
+
+                // Handle special cases first
+                if (minute.type === 'step' && minute.values === 1 && hour.type === 'all') {
+                    desc += 'every minute';
+                } else if (minute.type === 'step' && hour.type === 'all') {
+                    desc += `every ${minute.values} minutes`;
+                } else if (hour.type === 'step' && minute.type === 'specific' && minute.values === 0) {
+                    desc += `every ${hour.values} hours on the hour`;
+                } else {
+                    // Standard time description
+                    if (minute.type === 'specific' && hour.type === 'specific') {
+                        const timeStr = `${hour.values.toString().padStart(2, '0')}:${minute.values.toString().padStart(2, '0')}`;
+                        desc += `at ${timeStr}`;
+                    } else if (minute.type === 'specific') {
+                        desc += `at ${minute.values} minutes past `;
+                        if (hour.type === 'all') {
+                            desc += 'every hour';
+                        } else {
+                            desc += `hour ${hour.description}`;
+                        }
+                    } else {
+                        desc += `at minute ${minute.description} of hour ${hour.description}`;
+                    }
+                }
+
+                // Add day/month/weekday constraints
+                const constraints = [];
+
+                if (weekday.type !== 'all') {
+                    if (weekday.type === 'specific') {
+                        const dayName = this.fullDayNames[weekday.values === 7 ? 0 : weekday.values];
+                        constraints.push(`on ${dayName}`);
+                    } else {
+                        constraints.push(`on weekdays ${weekday.description}`);
+                    }
+                }
+
+                if (day.type !== 'all') {
+                    if (day.type === 'specific') {
+                        const suffix = this.getDaySuffix(day.values);
+                        constraints.push(`on the ${day.values}${suffix} day`);
+                    } else {
+                        constraints.push(`on days ${day.description}`);
+                    }
+                }
+
+                if (month.type !== 'all') {
+                    if (month.type === 'specific') {
+                        constraints.push(`in ${this.monthNames[month.values - 1]}`);
+                    } else {
+                        constraints.push(`in months ${month.description}`);
+                    }
+                }
+
+                if (constraints.length > 0) {
+                    desc += ' ' + constraints.join(' and ');
+                }
+
+                return desc;
+            }
+
+            getDaySuffix(day) {
+                if (day >= 11 && day <= 13) return 'th';
+                switch (day % 10) {
+                    case 1: return 'st';
+                    case 2: return 'nd';
+                    case 3: return 'rd';
+                    default: return 'th';
+                }
+            }
+
+            getNextRuns(cronExpression, count = 10) {
+                const runs = [];
+                const now = new Date();
+                let current = new Date(now.getTime() + 60000);
+                current.setSeconds(0, 0);
+
+                const parsed = this.parseCronExpression(cronExpression);
+
+                while (runs.length < count) {
+                    if (this.matchesCron(current, parsed)) {
+                        runs.push(new Date(current));
+                    }
+                    current.setMinutes(current.getMinutes() + 1);
+
+                    if (current.getTime() > now.getTime() + (365 * 24 * 60 * 60 * 1000)) {
+                        break;
+                    }
+                }
+
+                return runs;
+            }
+
+            parseCronExpression(cronExpression) {
+                const parts = cronExpression.trim().split(/\s+/);
+                const [minute, hour, day, month, weekday] = parts;
+
+                return {
+                    minute: this.parseCronField(minute, 0, 59),
+                    hour: this.parseCronField(hour, 0, 23),
+                    day: this.parseCronField(day, 1, 31),
+                    month: this.parseCronField(month, 1, 12, this.monthNames),
+                    weekday: this.parseCronField(weekday, 0, 7, this.fullDayNames)
+                };
+            }
+
+            matchesCron(date, parsed) {
+                const minute = date.getMinutes();
+                const hour = date.getHours();
+                const day = date.getDate();
+                const month = date.getMonth() + 1;
+                const weekday = date.getDay();
+
+                return (
+                    this.matchesField(minute, parsed.minute) &&
+                    this.matchesField(hour, parsed.hour) &&
+                    this.matchesField(day, parsed.day) &&
+                    this.matchesField(month, parsed.month) &&
+                    this.matchesField(weekday === 0 ? 7 : weekday, parsed.weekday, true)
+                );
+            }
+
+            matchesField(value, field, allowSundayAs7 = false) {
+                if (field.type === 'all') return true;
+
+                if (field.type === 'specific') {
+                    if (allowSundayAs7 && field.values === 7 && value === 7) return true;
+                    return value === field.values;
+                }
+
+                if (field.type === 'list') {
+                    return field.values.some(v => {
+                        if (allowSundayAs7 && v === 7 && value === 7) return true;
+                        return value === v;
+                    });
+                }
+
+                if (field.type === 'range') {
+                    return value >= field.values[0] && value <= field.values[1];
+                }
+
+                if (field.type === 'step') {
+                    return value % field.values === 0;
+                }
+
+                if (field.type === 'range_step') {
+                    const [range, step] = field.values;
+                    if (range === '*') {
+                        return value % step === 0;
+                    }
+                    return value % step === 0;
+                }
+
+                return false;
+            }
+
+            updateStatus(status) {
+                this.elements.cronStatus.textContent = status;
+                this.elements.cronStatus.className = `status-badge ${status.toLowerCase()}`;
+            }
+
+            updateFieldDisplays(parsed) {
+                this.elements.minuteValue.textContent = parsed.minute.description;
+                this.elements.hourValue.textContent = parsed.hour.description;
+                this.elements.dayValue.textContent = parsed.day.description;
+                this.elements.monthValue.textContent = parsed.month.description;
+                this.elements.weekdayValue.textContent = parsed.weekday.description;
+
+                this.elements.minuteDesc.textContent = this.getFieldHelp('minute', parsed.minute);
+                this.elements.hourDesc.textContent = this.getFieldHelp('hour', parsed.hour);
+                this.elements.dayDesc.textContent = this.getFieldHelp('day', parsed.day);
+                this.elements.monthDesc.textContent = this.getFieldHelp('month', parsed.month);
+                this.elements.weekdayDesc.textContent = this.getFieldHelp('weekday', parsed.weekday);
+            }
+
+            getFieldHelp(fieldName, field) {
+                const ranges = {
+                    minute: '0-59',
+                    hour: '0-23',
+                    day: '1-31',
+                    month: '1-12',
+                    weekday: '0-7 (Sun=0,7)'
+                };
+
+                if (field.type === 'all') return `${ranges[fieldName]} (all)`;
+                if (field.type === 'step') return `Every ${field.values}`;
+                if (field.type === 'range') return `Range: ${field.values[0]}-${field.values[1]}`;
+                if (field.type === 'list') return `List: ${field.values.join(',')}`;
+                return ranges[fieldName];
+            }
+
+            updateDescription(description) {
+                this.elements.cronDescription.innerHTML = `<div class="description-box">${description}</div>`;
+            }
+
+            updateNextRuns(runs) {
+                if (runs.length === 0) {
+                    this.elements.nextRunsList.innerHTML = '<li class="empty-state">No upcoming runs found</li>';
+                    return;
+                }
+
+                this.elements.nextRunsList.innerHTML = runs.map(run => `
+                    <li class="next-run-item">
+                        <span class="run-datetime">${run.toLocaleString()}</span>
+                        <span class="run-relative">${this.formatRelativeTime(run)}</span>
+                    </li>
+                `).join('');
+            }
+
+            formatRelativeTime(date) {
+                const now = new Date();
+                const diff = date.getTime() - now.getTime();
+
+                if (diff < 60000) return 'in less than a minute';
+                if (diff < 3600000) return `in ${Math.round(diff / 60000)} minutes`;
+                if (diff < 86400000) return `in ${Math.round(diff / 3600000)} hours`;
+
+                const days = Math.round(diff / 86400000);
+                return `in ${days} day${days > 1 ? 's' : ''}`;
+            }
+
+            clearResults() {
+                ['minuteValue', 'hourValue', 'dayValue', 'monthValue', 'weekdayValue'].forEach(id => {
+                    document.getElementById(id).textContent = '-';
+                });
+
+                const ranges = { minute: '0-59', hour: '0-23', day: '1-31', month: '1-12', weekday: '0-7 (Sun=0,7)' };
+                ['minuteDesc', 'hourDesc', 'dayDesc', 'monthDesc', 'weekdayDesc'].forEach(id => {
+                    const field = id.replace('Desc', '');
+                    document.getElementById(id).textContent = ranges[field];
+                });
+
+                this.elements.cronDescription.innerHTML = '<div class="empty-state">Enter a cron expression above to see its human-readable description</div>';
+                this.elements.nextRunsList.innerHTML = '<li class="empty-state">Enter a valid cron expression to see upcoming execution times</li>';
+            }
+
+            loadExample(expression) {
+                this.elements.cronInput.value = expression;
+                this.parseCron();
+            }
+
+            loadSample() {
+                this.loadExample('0 9-17 * * 1-5');
+            }
+
+            clearAll() {
+                this.elements.cronInput.value = '';
+                this.elements.errorMessage.style.display = 'none';
+                this.elements.cronInput.classList.remove('error', 'valid');
+                this.updateStatus('WAITING');
+                this.clearResults();
+            }
+
+            copyNextRuns() {
+                const runs = document.querySelectorAll('.next-run-item');
+                if (runs.length === 0) {
+                    return;
+                }
+
+                const runText = Array.from(runs).map((run, index) => {
+                    const datetime = run.querySelector('.run-datetime').textContent;
+                    const relative = run.querySelector('.run-relative').textContent;
+                    return `${index + 1}. ${datetime} (${relative})`;
+                }).join('\n');
+
+                navigator.clipboard.writeText(runText).then(() => {
+                    // Could show a temporary success message
+                }).catch(() => {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = runText;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                });
+            }
+
+            // History functionality
+            async saveToHistory(expression) {
+                try {
+                    const data = { expression: expression };
+                    const response = await fetch('/api/history/cron-parser', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ data: JSON.stringify(data), operation: 'parse' })
+                    });
+                    
+                    if (response.ok) {
+                        this.elements.historyToggle.classList.remove('disabled');
+                    }
+                } catch (error) {
+                    console.warn('History save error:', error);
+                }
+            }
+
+            toggleLocalHistory() {
+                if (this.elements.historyPopup.classList.contains('show')) {
+                    this.elements.historyPopup.classList.remove('show');
+                } else {
+                    this.elements.historyPopup.classList.add('show');
+                    this.loadLocalHistory();
+                }
+            }
+
+            toggleGlobalHistory() {
+                if (this.elements.globalHistoryPopup.classList.contains('show')) {
+                    this.elements.globalHistoryPopup.classList.remove('show');
+                } else {
+                    this.elements.globalHistoryPopup.classList.add('show');
+                    this.loadGlobalHistory();
+                }
+            }
+
+            async loadLocalHistory() {
+                try {
+                    const response = await fetch('/api/history/cron-parser?limit=10');
+                    if (!response.ok) throw new Error('Failed to fetch history');
+                    
+                    const data = await response.json();
+                    this.displayLocalHistory(data.history || []);
+                } catch (error) {
+                    console.error('Error loading history:', error);
+                    this.elements.historyContent.innerHTML = '<div class="empty-message">Error loading history</div>';
+                }
+            }
+
+            displayLocalHistory(history) {
+                if (!history.length) {
+                    this.elements.historyContent.innerHTML = '<div class="history-item">No history available</div>';
+                    return;
+                }
+
+                const historyHtml = history.map(entry => {
+                    let preview = 'Invalid history entry';
+                    try {
+                        const data = JSON.parse(entry.preview || entry.data || '{}');
+                        preview = data.expression || 'No expression';
+                    } catch (e) {
+                        preview = entry.preview || 'Invalid entry';
+                    }
+
+                    return `
+                        <div class="history-item" data-id="${entry.id}">
+                            <div class="history-item-header">
+                                <div class="history-item-content">
+                                    <input type="checkbox" class="history-checkbox" data-id="${entry.id}" onclick="event.stopPropagation()">
+                                    <div class="history-meta">
+                                        <span class="history-id">ID: ${entry.id}</span>
+                                        <span class="history-date">${this.formatTimestamp(entry.timestamp)} - ${entry.operation || 'parse'}</span>
+                                    </div>
+                                </div>
+                                <button class="history-delete-btn" onclick="cronParser.deleteHistoryItem('${entry.id}'); event.stopPropagation();">×</button>
+                            </div>
+                            <div class="history-preview">${preview}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                this.elements.historyContent.innerHTML = historyHtml;
+
+                // Add click listeners to history items (excluding checkbox clicks)
+                this.elements.historyContent.querySelectorAll('.history-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        if (e.target.type !== 'checkbox') {
+                            this.loadHistoryEntry(item.dataset.id);
+                        }
+                    });
+                });
+
+                // Add checkbox event listeners
+                this.elements.historyContent.querySelectorAll('.history-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', (e) => {
+                        this.handleHistorySelection(e.target.dataset.id, e.target.checked);
+                    });
+                });
+            }
+
+            async loadHistoryEntry(entryId) {
+                try {
+                    const response = await fetch(`/api/history/cron-parser/${entryId}`);
+                    if (!response.ok) throw new Error('Failed to fetch history entry');
+                    
+                    const entry = await response.json();
+                    const data = JSON.parse(entry.data);
+                    
+                    this.elements.cronInput.value = data.expression || '';
+                    this.parseCron();
+                    this.elements.historyPopup.classList.remove('show');
+                } catch (error) {
+                    console.error('Error loading history entry:', error);
+                }
+            }
+
+            async loadGlobalHistory() {
+                try {
+                    const response = await fetch('/api/global-history?limit=15');
+                    if (!response.ok) throw new Error('Failed to fetch global history');
+                    
+                    const data = await response.json();
+                    this.displayGlobalHistory(data.history || []);
+                } catch (error) {
+                    console.error('Error loading global history:', error);
+                    this.elements.globalHistoryContent.innerHTML = '<div class="empty-message">Error loading global history</div>';
+                }
+            }
+
+            displayGlobalHistory(history) {
+                if (!history.length) {
+                    this.elements.globalHistoryContent.innerHTML = '<div class="global-history-item">No global history available</div>';
+                    return;
+                }
+
+                const historyHtml = history.map(entry => {
+                    let preview = 'Invalid history entry';
+                    try {
+                        const data = JSON.parse(entry.preview || entry.data || '{}');
+                        preview = data.expression || data.pattern || data.text1 || 'No preview';
+                        if (preview.length > 50) preview = preview.substring(0, 50) + '...';
+                    } catch (e) {
+                        preview = (entry.preview || 'Invalid entry').substring(0, 50);
+                        if (entry.preview && entry.preview.length > 50) preview += '...';
+                    }
+
+                    return `
+                        <div class="global-history-item" data-id="${entry.id}" data-tool="${entry.tool_name}">
+                            <div class="global-history-item-header">
+                                <input type="checkbox" class="global-history-checkbox" data-id="${entry.id}" onclick="event.stopPropagation()">
+                                <div class="global-history-item-meta">
+                                    <div class="global-history-id-tool">
+                                        <span class="history-id">ID: ${entry.id}</span>
+                                        <span class="global-history-tool-label" style="background-color: ${this.getToolColor(entry.tool_name)}">${entry.tool_name}</span>
+                                    </div>
+                                    <span class="history-date">${this.formatTimestamp(entry.timestamp)} - ${entry.operation || 'parse'}</span>
+                                </div>
+                                <button class="history-delete-btn" onclick="cronParser.deleteGlobalHistoryItem('${entry.id}'); event.stopPropagation();">×</button>
+                            </div>
+                            <div class="history-preview">${preview}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                this.elements.globalHistoryContent.innerHTML = historyHtml;
+
+                // Add click listeners to global history items (allow cross-tool loading)
+                this.elements.globalHistoryContent.querySelectorAll('.global-history-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        if (e.target.type !== 'checkbox') {
+                            this.loadGlobalHistoryEntry(item.dataset.id, item.dataset.tool);
+                        }
+                    });
+                });
+            }
+
+            async loadGlobalHistoryEntry(entryId) {
+                try {
+                    const response = await fetch(`/api/global-history/${entryId}`);
+                    if (!response.ok) throw new Error('Failed to fetch global history entry');
+                    
+                    const entry = await response.json();
+                    
+                    if (entry.tool_name === 'cron-parser') {
+                        const data = JSON.parse(entry.data);
+                        this.elements.cronInput.value = data.expression || '';
+                        this.parseCron();
+                    }
+                    
+                    this.elements.globalHistoryPopup.classList.remove('show');
+                } catch (error) {
+                    console.error('Error loading global history entry:', error);
+                }
+            }
+
+            // Helper methods to match JSON formatter exactly
+            formatTimestamp(isoTimestamp) {
+                try {
+                    const date = new Date(isoTimestamp);
+                    const now = new Date();
+                    const diffMs = now - date;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    
+                    if (diffMins < 1) return 'just now';
+                    if (diffMins < 60) return `${diffMins}m ago`;
+                    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+                    return `${Math.floor(diffMins / 1440)}d ago`;
+                } catch (e) {
+                    return 'unknown';
+                }
+            }
+
+            handleHistorySelection(entryId, isSelected) {
+                if (!this.selectedHistoryItems) {
+                    this.selectedHistoryItems = new Set();
+                }
+                
+                if (isSelected) {
+                    this.selectedHistoryItems.add(entryId);
+                } else {
+                    this.selectedHistoryItems.delete(entryId);
+                }
+            }
+
+            getToolColor(toolName) {
+                const colors = {
+                    'json-formatter': '#2196F3',
+                    'json-yaml-xml-converter': '#4CAF50',
+                    'regex-tester': '#FF9800',
+                    'text-diff': '#9C27B0',
+                    'cron-parser': '#607D8B'
+                };
+                return colors[toolName] || '#757575';
+            }
+
+            async deleteHistoryItem(entryId) {
+                try {
+                    const response = await fetch(`/api/history/cron-parser/${entryId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        this.loadLocalHistory(); // Refresh local history list
+                        this.loadGlobalHistory(); // Refresh global history list if open
+                    }
+                } catch (error) {
+                    console.error('Error deleting history item:', error);
+                }
+            }
+
+            async deleteGlobalHistoryItem(entryId) {
+                try {
+                    const response = await fetch(`/api/global-history/${entryId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        this.loadLocalHistory(); // Refresh local history list
+                        this.loadGlobalHistory(); // Refresh global history list
+                    }
+                } catch (error) {
+                    console.error('Error deleting global history item:', error);
+                }
+            }
+        }
+
+        // Initialize the cron parser
+        const cronParser = new CronParser();
+        cronParser.clearResults();
+    </script>
+</body>
+</html>

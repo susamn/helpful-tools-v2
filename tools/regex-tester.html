@@ -472,11 +472,11 @@
             text-overflow: ellipsis;
         }
         
-        /* Global History popup - positioned from right edge */
+        /* Global History popup - positioned below button */
         .global-history-popup {
             position: absolute;
             top: 100%;
-            right: 0;
+            left: 0;
             background: white;
             border: 1px solid #a0a0a0;
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
@@ -549,7 +549,20 @@
         <h1>Regex Tester</h1>
         <div class="header-actions">
             <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
-            <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
+            <div style="position: relative; display: inline-block;">
+                <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
+                <div class="global-history-popup" id="globalHistoryPopup">
+                    <div class="global-history-header">
+                        <span>Global History</span>
+                        <button onclick="document.getElementById('globalHistoryPopup').classList.remove('show')" style="background: none; border: none; font-size: 14px; cursor: pointer;">✕</button>
+                    </div>
+                    <div class="global-history-content" id="globalHistoryContent">
+                        <div id="globalHistoryList">
+                            <div class="global-history-item">Loading global history...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <a href="/">← Back to Tools</a>
         </div>
     </div>
@@ -579,19 +592,6 @@
                         <div class="history-item">Copy features coming soon</div>
                     </div>
                 </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Global History popup positioned from right edge -->
-    <div class="global-history-popup" id="globalHistoryPopup">
-        <div class="global-history-header">
-            <span>Global History</span>
-            <button onclick="document.getElementById('globalHistoryPopup').classList.remove('show')" style="background: none; border: none; font-size: 14px; cursor: pointer;">✕</button>
-        </div>
-        <div class="global-history-content" id="globalHistoryContent">
-            <div id="globalHistoryList">
-                <div class="global-history-item">Loading global history...</div>
             </div>
         </div>
     </div>
@@ -1187,9 +1187,9 @@
 
                 this.elements.historyList.innerHTML = history.map(entry => {
                     try {
-                        const data = JSON.parse(entry.data);
                         const time = new Date(entry.timestamp).toLocaleString();
-                        const preview = `/${data.pattern}/${data.flags || ''} → ${data.testText.substring(0, 30)}${data.testText.length > 30 ? '...' : ''}`;
+                        // Use the preview field directly (it's already a formatted string from the backend)
+                        const preview = entry.preview || 'No preview available';
                         
                         return `
                             <div class="history-item" onclick="regexTester.loadHistoryEntry('${entry.id}')">
@@ -1198,7 +1198,8 @@
                             </div>
                         `;
                     } catch (error) {
-                        return '<div class="history-item">Invalid history entry</div>';
+                        console.error('Error displaying history entry:', error, entry);
+                        return '<div class="history-item">Error loading entry</div>';
                     }
                 }).join('');
             }
@@ -1212,7 +1213,8 @@
                         const data = JSON.parse(entry.data);
                         
                         this.elements.regexInput.value = data.pattern || '';
-                        this.elements.testText.value = data.testText || '';
+                        // Convert literal \n to actual newlines (same as loadExample)
+                        this.elements.testText.value = (data.testText || '').replace(/\\n/g, '\n');
                         
                         // Set flags
                         this.elements.flagGlobal.checked = (data.flags || '').includes('g');
@@ -1323,7 +1325,8 @@
                         const data = JSON.parse(entry.data);
                         
                         this.elements.regexInput.value = data.pattern || '';
-                        this.elements.testText.value = data.testText || '';
+                        // Convert literal \n to actual newlines (same as loadExample)
+                        this.elements.testText.value = (data.testText || '').replace(/\\n/g, '\n');
                         
                         // Set flags
                         this.elements.flagGlobal.checked = (data.flags || '').includes('g');

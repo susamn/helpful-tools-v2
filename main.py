@@ -47,6 +47,13 @@ TOOLS = [
         "path": "/tools/regex-tester",
         "tags": ["regex", "pattern", "match", "test", "validation"],
         "has_history": True
+    },
+    {
+        "name": "Cron Parser",
+        "description": "Parse and analyze cron expressions with human-readable descriptions and next execution times",
+        "path": "/tools/cron-parser",
+        "tags": ["cron", "scheduler", "parser", "time", "unix"],
+        "has_history": True
     }
 ]
 

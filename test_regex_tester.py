@@ -584,6 +584,98 @@ class TestNewlineHandling:
         # Should find at least the 3 valid entries
         assert len(matches_proper) >= 3, f"Should find at least 3 matches, found {len(matches_proper)}"
 
+class TestHistoryFunctionality:
+    """Test history functionality fixes"""
+    
+    def test_history_newline_conversion_simulation(self):
+        """Test that history loading simulates the JavaScript newline conversion"""
+        
+        # Simulate data as it would be stored in the database (with literal \n)
+        stored_history_data = {
+            "pattern": r"\d+",
+            "testText": "line1\\ntest123\\nline3", 
+            "flags": "g"
+        }
+        
+        # Simulate the JavaScript loadHistoryEntry conversion: (data.testText || '').replace(/\\n/g, '\n')
+        loaded_text = stored_history_data["testText"].replace('\\n', '\n')
+        
+        # Test that the conversion works correctly
+        assert '\\n' in stored_history_data["testText"], "Original data should have literal \\n"
+        assert '\n' in loaded_text, "Converted data should have actual newlines"
+        assert loaded_text.count('\n') == 2, "Should have 2 actual newlines"
+        assert loaded_text == "line1\ntest123\nline3", "Conversion should produce correct text"
+        
+        # Test that regex works better with converted text
+        pattern = r'^\w+\d+$'  # Line-anchored pattern
+        
+        # With literal \n - should not match individual lines properly
+        matches_literal = list(re.finditer(pattern, stored_history_data["testText"], re.MULTILINE))
+        
+        # With converted newlines - should match lines properly
+        matches_converted = list(re.finditer(pattern, loaded_text, re.MULTILINE))
+        
+        # Should find more matches with proper newlines
+        assert len(matches_converted) >= len(matches_literal), \
+            f"Converted text should find more or equal matches: {len(matches_converted)} >= {len(matches_literal)}"
+        
+        # Should find the test123 match
+        match_texts = [m.group() for m in matches_converted]
+        assert "test123" in match_texts, "Should find 'test123' with proper newlines"
+    
+    def test_history_data_format_compatibility(self):
+        """Test that history data format is compatible with the JavaScript loading functions"""
+        
+        # Test data structure as expected by JavaScript functions
+        history_entry = {
+            "id": "test123",
+            "data": '{"pattern":"test\\\\d+","testText":"line1\\\\ntest123\\\\nline3","flags":"g"}',
+            "timestamp": "2025-09-01T10:00:00.000000",
+            "operation": "test"
+        }
+        
+        # Simulate JavaScript JSON.parse(entry.data)
+        data = json.loads(history_entry["data"])
+        
+        # Verify structure
+        assert "pattern" in data, "Data should contain pattern"
+        assert "testText" in data, "Data should contain testText"
+        assert "flags" in data, "Data should contain flags"
+        
+        # Test the newline conversion
+        original_text = data["testText"]
+        converted_text = original_text.replace('\\n', '\n')
+        
+        # Verify conversion works as expected
+        assert original_text == "line1\\ntest123\\nline3", "Original should have literal \\n"
+        assert converted_text == "line1\ntest123\nline3", "Converted should have actual newlines"
+        
+        # Test that the pattern works with converted text
+        pattern = data["pattern"]
+        flags = data["flags"]
+        
+        # Create regex flags
+        regex_flags = 0
+        if 'i' in flags:
+            regex_flags |= re.IGNORECASE
+        if 'm' in flags:
+            regex_flags |= re.MULTILINE
+        if 's' in flags:
+            regex_flags |= re.DOTALL
+        if 'g' in flags:
+            # Global flag is handled by finditer vs search
+            pass
+            
+        compiled_regex = re.compile(pattern, regex_flags)
+        
+        # Test matching
+        matches = list(compiled_regex.finditer(converted_text))
+        assert len(matches) > 0, "Should find matches in the converted text"
+        
+        # Should find "test123"
+        match_values = [m.group() for m in matches]
+        assert any("123" in match for match in match_values), "Should find the number 123"
+
 if __name__ == '__main__':
     # Run tests with pytest
     pytest.main([__file__, '-v', '--tb=short'])
