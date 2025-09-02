@@ -54,6 +54,13 @@ TOOLS = [
         "path": "/tools/cron-parser",
         "tags": ["cron", "scheduler", "parser", "time", "unix"],
         "has_history": True
+    },
+    {
+        "name": "Scientific Calculator",
+        "description": "Advanced calculator with scientific functions and interactive graph plotter for mathematical expressions",
+        "path": "/tools/scientific-calculator",
+        "tags": ["calculator", "math", "science", "graph", "plotter", "functions"],
+        "has_history": True
     }
 ]
 

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scientific Calculator - Helpful Tools v2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            font-size: 13px;
+        }
+        .header {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .header-actions button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .header-actions button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .header-actions a {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            text-decoration: none;
+        }
+        .header-actions a:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .toolbar button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .toolbar button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .toolbar button:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .separator {
+            width: 1px;
+            height: 16px;
+            background: #c0c0c0;
+            margin: 0 2px;
+        }
+        .main-container {
+            height: calc(100vh - 80px);
+            display: flex;
+        }
+        .calculator-panel {
+            width: 350px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #c0c0c0;
+            flex-shrink: 0;
+        }
+        .graph-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .panel-header {
+            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #555;
+        }
+        .panel-content {
+            flex: 1;
+            background: #ffffff;
+            overflow: hidden;
+            min-width: 0;
+        }
+        .display {
+            background: #000000;
+            color: #00ff00;
+            padding: 12px 16px;
+            font-family: 'Courier New', 'Liberation Mono', monospace;
+            font-size: 24px;
+            text-align: right;
+            height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            font-weight: bold;
+            border-bottom: 1px solid #c0c0c0;
+        }
+        .display-expression {
+            font-size: 14px;
+            color: #888888;
+            margin-bottom: 4px;
+            min-height: 16px;
+        }
+        .display-result {
+            font-size: 24px;
+            color: #00ff00;
+            min-height: 28px;
+        }
+        .button-grid { display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(7, 60px); gap: 1px; background: #f0f0f0; padding: 0; } .calc-button { background: linear-gradient(to bottom, #f8f8f8, #e0e0e0); border: 1px solid #a0a0a0; font-size: 18px; cursor: pointer; color: #000; height: 60px; display: flex; align-items: center; justify-content: center; font-weight: bold; user-select: none; margin: 0; }
+        .calc-button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            font-size: 18px;
+            cursor: pointer;
+            color: #000;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            user-select: none;
+        }
+        .calc-button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .calc-button:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .calc-button.number {
+            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+            color: #000000;
+            font-size: 20px;
+        }
+        .calc-button.operator {
+            background: linear-gradient(to bottom, #ffeb3b, #fbc02d);
+            color: #000000;
+            font-size: 20px;
+        }
+        .calc-button.function {
+            background: linear-gradient(to bottom, #e0e0e0, #d0d0d0);
+            color: #000000;
+            font-size: 12px;
+        }
+        .calc-button.equals {
+            background: linear-gradient(to bottom, #ff9800, #f57c00);
+            color: #000000;
+            font-size: 22px;
+        }
+        .calc-button.clear {
+            background: linear-gradient(to bottom, #f44336, #d32f2f);
+            color: #ffffff;
+            font-size: 14px;
+        }
+        .function-input-panel {
+            background: #ffffff;
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px;
+        }
+        .function-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+        .function-controls label {
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .function-input {
+            width: 100%;
+            padding: 4px 8px;
+            border: 1px solid #a0a0a0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            background: #ffffff;
+        }
+        .function-input.valid {
+            border-color: #4CAF50;
+            background: #f0fff0;
+        }
+        .function-input.error {
+            border-color: #F44336;
+            background: #fff0f0;
+        }
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 4px;
+            font-size: 11px;
+            flex-wrap: wrap;
+        }
+        .zoom-input {
+            width: 50px;
+            padding: 2px 4px;
+            border: 1px solid #a0a0a0;
+            font-size: 11px;
+            background: #ffffff;
+        }
+        .btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .btn:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        .graph-container {
+            flex: 1;
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+        .graph-canvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        .function-legend {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #a0a0a0;
+            padding: 8px;
+            font-size: 11px;
+            max-width: 200px;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 2px 0;
+            cursor: pointer;
+        }
+        .legend-item:hover {
+            background: #f0f0f0;
+        }
+        .legend-color {
+            width: 16px;
+            height: 3px;
+            border: 1px solid #666;
+        }
+        .legend-text {
+            flex: 1;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+        .legend-remove {
+            color: #cc0000;
+            cursor: pointer;
+            font-weight: bold;
+            padding: 0 4px;
+        }
+        .coordinate-display {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 4px 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 2px;
+        }
+        .mode-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+        }
+        .mode-controls label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .history-popup {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #a0a0a0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            width: 400px;
+            max-height: 500px;
+            z-index: 1000;
+            display: none;
+            margin-top: 2px;
+        }
+        .history-popup.show {
+            display: block;
+        }
+        .history-header {
+            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 4px 8px;
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+        }
+        .history-content {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .history-item {
+            border: 1px solid #f0f0f0;
+            margin: 2px 0;
+            background: #ffffff;
+        }
+        .history-item-header {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            background: #f8f8f8;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .history-item-content {
+            display: flex;
+            align-items: center;
+            flex: 1;
+        }
+        .history-checkbox {
+            margin-right: 8px;
+        }
+        .history-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .history-id {
+            font-size: 10px;
+            color: #666;
+            font-weight: bold;
+        }
+        .history-date {
+            font-size: 10px;
+            color: #888;
+        }
+        .history-delete-btn {
+            background: #f44336;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 2px 8px;
+            font-size: 11px;
+            border-radius: 2px;
+            margin-left: auto;
+        }
+        .history-delete-btn:hover {
+            background: #d32f2f;
+        }
+        .history-preview {
+            padding: 6px 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            word-break: break-all;
+            cursor: pointer;
+        }
+        .history-preview:hover {
+            background: #f0f0f0;
+        }
+        .history-actions {
+            padding: 6px 8px;
+            border-top: 1px solid #e0e0e0;
+            background: #f8f8f8;
+            display: flex;
+            gap: 6px;
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            display: none;
+        }
+        .overlay.show {
+            display: block;
+        }
+        .status-bar {
+            background: linear-gradient(to bottom, #e8e8e8, #d8d8d8);
+            border-top: 1px solid #c0c0c0;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: #555;
+            display: flex;
+            gap: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧮 Scientific Calculator</h1>
+        <div class="header-actions">
+            <div class="history-container" style="position: relative; display: inline-block;">
+                <button class="global-history-btn" id="globalHistoryBtn">🌐 Global History</button>
+                <div class="history-popup" id="globalHistoryPopup">
+                    <div class="history-header">
+                        <span>Global History</span>
+                        <button class="history-close" onclick="closeGlobalHistoryPopup()">×</button>
+                    </div>
+                    <div class="history-content" id="globalHistoryContent">
+                        <p style="text-align: center; color: #666; padding: 20px;">No global history yet</p>
+                    </div>
+                    <div class="history-actions">
+                        <button class="btn" onclick="deleteSelectedGlobalHistory()">Delete Selected</button>
+                        <button class="btn" onclick="clearGlobalHistory()">Clear All</button>
+                    </div>
+                </div>
+            </div>
+            <a href="/">← Back to Tools</a>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="calculator-panel">
+            <div class="panel">
+                <div class="panel-header">Calculator</div>
+                <div class="panel-content" style="display: flex; flex-direction: column;">
+                    <!-- Calculator Controls -->
+                    <div style="padding: 6px 8px; background: #f8f8f8; border-bottom: 1px solid #c0c0c0; display: flex; justify-content: flex-end; align-items: center;">
+                        <div class="mode-controls">
+                            <label>
+                                <input type="radio" name="angleMode" value="deg" checked onchange="updateAngleMode()">
+                                DEG
+                            </label>
+                            <label>
+                                <input type="radio" name="angleMode" value="rad" onchange="updateAngleMode()">
+                                RAD
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="display">
+                        <div class="display-expression" id="expression"></div>
+                        <div class="display-result" id="result">0</div>
+                    </div>
+
+                    <div class="button-grid">
+                        <!-- Row 1: Functions -->
+                        <button class="calc-button function" onclick="appendFunction('sin(')">sin</button>
+                        <button class="calc-button function" onclick="appendFunction('cos(')">cos</button>
+                        <button class="calc-button function" onclick="appendFunction('tan(')">tan</button>
+                        <button class="calc-button function" onclick="appendFunction('log(')">log</button>
+                        <button class="calc-button function" onclick="appendFunction('ln(')">ln</button>
+                        <button class="calc-button function" onclick="appendFunction('sqrt(')">√</button>
+
+                        <!-- Row 2: More Functions -->
+                        <button class="calc-button function" onclick="appendFunction('asin(')">asin</button>
+                        <button class="calc-button function" onclick="appendFunction('acos(')">acos</button>
+                        <button class="calc-button function" onclick="appendFunction('atan(')">atan</button>
+                        <button class="calc-button function" onclick="appendOperator('^')">x^y</button>
+                        <button class="calc-button function" onclick="appendFunction('abs(')">|x|</button>
+                        <button class="calc-button function" onclick="appendFunction('factorial(')">x!</button>
+
+                        <!-- Row 3: Constants & Brackets -->
+                        <button class="calc-button function" onclick="appendConstant('pi')">π</button>
+                        <button class="calc-button function" onclick="appendConstant('e')">e</button>
+                        <button class="calc-button operator" onclick="appendOperator('(')">(</button>
+                        <button class="calc-button operator" onclick="appendOperator(')')">)</button>
+                        <button class="calc-button clear" onclick="clearEntry()">CE</button>
+                        <button class="calc-button clear" onclick="backspace()">⌫</button>
+
+                        <!-- Row 4: Numbers & Operations -->
+                        <button class="calc-button number" onclick="appendNumber('7')">7</button>
+                        <button class="calc-button number" onclick="appendNumber('8')">8</button>
+                        <button class="calc-button number" onclick="appendNumber('9')">9</button>
+                        <button class="calc-button operator" onclick="appendOperator('/')">/</button>
+                        <button class="calc-button operator" onclick="appendOperator('*')">×</button>
+                        <button class="calc-button function" onclick="plotCurrentExpression()">Graph</button>
+
+                        <!-- Row 5: Numbers & Operations -->
+                        <button class="calc-button number" onclick="appendNumber('4')">4</button>
+                        <button class="calc-button number" onclick="appendNumber('5')">5</button>
+                        <button class="calc-button number" onclick="appendNumber('6')">6</button>
+                        <button class="calc-button operator" onclick="appendOperator('-')">-</button>
+                        <button class="calc-button operator" onclick="appendOperator('+')">+</button>
+                        <button class="calc-button equals" onclick="calculate()" style="grid-row: span 2;">=</button>
+
+                        <!-- Row 6: Numbers & Operations -->
+                        <button class="calc-button number" onclick="appendNumber('1')">1</button>
+                        <button class="calc-button number" onclick="appendNumber('2')">2</button>
+                        <button class="calc-button number" onclick="appendNumber('3')">3</button>
+                        <button class="calc-button number" onclick="appendNumber('0')" style="grid-column: span 2;">0</button>
+
+                        <!-- Row 7: Decimal -->
+                        <button class="calc-button operator" onclick="appendOperator('.')">.</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="graph-panel">
+            <div class="panel">
+                <div class="panel-header">Graph Plotter</div>
+                <div class="panel-content" style="display: flex; flex-direction: column;">
+                    <!-- Graph Controls -->
+                    <div style="padding: 8px; background: #f8f8f8; border-bottom: 1px solid #c0c0c0; display: flex; align-items: center; gap: 8px;">
+                        <div class="history-container" style="position: relative; display: inline-block;">
+                            <button class="btn" id="historyToggle">📊 History</button>
+                            <div class="history-popup" id="historyPopup">
+                                <div class="history-header">
+                                    <span>Plotting History</span>
+                                    <button class="history-close" onclick="closeHistoryPopup()">×</button>
+                                </div>
+                                <div class="history-content" id="historyContent">
+                                    <p style="text-align: center; color: #666; padding: 20px;">No plotting history yet</p>
+                                </div>
+                                <div class="history-actions">
+                                    <button class="btn" onclick="deleteSelectedHistory()">Delete Selected</button>
+                                    <button class="btn" onclick="clearLocalHistory()">Clear All</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn" onclick="clearGraph()">Clear Graph</button>
+                        <button class="btn" onclick="resetZoom()">Reset Zoom</button>
+                    </div>
+                    
+                    <div class="function-input-panel">
+                        <div class="function-controls">
+                            <label>f(x) =</label>
+                            <input type="text" class="function-input" id="functionInput" placeholder="Enter function (e.g., x^2, sin(x))" autocomplete="off">
+                            <button class="btn" onclick="plotFunction()">Plot</button>
+                            <button class="btn" onclick="addToGraph()">Add</button>
+                            <button class="btn" onclick="plotDerivative()" title="Plot derivative">f'(x)</button>
+                        </div>
+                        <div class="function-controls">
+                            <button class="btn" onclick="loadExample('quadratic')">x²</button>
+                            <button class="btn" onclick="loadExample('sine')">sin(x)</button>
+                            <button class="btn" onclick="loadExample('exponential')">e^x</button>
+                            <button class="btn" onclick="loadExample('logarithmic')">ln(x)</button>
+                        </div>
+                        <div class="zoom-controls">
+                            <span>X:</span>
+                            <input type="number" class="zoom-input" id="xMinInput" value="-10" onchange="updateZoom()">
+                            <span>to</span>
+                            <input type="number" class="zoom-input" id="xMaxInput" value="10" onchange="updateZoom()">
+                            <span>Y:</span>
+                            <input type="number" class="zoom-input" id="yMinInput" value="-10" onchange="updateZoom()">
+                            <span>to</span>
+                            <input type="number" class="zoom-input" id="yMaxInput" value="10" onchange="updateZoom()">
+                            <button class="btn" onclick="fitToData()">Fit</button>
+                        </div>
+                    </div>
+
+                    <div class="graph-container">
+                        <canvas class="graph-canvas" id="graphCanvas"></canvas>
+                        <div class="function-legend" id="functionLegend" style="display: none;"></div>
+                        <div class="coordinate-display" id="coordinateDisplay" style="display: none;">x: 0, y: 0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div id="statusText">Ready</div>
+        <div id="graphInfo">Click and drag to pan, scroll to zoom</div>
+    </div>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+    <script src="/static/js/scientific-calculator.js"></script>
+</body>
+</html>
