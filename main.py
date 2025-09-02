@@ -61,6 +61,13 @@ TOOLS = [
         "path": "/tools/scientific-calculator",
         "tags": ["calculator", "math", "science", "graph", "plotter", "functions"],
         "has_history": True
+    },
+    {
+        "name": "JWT Decoder",
+        "description": "Decode and analyze JWT (JSON Web Tokens) with syntax highlighting, validation, and timestamp formatting",
+        "path": "/tools/jwt-decoder",
+        "tags": ["jwt", "decoder", "token", "security", "json", "auth"],
+        "has_history": True
     }
 ]
 
