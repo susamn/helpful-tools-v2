@@ -43,6 +43,88 @@
         .header a:hover {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
         }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .history-toggle-btn {
+            background: linear-gradient(to bottom, #f0f8ff, #d1e7ff);
+            border: 1px solid #4a90e2;
+            color: #1565c0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        
+        .history-toggle-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        }
+        
+        .history-toggle-btn.disabled {
+            background: linear-gradient(to bottom, #fff0f0, #fdd8d8);
+            border-color: #dc3545;
+            color: #c82333;
+        }
+        
+        .history-toggle-btn.disabled:hover {
+            background: linear-gradient(to bottom, #fff5f5, #ffe0e0);
+        }
+        
+        .global-history-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        
+        .global-history-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        
+        /* Font controls styling */
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+        
+        .font-controls label {
+            color: #333;
+            margin: 0;
+        }
+        
+        .font-controls button {
+            font-size: 14px;
+            padding: 2px 6px;
+            font-weight: bold;
+            min-width: 24px;
+            height: 24px;
+            border: 1px solid #a0a0a0;
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .font-controls button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        
+        .font-controls button:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
         .toolbar {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
             border-bottom: 1px solid #c0c0c0;
@@ -524,6 +606,11 @@
     <div class="header">
         <h1>JSON-YAML-XML Converter</h1>
         <div class="header-actions">
+            <div class="font-controls">
+                <label>Font:</label>
+                <button id="fontDecreaseBtn" title="Decrease font size">−</button>
+                <button id="fontIncreaseBtn" title="Increase font size">+</button>
+            </div>
             <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
             <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
             <a href="/">← Back to Tools</a>
@@ -656,6 +743,7 @@ Example XML:
                     this.currentInputFormat = 'unknown';
                     this.currentOutputFormat = 'unknown';
                     this.lastInputData = '';
+                    this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '13');
                     
                     this.examples = {
                         json: `{
@@ -711,6 +799,7 @@ metadata:
                     this.init();
                     this.loadHistory();
                     this.initHistoryToggle();
+                    this.applyFontSize();
                 }
 
                 init() {
@@ -758,6 +847,10 @@ metadata:
                     document.querySelectorAll('.history-tab').forEach(tab => {
                         tab.addEventListener('click', (e) => this.switchHistoryTab(e));
                     });
+                    
+                    // Font size controls
+                    document.getElementById('fontIncreaseBtn').addEventListener('click', () => this.increaseFontSize());
+                    document.getElementById('fontDecreaseBtn').addEventListener('click', () => this.decreaseFontSize());
                 }
 
                 loadExample(format) {
@@ -769,7 +862,7 @@ metadata:
                     this.updateStatus(`${format.toUpperCase()} example loaded - try converting to other formats`);
                 }
 
-                convertTo(targetFormat) {
+                async convertTo(targetFormat) {
                     const input = document.getElementById('inputArea').value.trim();
                     const output = document.getElementById('outputArea');
                     
@@ -778,214 +871,94 @@ metadata:
                         return;
                     }
 
+                    this.updateStatus('Converting...');
+
                     try {
-                        const inputFormat = this.detectFormat(input);
-                        
-                        if (inputFormat === 'unknown') {
-                            this.updateStatus('Could not detect input format');
-                            return;
-                        }
+                        const response = await fetch('/api/convert', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                data: input,
+                                input_format: 'auto',
+                                output_format: targetFormat
+                            })
+                        });
 
-                        let result = '';
-                        let highlightedResult = '';
+                        const result = await response.json();
 
-                        // Convert between formats
-                        if (inputFormat === 'json' && targetFormat === 'yaml') {
-                            result = this.jsonToYaml(input);
-                            highlightedResult = this.syntaxHighlightYaml(result);
-                        } else if (inputFormat === 'yaml' && targetFormat === 'json') {
-                            result = this.yamlToJson(input);
-                            highlightedResult = this.syntaxHighlightJson(result);
-                        } else if (inputFormat === 'json' && targetFormat === 'xml') {
-                            result = this.jsonToXml(input);
-                            highlightedResult = this.syntaxHighlightXml(result);
-                        } else if (inputFormat === 'xml' && targetFormat === 'json') {
-                            result = this.xmlToJson(input);
-                            highlightedResult = this.syntaxHighlightJson(result);
-                        } else if (inputFormat === targetFormat) {
-                            // Same format - just format nicely
-                            if (targetFormat === 'json') {
-                                const parsed = JSON.parse(input);
-                                result = JSON.stringify(parsed, null, 2);
-                                highlightedResult = this.syntaxHighlightJson(result);
+                        if (result.success) {
+                            const highlightedResult = this.syntaxHighlight(result.result, targetFormat);
+                            output.innerHTML = highlightedResult;
+                            
+                            this.currentInputFormat = result.input_format;
+                            this.currentOutputFormat = result.output_format;
+                            this.updateFormatIndicators();
+
+                            if (result.operation === 'convert') {
+                                this.updateStatus(`Converted ${result.input_format.toUpperCase()} to ${result.output_format.toUpperCase()}`);
+                                // Save to history only on actual conversions
+                                this.saveToHistoryIfChanged(input, `${result.input_format}-to-${result.output_format}`);
+                            } else {
+                                this.updateStatus(`${targetFormat.toUpperCase()} formatted`);
                             }
-                            this.updateStatus(`${targetFormat.toUpperCase()} formatted`);
                         } else {
-                            this.updateStatus(`Direct ${inputFormat} to ${targetFormat} conversion not yet implemented`);
-                            return;
-                        }
-
-                        output.innerHTML = highlightedResult;
-                        this.currentInputFormat = inputFormat;
-                        this.currentOutputFormat = targetFormat;
-                        this.updateFormatIndicators();
-
-                        if (inputFormat !== targetFormat) {
-                            this.updateStatus(`Converted ${inputFormat.toUpperCase()} to ${targetFormat.toUpperCase()}`);
-                            // Save to history only on actual conversions
-                            this.saveToHistoryIfChanged(input, `${inputFormat}-to-${targetFormat}`);
+                            output.innerHTML = `<div class="error-display">Error: ${result.error}</div>`;
+                            this.updateStatus(`Conversion error: ${result.error}`);
                         }
 
                     } catch (error) {
-                        output.innerHTML = `<div class="error-display">Error: ${error.message}</div>`;
-                        this.updateStatus(`Conversion error: ${error.message}`);
+                        output.innerHTML = `<div class="error-display">Network Error: ${error.message}</div>`;
+                        this.updateStatus(`Network error: ${error.message}`);
                     }
                 }
 
-                detectFormat(content) {
+                async detectFormat(content) {
                     if (!content.trim()) return 'unknown';
-                    content = content.trim();
-
-                    // Check for XML
-                    if (content.startsWith('<?xml') || (content.startsWith('<') && content.endsWith('>'))) {
-                        try {
-                            const parser = new DOMParser();
-                            const doc = parser.parseFromString(content, 'text/xml');
-                            if (!doc.getElementsByTagName('parsererror').length) {
-                                return 'xml';
-                            }
-                        } catch (e) {}
-                    }
-
-                    // Check for JSON
+                    
                     try {
-                        JSON.parse(content);
-                        return 'json';
-                    } catch (e) {}
+                        const response = await fetch('/api/detect-format', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                data: content
+                            })
+                        });
 
-                    // Check for YAML
-                    if (content.includes(':') && !content.startsWith('{') && !content.startsWith('[')) {
-                        return 'yaml';
+                        const result = await response.json();
+                        return result.format || 'unknown';
+                    } catch (error) {
+                        console.error('Format detection error:', error);
+                        return 'unknown';
                     }
-
-                    return 'unknown';
                 }
 
-                autoDetectFormat() {
+                async autoDetectFormat() {
                     const input = document.getElementById('inputArea').value.trim();
                     if (!input) return;
 
-                    const detectedFormat = this.detectFormat(input);
+                    const detectedFormat = await this.detectFormat(input);
                     if (detectedFormat !== 'unknown' && detectedFormat !== this.currentInputFormat) {
                         this.currentInputFormat = detectedFormat;
                         this.updateFormatIndicators();
                     }
                 }
 
-                // Simplified conversion methods for basic functionality
-                jsonToYaml(jsonStr) {
-                    const obj = JSON.parse(jsonStr);
-                    return this.objectToYaml(obj, 0);
+                // Unified syntax highlighting method
+                syntaxHighlight(text, format) {
+                    if (format === 'json') {
+                        return this.syntaxHighlightJson(text);
+                    } else if (format === 'yaml') {
+                        return this.syntaxHighlightYaml(text);
+                    } else if (format === 'xml') {
+                        return this.syntaxHighlightXml(text);
+                    }
+                    return text;
                 }
 
-                objectToYaml(obj, indent = 0) {
-                    const spaces = ' '.repeat(indent);
-                    
-                    if (obj === null) return 'null';
-                    if (typeof obj === 'boolean') return obj.toString();
-                    if (typeof obj === 'number') return obj.toString();
-                    if (typeof obj === 'string') return obj;
-
-                    if (Array.isArray(obj)) {
-                        if (obj.length === 0) return '[]';
-                        return obj.map(item => {
-                            const yamlItem = this.objectToYaml(item, indent + this.yamlIndentSize);
-                            return `${spaces}- ${yamlItem}`;
-                        }).join('\n');
-                    }
-
-                    if (typeof obj === 'object') {
-                        if (Object.keys(obj).length === 0) return '{}';
-                        return Object.entries(obj).map(([key, value]) => {
-                            const yamlValue = this.objectToYaml(value, indent + this.yamlIndentSize);
-                            if (typeof value === 'object' && value !== null) {
-                                return `${spaces}${key}:\n${yamlValue}`;
-                            }
-                            return `${spaces}${key}: ${yamlValue}`;
-                        }).join('\n');
-                    }
-
-                    return String(obj);
-                }
-
-                yamlToJson(yamlStr) {
-                    // Very basic YAML parser - for demo purposes
-                    const lines = yamlStr.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
-                    const result = {};
-                    
-                    for (const line of lines) {
-                        if (line.includes(':')) {
-                            const [key, value] = line.split(':').map(s => s.trim());
-                            if (value) {
-                                result[key] = isNaN(value) ? value : Number(value);
-                            }
-                        }
-                    }
-                    
-                    return JSON.stringify(result, null, 2);
-                }
-
-                jsonToXml(jsonStr) {
-                    const obj = JSON.parse(jsonStr);
-                    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-                    xml += this.objectToXml(obj, 'root', 0);
-                    return xml;
-                }
-
-                objectToXml(obj, tagName, indent = 0) {
-                    const spaces = '  '.repeat(indent);
-
-                    if (obj === null) {
-                        return `${spaces}<${tagName}></${tagName}>`;
-                    }
-
-                    if (typeof obj === 'string' || typeof obj === 'number' || typeof obj === 'boolean') {
-                        return `${spaces}<${tagName}>${obj}</${tagName}>`;
-                    }
-
-                    if (Array.isArray(obj)) {
-                        let xml = '';
-                        obj.forEach(item => {
-                            xml += this.objectToXml(item, 'item', indent) + '\n';
-                        });
-                        return xml.trimEnd();
-                    }
-
-                    if (typeof obj === 'object') {
-                        let xml = `${spaces}<${tagName}>\n`;
-                        Object.entries(obj).forEach(([key, value]) => {
-                            xml += this.objectToXml(value, key, indent + 1) + '\n';
-                        });
-                        xml += `${spaces}</${tagName}>`;
-                        return xml;
-                    }
-
-                    return `${spaces}<${tagName}>${obj}</${tagName}>`;
-                }
-
-                xmlToJson(xmlStr) {
-                    // Basic XML to JSON conversion for demo
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(xmlStr, 'text/xml');
-                    const result = this.xmlNodeToObject(doc.documentElement);
-                    return JSON.stringify(result, null, 2);
-                }
-
-                xmlNodeToObject(node) {
-                    const obj = {};
-                    
-                    if (node.childNodes.length === 1 && node.childNodes[0].nodeType === 3) {
-                        return node.textContent;
-                    }
-                    
-                    for (const child of node.childNodes) {
-                        if (child.nodeType === 1) {
-                            obj[child.tagName] = this.xmlNodeToObject(child);
-                        }
-                    }
-                    
-                    return obj;
-                }
 
                 // Syntax highlighting
                 syntaxHighlightJson(json) {
@@ -1027,20 +1000,42 @@ metadata:
                 }
 
                 // Utility functions
-                formatCurrent() {
+                async formatCurrent() {
                     const input = document.getElementById('inputArea').value.trim();
                     if (!input) return;
 
-                    const format = this.detectFormat(input);
-                    if (format === 'json') {
-                        try {
-                            const parsed = JSON.parse(input);
-                            document.getElementById('inputArea').value = JSON.stringify(parsed, null, 2);
-                            this.updateCharCount();
-                            this.updateStatus('JSON formatted');
-                        } catch (e) {
-                            this.updateStatus('Invalid JSON format');
+                    this.updateStatus('Formatting...');
+
+                    try {
+                        const format = await this.detectFormat(input);
+                        if (format !== 'unknown') {
+                            // Use the backend conversion API to format the current input
+                            const response = await fetch('/api/convert', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    data: input,
+                                    input_format: format,
+                                    output_format: format
+                                })
+                            });
+
+                            const result = await response.json();
+
+                            if (result.success) {
+                                document.getElementById('inputArea').value = result.result;
+                                this.updateCharCount();
+                                this.updateStatus(`${format.toUpperCase()} formatted`);
+                            } else {
+                                this.updateStatus(`Formatting error: ${result.error}`);
+                            }
+                        } else {
+                            this.updateStatus('Could not detect format to format');
                         }
+                    } catch (error) {
+                        this.updateStatus(`Formatting error: ${error.message}`);
                     }
                 }
 
@@ -1517,6 +1512,35 @@ metadata:
                         this.lastInputData = data;
                         await this.saveToHistory(data, operation);
                     }
+                }
+                
+                // Font size methods
+                increaseFontSize() {
+                    if (this.fontSize < 24) {
+                        this.fontSize += 1;
+                        this.applyFontSize();
+                        this.saveFontSize();
+                    }
+                }
+                
+                decreaseFontSize() {
+                    if (this.fontSize > 8) {
+                        this.fontSize -= 1;
+                        this.applyFontSize();
+                        this.saveFontSize();
+                    }
+                }
+                
+                applyFontSize() {
+                    const inputArea = document.getElementById('inputArea');
+                    const outputArea = document.getElementById('outputArea');
+                    
+                    if (inputArea) inputArea.style.fontSize = `${this.fontSize}px`;
+                    if (outputArea) outputArea.style.fontSize = `${this.fontSize}px`;
+                }
+                
+                saveFontSize() {
+                    localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
                 }
             }
 

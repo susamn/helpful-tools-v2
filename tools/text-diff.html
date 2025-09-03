@@ -77,6 +77,44 @@
         .global-history-btn:hover {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
         }
+        
+        /* Font controls styling */
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+        
+        .font-controls label {
+            color: #333;
+            margin: 0;
+        }
+        
+        .font-controls button {
+            font-size: 14px;
+            padding: 2px 6px;
+            font-weight: bold;
+            min-width: 24px;
+            height: 24px;
+            border: 1px solid #a0a0a0;
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .font-controls button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        
+        .font-controls button:active {
+            background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+        }
         .toolbar {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
             border-bottom: 1px solid #c0c0c0;
@@ -533,6 +571,11 @@
     <div class="header">
         <h1>Text Diff Tool</h1>
         <div class="header-actions">
+            <div class="font-controls">
+                <label>Font:</label>
+                <button id="fontDecreaseBtn" title="Decrease font size">−</button>
+                <button id="fontIncreaseBtn" title="Increase font size">+</button>
+            </div>
             <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
             <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
             <a href="/">← Back to Tools</a>
@@ -646,10 +689,12 @@
                     this.toolName = 'text-diff';
                     this.historyEnabled = localStorage.getItem(`${this.toolName}-historyEnabled`) !== 'false';
                     this.lastInputData = '';
+                    this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '13');
                     this.initializeElements();
                     this.attachEventListeners();
                     this.loadHistory();
                     this.initializeHistoryToggle();
+                    this.applyFontSize();
                 }
 
                 initializeElements() {
@@ -689,7 +734,11 @@
                         // Global History
                         globalHistoryBtn: document.getElementById('globalHistoryBtn'),
                         globalHistoryPopup: document.getElementById('globalHistoryPopup'),
-                        globalHistoryList: document.getElementById('globalHistoryList')
+                        globalHistoryList: document.getElementById('globalHistoryList'),
+                        
+                        // Font controls
+                        fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
+                        fontDecreaseBtn: document.getElementById('fontDecreaseBtn')
                     };
                     
                     this.inputsCollapsed = false;
@@ -716,6 +765,10 @@
                     this.elements.historyBtn.addEventListener('click', () => this.toggleHistory());
                     this.elements.historyToggleBtn.addEventListener('click', () => this.toggleHistoryEnabled());
                     this.elements.globalHistoryBtn.addEventListener('click', () => this.toggleGlobalHistory());
+                    
+                    // Font size controls
+                    this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
+                    this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
                     
                     // Text input listeners
                     this.elements.text1.addEventListener('input', () => this.updateLineCount());
@@ -1396,6 +1449,34 @@
                             }
                             break;
                     }
+                }
+                
+                // Font size methods
+                increaseFontSize() {
+                    if (this.fontSize < 24) {
+                        this.fontSize += 1;
+                        this.applyFontSize();
+                        this.saveFontSize();
+                    }
+                }
+                
+                decreaseFontSize() {
+                    if (this.fontSize > 8) {
+                        this.fontSize -= 1;
+                        this.applyFontSize();
+                        this.saveFontSize();
+                    }
+                }
+                
+                applyFontSize() {
+                    this.elements.text1.style.fontSize = `${this.fontSize}px`;
+                    this.elements.text2.style.fontSize = `${this.fontSize}px`;
+                    this.elements.leftDiff.style.fontSize = `${this.fontSize}px`;
+                    this.elements.rightDiff.style.fontSize = `${this.fontSize}px`;
+                }
+                
+                saveFontSize() {
+                    localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
                 }
             }
 

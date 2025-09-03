@@ -310,6 +310,30 @@
             background: white;
         }
         
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .font-controls label {
+            color: #555;
+        }
+        .font-controls button {
+            font-size: 14px;
+            padding: 2px 6px;
+            border: 1px solid #a0a0a0;
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            width: 24px;
+            height: 24px;
+        }
+        .font-controls button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        
         .search-controls {
             display: flex;
             align-items: center;
@@ -585,6 +609,11 @@
     <div class="header">
         <h1>JSON Formatter</h1>
         <div class="header-actions">
+            <div class="font-controls">
+                <label>Font:</label>
+                <button id="fontDecreaseBtn" title="Decrease font size">−</button>
+                <button id="fontIncreaseBtn" title="Increase font size">+</button>
+            </div>
             <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
             <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
             <a href="/">← Back to Tools</a>

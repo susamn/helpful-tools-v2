@@ -11,11 +11,13 @@ class JsonFormatter {
         this.originalOutputData = null;  // Store original data before JSONPath filtering
         this.markupEnabled = true;
         this.indentPrefs = { type: 'spaces', size: 2 };
+        this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '12');
         this.historyEnabled = localStorage.getItem(`${this.toolName}-historyEnabled`) !== 'false';
         this.initializeElements();
         this.attachEventListeners();
         this.loadHistory();
         this.initializeHistoryToggle();
+        this.applyFontSize();
     }
 
     initializeElements() {
@@ -41,6 +43,8 @@ class JsonFormatter {
             // Controls
             indentType: document.getElementById('indentType'),
             indentSize: document.getElementById('indentSize'),
+            fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
+            fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
             jsonPathInput: document.getElementById('jsonPathInput'),
             clearSearchBtn: document.getElementById('clearSearchBtn'),
             
@@ -83,6 +87,8 @@ class JsonFormatter {
         // Controls
         this.elements.indentType.addEventListener('change', () => this.updateIndentPreference());
         this.elements.indentSize.addEventListener('change', () => this.updateIndentPreference());
+        this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
+        this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
         this.elements.jsonPathInput.addEventListener('input', () => this.performJsonPathLookup());
         this.elements.jsonPathInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') this.performJsonPathLookup();
@@ -738,6 +744,46 @@ class JsonFormatter {
     updateIndentPreference() {
         this.indentPrefs.type = this.elements.indentType.value;
         this.indentPrefs.size = parseInt(this.elements.indentSize.value);
+    }
+
+    /**
+     * Increase font size
+     */
+    increaseFontSize() {
+        if (this.fontSize < 24) {
+            this.fontSize += 1;
+            this.applyFontSize();
+            this.saveFontSize();
+        }
+    }
+
+    /**
+     * Decrease font size
+     */
+    decreaseFontSize() {
+        if (this.fontSize > 8) {
+            this.fontSize -= 1;
+            this.applyFontSize();
+            this.saveFontSize();
+        }
+    }
+
+    /**
+     * Apply font size to textarea elements
+     */
+    applyFontSize() {
+        this.elements.jsonInput.style.fontSize = `${this.fontSize}px`;
+        this.elements.jsonOutput.style.fontSize = `${this.fontSize}px`;
+        if (this.elements.jsonOutputFormatted) {
+            this.elements.jsonOutputFormatted.style.fontSize = `${this.fontSize}px`;
+        }
+    }
+
+    /**
+     * Save font size to localStorage
+     */
+    saveFontSize() {
+        localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
     }
 
     /**

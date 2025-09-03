@@ -8,10 +8,12 @@ class JwtDecoder {
         this.toolName = 'jwt-decoder';
         this.currentJWT = null;
         this.historyEnabled = localStorage.getItem(`${this.toolName}-historyEnabled`) !== 'false';
+        this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '13');
         this.initializeElements();
         this.attachEventListeners();
         this.loadHistory();
         this.updateTokenInfo();
+        this.applyFontSize();
     }
 
     initializeElements() {
@@ -27,7 +29,9 @@ class JwtDecoder {
             historyList: document.getElementById('historyList'),
             globalHistoryList: document.getElementById('globalHistoryList'),
             globalHistoryBtn: document.getElementById('globalHistoryBtn'),
-            globalHistoryPopup: document.getElementById('globalHistoryPopup')
+            globalHistoryPopup: document.getElementById('globalHistoryPopup'),
+            fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
+            fontDecreaseBtn: document.getElementById('fontDecreaseBtn')
         };
     }
 
@@ -45,6 +49,10 @@ class JwtDecoder {
         
         // Outside click handler
         document.addEventListener('click', (e) => this.handleOutsideClick(e));
+        
+        // Font size controls
+        this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
+        this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
         
         // Auto-decode on input change
         this.elements.jwtInput.addEventListener('input', () => {
@@ -265,6 +273,9 @@ class JwtDecoder {
 
             statusText.textContent = 'JWT decoded successfully';
             statusText.style.color = '#008000';
+            
+            // Apply font size to newly created content
+            this.applyFontSize();
 
         } catch (error) {
             this.currentJWT = null;
@@ -530,6 +541,37 @@ class JwtDecoder {
             globalTab.classList.add('active');
             this.loadGlobalHistory();
         }
+    }
+    
+    // Font size methods
+    increaseFontSize() {
+        if (this.fontSize < 24) {
+            this.fontSize += 1;
+            this.applyFontSize();
+            this.saveFontSize();
+        }
+    }
+    
+    decreaseFontSize() {
+        if (this.fontSize > 8) {
+            this.fontSize -= 1;
+            this.applyFontSize();
+            this.saveFontSize();
+        }
+    }
+    
+    applyFontSize() {
+        this.elements.jwtInput.style.fontSize = `${this.fontSize}px`;
+        
+        // Apply font size to all section content areas
+        const sectionContents = document.querySelectorAll('.section-content');
+        sectionContents.forEach(section => {
+            section.style.fontSize = `${this.fontSize}px`;
+        });
+    }
+    
+    saveFontSize() {
+        localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
     }
 }
 

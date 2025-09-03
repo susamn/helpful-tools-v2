@@ -20,6 +20,7 @@ class ScientificCalculator {
         this.lastMouseX = 0;
         this.lastMouseY = 0;
         this.localHistory = [];
+        this.fontSize = parseInt(localStorage.getItem('scientific-calculator-fontSize') || '16');
 
         this.functionExamples = {
             quadratic: 'x^2',
@@ -42,6 +43,7 @@ class ScientificCalculator {
         this.updateZoomInputs();
         this.loadLocalHistory();
         this.updatePopupPositions();
+        this.applyFontSize();
         setTimeout(() => this.initGraph(), 100);
     }
 
@@ -78,6 +80,16 @@ class ScientificCalculator {
         const globalHistoryBtn = document.getElementById('globalHistoryBtn');
         if (globalHistoryBtn) {
             globalHistoryBtn.addEventListener('click', this.toggleGlobalHistory.bind(this));
+        }
+        
+        // Font size controls
+        const fontIncreaseBtn = document.getElementById('fontIncreaseBtn');
+        const fontDecreaseBtn = document.getElementById('fontDecreaseBtn');
+        if (fontIncreaseBtn) {
+            fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
+        }
+        if (fontDecreaseBtn) {
+            fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
         }
 
         // Overlay click
@@ -1097,6 +1109,37 @@ class ScientificCalculator {
     setGraphInfo(text) {
         const graphInfoEl = document.getElementById('graphInfo');
         if (graphInfoEl) graphInfoEl.textContent = text;
+    }
+    
+    // Font size methods
+    increaseFontSize() {
+        if (this.fontSize < 24) {
+            this.fontSize += 1;
+            this.applyFontSize();
+            this.saveFontSize();
+        }
+    }
+    
+    decreaseFontSize() {
+        if (this.fontSize > 8) {
+            this.fontSize -= 1;
+            this.applyFontSize();
+            this.saveFontSize();
+        }
+    }
+    
+    applyFontSize() {
+        const displayEl = document.getElementById('display');
+        const historyListEl = document.getElementById('historyList');
+        const functionInputEl = document.getElementById('functionInput');
+        
+        if (displayEl) displayEl.style.fontSize = `${this.fontSize}px`;
+        if (historyListEl) historyListEl.style.fontSize = `${this.fontSize}px`;
+        if (functionInputEl) functionInputEl.style.fontSize = `${this.fontSize}px`;
+    }
+    
+    saveFontSize() {
+        localStorage.setItem('scientific-calculator-fontSize', this.fontSize.toString());
     }
 }
 
