@@ -204,6 +204,9 @@
         }
         .text-panel {
             flex: 1;
+            width: 50%;
+            min-width: 50%;
+            max-width: 50%;
             display: flex;
             flex-direction: column;
             border-right: 1px solid #c0c0c0;
@@ -263,20 +266,24 @@
         }
         .diff-display {
             flex: 1;
+            width: 100%;
             overflow-y: auto;
             overflow-x: hidden;
             background: #ffffff;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 12px;
             border-top: 1px solid #e0e0e0;
-            scroll-behavior: smooth;
+            scroll-behavior: auto;
             min-height: 0;
+            box-sizing: border-box;
         }
         .diff-line {
             display: flex;
             min-height: 18px;
             line-height: 18px;
             border-bottom: 1px solid #f8f8f8;
+            width: 100%;
+            box-sizing: border-box;
         }
         .line-number {
             min-width: 40px;
@@ -290,9 +297,12 @@
         }
         .line-content {
             flex: 1;
+            min-width: 0;
             padding: 0 8px;
             white-space: pre-wrap;
             word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
         /* Diff line types */
         .diff-line.equal {
@@ -746,6 +756,7 @@
                     this.currentDiffIndex = -1;
                     this.diffCount = 0;
                     this.syncingScroll = false;
+                    this.syncTimeout = null;
                 }
 
                 attachEventListeners() {
@@ -774,9 +785,9 @@
                     this.elements.text1.addEventListener('input', () => this.updateLineCount());
                     this.elements.text2.addEventListener('input', () => this.updateLineCount());
                     
-                    // Synchronized scrolling between diff panels
-                    this.elements.leftDiff.addEventListener('scroll', (e) => this.syncScroll('left', e));
-                    this.elements.rightDiff.addEventListener('scroll', (e) => this.syncScroll('right', e));
+                    // Synchronized scrolling between diff panels with passive listeners for better performance
+                    this.elements.leftDiff.addEventListener('scroll', (e) => this.syncScroll('left', e), { passive: true });
+                    this.elements.rightDiff.addEventListener('scroll', (e) => this.syncScroll('right', e), { passive: true });
                     
                     // History tabs
                     document.querySelectorAll('.history-tab').forEach(tab => {
@@ -1367,22 +1378,29 @@
                     
                     // Center the line in the view
                     const scrollTop = lineTop - (containerHeight / 2) + (line.offsetHeight / 2);
+                    const targetScrollTop = Math.max(0, scrollTop);
+                    
+                    // Cancel any pending sync operations
+                    if (this.syncTimeout) {
+                        clearTimeout(this.syncTimeout);
+                    }
                     
                     // Disable sync temporarily to avoid infinite loop
                     this.syncingScroll = true;
                     
+                    // Scroll both containers simultaneously
                     leftContainer.scrollTo({
-                        top: Math.max(0, scrollTop),
+                        top: targetScrollTop,
                         behavior: 'smooth'
                     });
                     
                     rightContainer.scrollTo({
-                        top: Math.max(0, scrollTop),
+                        top: targetScrollTop,
                         behavior: 'smooth'
                     });
                     
                     // Re-enable sync after animation
-                    setTimeout(() => {
+                    this.syncTimeout = setTimeout(() => {
                         this.syncingScroll = false;
                     }, 500);
                 }
@@ -1393,15 +1411,21 @@
                     const sourceContainer = event.target;
                     const targetContainer = source === 'left' ? this.elements.rightDiff : this.elements.leftDiff;
                     
-                    // Disable sync temporarily to avoid infinite loop
+                    // Cancel any pending sync operations
+                    if (this.syncTimeout) {
+                        clearTimeout(this.syncTimeout);
+                    }
+                    
+                    // Set sync flag to prevent infinite loop
                     this.syncingScroll = true;
                     
+                    // Sync immediately without animation for smooth scrolling
                     targetContainer.scrollTop = sourceContainer.scrollTop;
                     
-                    // Re-enable sync immediately for manual scrolling
-                    setTimeout(() => {
+                    // Reset sync flag after a minimal delay
+                    this.syncTimeout = setTimeout(() => {
                         this.syncingScroll = false;
-                    }, 50);
+                    }, 10);
                 }
                 
                 updateNavigationState() {
