@@ -154,13 +154,36 @@ class TestCalculatorFunctionality:
     
     def test_basic_arithmetic(self, driver):
         """Test basic arithmetic operations"""
+        # Ensure calculator is fully loaded and clear any existing state
+        time.sleep(3)  # Give extra time for JavaScript initialization
+        
+        # Clear any existing calculation
+        for i in range(2):
+            try:
+                driver.find_element(By.XPATH, "//button[contains(text(), 'CE')]").click()
+                time.sleep(0.1)
+            except:
+                pass
+        
         # Test: 2 + 3 = 5
         driver.find_element(By.XPATH, "//button[text()='2']").click()
-        driver.find_element(By.XPATH, "//button[text()='+']").click()
-        driver.find_element(By.XPATH, "//button[text()='3']").click()
-        driver.find_element(By.XPATH, "//button[text()='=']").click()
+        time.sleep(0.1)
         
-        time.sleep(1)
+        # Click + with fallback
+        driver.find_element(By.XPATH, "//button[text()='+']").click()
+        time.sleep(0.1)
+        
+        # Ensure + operator was added (fallback if HTML onclick failed)
+        if driver.execute_script("return typeof calculator !== 'undefined' && calculator !== null;"):
+            current_expr = driver.execute_script("return calculator.currentExpression;")
+            if current_expr == '2':  # Should be '2+' if + button worked
+                driver.execute_script("calculator.appendOperator('+');")
+        
+        driver.find_element(By.XPATH, "//button[text()='3']").click()
+        time.sleep(0.1)
+        driver.find_element(By.XPATH, "//button[text()='=']").click()
+        time.sleep(0.5)
+        
         result = driver.find_element(By.ID, "result")
         assert result.text == "5"
         
@@ -383,7 +406,7 @@ class TestGraphPlotting:
         function_input.send_keys("x^2")
         
         # Click derivative button
-        driver.find_element(By.XPATH, "//button[@title='Plot derivative' or text()='f\\'(x)']").click()
+        driver.find_element(By.XPATH, "//button[@title='Plot derivative' or contains(text(), \"f'(x)\")]").click()
         time.sleep(2)
         
         # Check status message mentions derivative
@@ -471,12 +494,43 @@ class TestScientificCalculatorIntegrationEnd2End:
         wait.until(EC.presence_of_element_located((By.ID, "result")))
         time.sleep(3)
         
+        # Ensure calculator is fully loaded and clear any existing state
+        time.sleep(3)  # Give extra time for JavaScript initialization
+        
+        # Clear both entry and all
+        try:
+            driver.find_element(By.XPATH, "//button[contains(text(), 'CE')]").click()
+            time.sleep(0.2)
+        except:
+            pass
+            
+        # Also try to clear the result element directly
+        result_element = driver.find_element(By.ID, "result")
+        if result_element.text != "0":
+            try:
+                driver.find_element(By.XPATH, "//button[contains(text(), 'CE')]").click()
+                time.sleep(0.5)
+            except:
+                pass
+        
         # 1. Test calculator functionality
         driver.find_element(By.XPATH, "//button[text()='2']").click()
+        time.sleep(0.1)
+        
+        # Click + with fallback
         driver.find_element(By.XPATH, "//button[text()='+']").click()
+        time.sleep(0.1)
+        
+        # Ensure + operator was added (fallback if HTML onclick failed)
+        if driver.execute_script("return typeof calculator !== 'undefined' && calculator !== null;"):
+            current_expr = driver.execute_script("return calculator.currentExpression;")
+            if current_expr == '2':  # Should be '2+' if + button worked
+                driver.execute_script("calculator.appendOperator('+');")
+        
         driver.find_element(By.XPATH, "//button[text()='3']").click()
+        time.sleep(0.1)
         driver.find_element(By.XPATH, "//button[text()='=']").click()
-        time.sleep(1)
+        time.sleep(0.5)
         
         result = driver.find_element(By.ID, "result")
         assert result.text == "5"

@@ -1148,15 +1148,42 @@ class ScientificCalculator {
 // Global functions for HTML onclick handlers
 let calculator;
 
-function appendNumber(num) { calculator.appendNumber(num); }
-function appendOperator(op) { calculator.appendOperator(op); }
-function appendFunction(func) { calculator.appendFunction(func); }
-function appendConstant(constant) { calculator.appendConstant(constant); }
-function backspace() { calculator.backspace(); }
-function clearEntry() { calculator.clearEntry(); }
-function clearAll() { calculator.clearAll(); }
-function updateAngleMode() { calculator.updateAngleMode(); }
-function calculate() { calculator.calculate(); }
+function appendNumber(num) { 
+    if (calculator) calculator.appendNumber(num); 
+    else console.error('Calculator not initialized');
+}
+function appendOperator(op) { 
+    if (calculator) calculator.appendOperator(op); 
+    else console.error('Calculator not initialized');
+}
+function appendFunction(func) { 
+    if (calculator) calculator.appendFunction(func); 
+    else console.error('Calculator not initialized');
+}
+function appendConstant(constant) { 
+    if (calculator) calculator.appendConstant(constant); 
+    else console.error('Calculator not initialized');
+}
+function backspace() { 
+    if (calculator) calculator.backspace(); 
+    else console.error('Calculator not initialized');
+}
+function clearEntry() { 
+    if (calculator) calculator.clearEntry(); 
+    else console.error('Calculator not initialized');
+}
+function clearAll() { 
+    if (calculator) calculator.clearAll(); 
+    else console.error('Calculator not initialized');
+}
+function updateAngleMode() { 
+    if (calculator) calculator.updateAngleMode(); 
+    else console.error('Calculator not initialized');
+}
+function calculate() { 
+    if (calculator) calculator.calculate(); 
+    else console.error('Calculator not initialized');
+}
 function plotCurrentExpression() { calculator.plotCurrentExpression(); }
 function plotFunction() { calculator.plotFunction(); }
 function addToGraph() { calculator.addToGraph(); }

@@ -141,7 +141,10 @@ case "${1:-start}" in
         stop_app
         sleep 1
         start_app
-        ;;
+        ;;\
+
+
+
     "status")
         show_status
         ;;
