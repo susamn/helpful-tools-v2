@@ -1,0 +1,165 @@
+/**
+ * Common UI Enhancements - Larger fonts and buttons
+ * This file provides size improvements across all tools with minimal code changes
+ */
+
+/* Base font size increase */
+body {
+    font-size: 15px !important; /* Increased from 13px */
+}
+
+/* Header improvements */
+.header h1 {
+    font-size: 18px !important; /* Increased from 16px */
+}
+
+.header a,
+.header button {
+    padding: 6px 12px !important; /* Increased from 4px 8px */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* Toolbar button improvements */
+.toolbar button {
+    padding: 6px 12px !important; /* Increased from 4px 8px */  
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* History button improvements */
+.history-btn,
+.history-toggle-btn,
+.global-history-btn {
+    padding: 6px 12px !important; /* Increased from 4px 8px */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* History tab improvements */
+.history-tab {
+    padding: 6px 12px !important; /* Increased from 4px 8px */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* History item improvements */
+.history-item {
+    padding: 8px 12px !important; /* Increased from 6px 8px */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* Global history item improvements */
+.global-history-item {
+    padding: 10px 15px !important; /* Increased from 8px 12px */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* Text area and input improvements */
+.text-area,
+textarea,
+input[type="text"] {
+    font-size: 14px !important; /* Increased from 12-13px */
+    padding: 10px !important; /* Increased from 8px */
+}
+
+/* Panel header improvements */
+.panel-header {
+    padding: 8px 15px !important; /* Increased from 6px 12px */
+    font-size: 14px !important; /* Increased from 12px */
+}
+
+/* Status bar improvements */
+.status-bar {
+    padding: 6px 15px !important; /* Increased from 4px 12px */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* Section content improvements */
+.section-content {
+    font-size: 14px !important; /* Increased from 12px */
+    padding: 12px !important; /* Increased from 8px */
+}
+
+/* JSON output and code areas */
+.json-output,
+.section-content,
+pre {
+    font-size: 14px !important; /* Increased from 12px */
+}
+
+/* Button improvements for all tools */
+button:not(.delete-btn):not(.history-delete-btn) {
+    min-height: 32px !important; /* Increased from ~24px */
+    padding: 6px 12px !important; /* Increased from 4px 8px */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* Font control buttons - keep slightly smaller but still bigger than original */
+.font-controls button {
+    padding: 4px 8px !important; /* Increased from 2px 6px */
+    font-size: 16px !important; /* Keep large for +/- symbols */
+    min-width: 28px !important; /* Increased from 24px */
+    height: 28px !important; /* Increased from 24px */
+}
+
+/* Copy buttons and action buttons */
+.copy-btn,
+.copy-section-btn,
+.copy-formatted-btn {
+    padding: 6px 12px !important; /* Increased from smaller values */
+    font-size: 13px !important; /* Increased from 11px */
+}
+
+/* Primary buttons - make them even more prominent */
+.primary,
+button.primary {
+    padding: 8px 16px !important; /* Even larger for primary actions */
+    font-size: 14px !important; /* Slightly larger font */
+    font-weight: 600 !important; /* Make them bold */
+}
+
+/* Delete buttons - keep small but readable */
+.delete-btn,
+.history-delete-btn {
+    width: 20px !important; /* Increased from 16px */
+    height: 20px !important; /* Increased from 16px */
+    font-size: 12px !important; /* Increased from 10px */
+}
+
+/* Tool-specific improvements */
+
+/* JSON Path input */
+.jsonpath-input {
+    font-size: 14px !important; /* Increased for better readability */
+    padding: 8px !important; /* Increased padding */
+}
+
+/* JWT parts display */
+.jwt-part {
+    font-size: 13px !important; /* Increased from 11px */
+    padding: 6px 8px !important; /* Increased from 4px 6px */
+}
+
+/* Regex tester specific */
+.regex-input,
+.test-input {
+    font-size: 14px !important; /* Increased for better readability */
+}
+
+/* Scientific calculator buttons */
+.calc-button {
+    font-size: 16px !important; /* Increased for better readability */
+    padding: 8px !important; /* Increased padding */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    /* On smaller screens, increase sizes even more for better touch targets */
+    button:not(.delete-btn):not(.history-delete-btn) {
+        min-height: 36px !important;
+        padding: 8px 14px !important;
+    }
+    
+    .text-area,
+    textarea,
+    input[type="text"] {
+        font-size: 16px !important; /* Prevent zoom on iOS */
+    }
+}

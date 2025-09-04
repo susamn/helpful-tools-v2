@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Text Diff Tool - Helpful Tools v2</title>
+    <link rel="stylesheet" href="/static/css/common-enhancements.css">
     <style>
         * {
             margin: 0;
@@ -590,14 +591,6 @@
         <div class="separator"></div>
         <button id="copyLeftBtn">Copy Left</button>
         <button id="copyRightBtn">Copy Right</button>
-        <button class="collapse-btn" id="collapseBtn">▲ Collapse Inputs</button>
-        <div class="separator"></div>
-        <div class="navigation-controls">
-            <button class="nav-btn" id="prevDiffBtn" title="Previous difference">▲</button>
-            <span class="diff-counter" id="diffCounter">0/0</span>
-            <button class="nav-btn" id="nextDiffBtn" title="Next difference">▼</button>
-        </div>
-        <div class="separator"></div>
         <div class="history-container">
             <button class="history-btn" id="historyBtn">📋 History</button>
             <div class="history-popup" id="historyPopup">
@@ -616,6 +609,13 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <button class="collapse-btn" id="collapseBtn">▲ Collapse Inputs</button>
+        <div class="separator"></div>
+        <div class="navigation-controls">
+            <button class="nav-btn" id="prevDiffBtn" title="Previous difference">▲</button>
+            <span class="diff-counter" id="diffCounter">0/0</span>
+            <button class="nav-btn" id="nextDiffBtn" title="Next difference">▼</button>
         </div>
     </div>
     

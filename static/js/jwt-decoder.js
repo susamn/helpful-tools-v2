@@ -12,6 +12,7 @@ class JwtDecoder {
         this.initializeElements();
         this.attachEventListeners();
         this.loadHistory();
+        this.initializeHistoryToggle();
         this.updateTokenInfo();
         this.applyFontSize();
     }
@@ -25,6 +26,7 @@ class JwtDecoder {
             jwtAlgorithm: document.getElementById('jwtAlgorithm'),
             tokenInfo: document.getElementById('tokenInfo'),
             historyBtn: document.getElementById('historyBtn'),
+            historyToggleBtn: document.getElementById('historyToggleBtn'),
             historyPopup: document.getElementById('historyPopup'),
             historyList: document.getElementById('historyList'),
             globalHistoryList: document.getElementById('globalHistoryList'),
@@ -38,6 +40,9 @@ class JwtDecoder {
     attachEventListeners() {
         // History button
         this.elements.historyBtn.addEventListener('click', () => this.toggleHistory());
+        
+        // History toggle button
+        this.elements.historyToggleBtn.addEventListener('click', () => this.toggleHistoryEnabled());
         
         // Global history button
         this.elements.globalHistoryBtn.addEventListener('click', () => this.toggleGlobalHistory());
@@ -439,18 +444,39 @@ class JwtDecoder {
             
             return `
                 <div class="history-item" data-id="${item.id}">
-                    <div class="history-date">${item.formatted_date || new Date(item.timestamp).toLocaleString()}</div>
-                    <div class="history-preview">${truncatedPreview}</div>
+                    <input type="checkbox" class="history-checkbox" onclick="event.stopPropagation()" style="margin-right: 4px; margin-bottom: 2px;">
+                    <div class="history-content" style="flex: 1;">
+                        <div class="history-date">${item.formatted_date || new Date(item.timestamp).toLocaleString()}</div>
+                        <div class="history-preview">${truncatedPreview}</div>
+                    </div>
+                    <button class="delete-btn" onclick="event.stopPropagation(); window.jwtDecoder.deleteHistoryItem('${item.id}')" title="Delete this item">×</button>
                 </div>
             `;
         }).join('');
 
-        this.elements.historyList.innerHTML = historyHtml;
+        this.elements.historyList.innerHTML = `
+            <div class="history-controls" style="padding: 8px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
+                <label style="font-size: 11px; display: flex; align-items: center;">
+                    <input type="checkbox" id="selectAll" style="margin-right: 4px;"> Select All
+                </label>
+                <button class="delete-selected-btn" onclick="window.jwtDecoder.deleteSelectedHistory()" style="font-size: 10px; padding: 2px 6px; background: #dc3545; color: white; border: none; border-radius: 2px; cursor: pointer;">Delete Selected</button>
+            </div>
+            ${historyHtml}
+        `;
+
+        // Add select all functionality
+        const selectAllCheckbox = this.elements.historyList.querySelector('#selectAll');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                const checkboxes = this.elements.historyList.querySelectorAll('.history-checkbox');
+                checkboxes.forEach(cb => cb.checked = e.target.checked);
+            });
+        }
 
         // Add click event listeners
         this.elements.historyList.querySelectorAll('.history-item').forEach(item => {
-            item.addEventListener('click', () => {
-                if (item.dataset.id) {
+            item.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox' && !e.target.classList.contains('delete-btn')) {
                     this.loadHistoryEntry(item.dataset.id);
                 }
             });
@@ -458,32 +484,35 @@ class JwtDecoder {
     }
 
     displayGlobalHistory(history) {
-        const globalHistoryList = document.getElementById('globalHistoryList');
         if (history.length === 0) {
-            globalHistoryList.innerHTML = '<div class="global-history-item">No global history available</div>';
+            this.elements.globalHistoryList.innerHTML = '<div class="global-history-item">No global history available</div>';
             return;
         }
 
-        const historyHtml = history.map(item => {
-            const toolName = item.tool || 'Unknown';
-            const preview = item.preview || (item.data ? JSON.stringify(item.data).substring(0, 50) + '...' : 'No preview');
-            
-            return `
-                <div class="global-history-item" data-id="${item.id}" data-tool="${item.tool}">
-                    <div class="history-date">${toolName} - ${new Date(item.timestamp).toLocaleString()}</div>
-                    <div class="history-preview">${preview}</div>
+        const historyHtml = history.map(item => `
+            <div class="global-history-item" data-id="${item.id}" data-tool="${item.tool_name}">
+                <div class="global-history-item-header">
+                    <input type="checkbox" class="global-history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
+                    <div class="global-history-item-meta">
+                        <div class="global-history-id-tool">
+                            <span class="history-id">ID: ${item.id}</span>
+                            <span class="global-history-tool-label" style="background-color: ${this.getToolColor(item.tool_name)}">${item.tool_name}</span>
+                        </div>
+                        <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
+                    </div>
+                    <button class="history-delete-btn" onclick="window.jwtDecoder.deleteGlobalHistoryItem('${item.id}'); event.stopPropagation();">×</button>
                 </div>
-            `;
-        }).join('');
+                <div class="history-preview">${item.preview}</div>
+            </div>
+        `).join('');
 
-        globalHistoryList.innerHTML = historyHtml;
+        this.elements.globalHistoryList.innerHTML = historyHtml;
 
-        // Add click event listeners for global history
-        globalHistoryList.querySelectorAll('.global-history-item').forEach(item => {
-            item.addEventListener('click', () => {
-                if (item.dataset.tool === this.toolName && item.dataset.id) {
-                    this.loadHistoryEntry(item.dataset.id);
-                    this.toggleGlobalHistory(); // Close popup after loading
+        // Add click listeners to global history items (allow cross-tool loading)
+        this.elements.globalHistoryList.querySelectorAll('.global-history-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox') {
+                    this.loadGlobalHistoryEntry(item.dataset.id, item.dataset.tool);
                 }
             });
         });
@@ -509,6 +538,41 @@ class JwtDecoder {
         this.elements.historyPopup.classList.toggle('show');
         if (this.elements.historyPopup.classList.contains('show')) {
             this.loadHistory(); // Refresh when opening
+        }
+    }
+
+    /**
+     * Toggle history enabled/disabled state
+     */
+    toggleHistoryEnabled() {
+        this.historyEnabled = !this.historyEnabled;
+        localStorage.setItem(`${this.toolName}-historyEnabled`, this.historyEnabled.toString());
+        
+        const btn = this.elements.historyToggleBtn;
+        if (this.historyEnabled) {
+            btn.textContent = '📝 History On';
+            btn.classList.remove('disabled');
+            btn.title = 'History Enabled - Click to Disable';
+        } else {
+            btn.textContent = '📝 History Off';
+            btn.classList.add('disabled');
+            btn.title = 'History Disabled - Click to Enable';
+        }
+    }
+
+    /**
+     * Initialize history toggle button state
+     */
+    initializeHistoryToggle() {
+        const btn = this.elements.historyToggleBtn;
+        if (this.historyEnabled) {
+            btn.textContent = '📝 History On';
+            btn.classList.remove('disabled');
+            btn.title = 'History Enabled - Click to Disable';
+        } else {
+            btn.textContent = '📝 History Off';
+            btn.classList.add('disabled');
+            btn.title = 'History Disabled - Click to Enable';
         }
     }
 
@@ -572,6 +636,169 @@ class JwtDecoder {
     
     saveFontSize() {
         localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
+    }
+
+    getToolColor(toolName) {
+        const colors = {
+            'json-formatter': '#2196F3',
+            'json-yaml-xml-converter': '#4CAF50', 
+            'text-diff': '#FF5722',
+            'regex-tester': '#9C27B0',
+            'cron-parser': '#FF9800',
+            'scientific-calculator': '#607D8B',
+            'jwt-decoder': '#795548'
+        };
+        return colors[toolName] || '#757575';
+    }
+
+    async deleteGlobalHistoryItem(entryId) {
+        try {
+            const response = await fetch(`/api/global-history/${entryId}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                this.loadHistory();
+                this.loadGlobalHistory();
+            }
+        } catch (error) {
+            console.error('Error deleting global history item:', error);
+        }
+    }
+
+    /**
+     * Delete individual history item
+     */
+    async deleteHistoryItem(entryId) {
+        if (!confirm('Are you sure you want to delete this history item?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/history/${this.toolName}/${entryId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.loadHistory(); // Refresh history display
+                this.loadGlobalHistory(); // Refresh global history as well
+            }
+        } catch (error) {
+            console.error('Error deleting history item:', error);
+        }
+    }
+
+    /**
+     * Delete selected history items
+     */
+    async deleteSelectedHistory() {
+        const checkboxes = this.elements.historyList.querySelectorAll('.history-checkbox:checked');
+        if (checkboxes.length === 0) {
+            alert('Please select at least one item to delete.');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete ${checkboxes.length} selected item(s)?`)) {
+            return;
+        }
+
+        const deletePromises = Array.from(checkboxes).map(cb => {
+            const historyItem = cb.closest('.history-item');
+            const entryId = historyItem.dataset.id;
+            return fetch(`/api/history/${this.toolName}/${entryId}`, { method: 'DELETE' });
+        });
+
+        try {
+            await Promise.all(deletePromises);
+            this.loadHistory(); // Refresh history display
+            this.loadGlobalHistory(); // Refresh global history as well
+        } catch (error) {
+            console.error('Error deleting selected history items:', error);
+        }
+    }
+
+    /**
+     * Clear all history
+     */
+    async clearHistory() {
+        if (!confirm('Are you sure you want to clear all history? This cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/history/${this.toolName}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.loadHistory(); // Refresh history display
+                this.loadGlobalHistory(); // Refresh global history as well
+            }
+        } catch (error) {
+            console.error('Error clearing history:', error);
+        }
+    }
+
+
+    /**
+     * Load specific global history entry
+     */
+    async loadGlobalHistoryEntry(entryId, toolName) {
+        try {
+            const response = await fetch(`/api/global-history/${entryId}`);
+            const entry = await response.json();
+            
+            if (entry.tool_name === this.toolName && entry.data) {
+                this.elements.jwtInput.value = entry.data;
+                this.updateTokenInfo();
+                this.decodeJWT();
+                this.toggleGlobalHistory(); // Close popup after loading
+            }
+        } catch (error) {
+            console.error('Error loading global history entry:', error);
+        }
+    }
+
+    /**
+     * Format timestamp for display
+     */
+    formatTimestamp(isoTimestamp) {
+        try {
+            const date = new Date(isoTimestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffDays > 0) {
+                return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            } else if (diffHours > 0) {
+                return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            } else if (diffMins > 0) {
+                return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+            } else {
+                return 'Just now';
+            }
+        } catch (error) {
+            return new Date(isoTimestamp).toLocaleString();
+        }
+    }
+
+    /**
+     * Get tool-specific color for global history items
+     */
+    getToolColor(toolName) {
+        const colors = {
+            'json-formatter': '#2196F3',
+            'json-yaml-xml-converter': '#4CAF50',
+            'text-diff': '#FF9800',
+            'regex-tester': '#9C27B0',
+            'cron-parser': '#F44336',
+            'scientific-calculator': '#607D8B',
+            'jwt-decoder': '#795548'
+        };
+        return colors[toolName] || '#757575';
     }
 }
 

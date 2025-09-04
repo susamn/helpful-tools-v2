@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JWT Decoder - Helpful Tools v2</title>
+    <link rel="stylesheet" href="/static/css/common-enhancements.css">
     <style>
         * {
             margin: 0;
@@ -89,6 +90,11 @@
         .history-btn:hover {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
         }
+        .history-btn.disabled {
+            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+            color: #999;
+            cursor: not-allowed;
+        }
         .history-popup {
             position: absolute;
             top: 100%;
@@ -133,6 +139,9 @@
             border-bottom: 1px solid #f0f0f0;
             cursor: pointer;
             font-size: 11px;
+            display: flex;
+            align-items: flex-start;
+            gap: 4px;
         }
         .history-item:hover {
             background: #f8f8f8;
@@ -248,11 +257,10 @@
         .global-history-content {
             max-height: 450px;
             overflow-y: auto;
-            padding: 8px;
         }
         
         .global-history-item {
-            padding: 6px 8px;
+            padding: 8px 12px;
             border-bottom: 1px solid #f0f0f0;
             cursor: pointer;
             font-size: 11px;
@@ -262,10 +270,70 @@
             background: #f8f8f8;
         }
         
+        .global-history-item-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .global-history-item-meta {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .global-history-id-tool {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 2px;
+        }
+        
+        .global-history-tool-label {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .global-history-checkbox {
+            margin-top: 2px;
+            cursor: pointer;
+        }
+        
+        .history-id {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 9px;
+            color: #666;
+        }
+        
+        .history-delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 2px;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        
+        .history-delete-btn:hover {
+            background: #c82333;
+        }
+        
         .global-history-item .history-date {
             color: #666;
             font-size: 10px;
-            margin-bottom: 2px;
         }
         
         .global-history-item .history-preview {
@@ -274,6 +342,38 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        
+        /* Delete button styling */
+        .delete-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 2px;
+            width: 16px;
+            height: 16px;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        
+        .delete-btn:hover {
+            background: #c82333;
+        }
+        
+        /* History controls */
+        .history-controls {
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .history-content {
+            flex: 1;
+            min-width: 0;
         }
         .main-container {
             display: flex;
@@ -480,6 +580,8 @@
         <div class="separator"></div>
         <button onclick="copyDecoded()">Copy Decoded</button>
         <div class="separator"></div>
+        <button class="history-btn" id="historyToggleBtn">📝 History On</button>
+        <div class="separator"></div>
         <div class="history-container">
             <button class="history-btn" id="historyBtn">📋 History</button>
             <div class="history-popup" id="historyPopup">
@@ -494,9 +596,7 @@
                         </div>
                     </div>
                     <div class="tab-content" id="globalTab">
-                        <div id="globalHistoryList">
-                            <div class="history-item">No global history available</div>
-                        </div>
+                        <div class="history-item">Global history moved to dedicated button - use 📚 Global History button above</div>
                     </div>
                 </div>
             </div>

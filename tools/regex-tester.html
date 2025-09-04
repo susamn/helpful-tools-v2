@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Regex Tester - Helpful Tools v2</title>
+    <link rel="stylesheet" href="/static/css/common-enhancements.css">
     <style>
         * {
             margin: 0;
@@ -512,9 +513,9 @@
         
         /* Global History popup - positioned below button */
         .global-history-popup {
-            position: absolute;
-            top: 100%;
-            left: 0;
+            position: fixed;
+            top: 50px;
+            right: 16px;
             background: white;
             border: 1px solid #a0a0a0;
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
@@ -1246,8 +1247,17 @@
                         
                         return `
                             <div class="history-item" onclick="regexTester.loadHistoryEntry('${entry.id}')">
-                                <div class="history-item-time">${time}</div>
-                                <div class="history-item-preview">${preview}</div>
+                                <div class="history-item-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                                    <div class="history-item-content" style="flex: 1; display: flex; align-items: flex-start; gap: 6px;">
+                                        <input type="checkbox" class="history-checkbox" data-id="${entry.id}" onclick="regexTester.handleHistorySelection('${entry.id}', event.target.checked); event.stopPropagation();" style="margin-top: 2px; cursor: pointer;">
+                                        <div class="history-meta" style="display: flex; flex-direction: column; gap: 2px;">
+                                            <span class="history-id" style="font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 9px; color: #666; font-weight: bold;">ID: ${entry.id}</span>
+                                            <div class="history-item-time" style="color: #999; font-size: 10px;">${time} - ${entry.operation || 'test'}</div>
+                                        </div>
+                                    </div>
+                                    <button class="history-delete-btn" onclick="regexTester.deleteHistoryItem('${entry.id}'); event.stopPropagation();" style="background: #ff4444; color: white; border: none; border-radius: 2px; padding: 2px 6px; font-size: 10px; cursor: pointer; margin-left: 8px; opacity: 0.7; transition: opacity 0.2s;">×</button>
+                                </div>
+                                <div class="history-item-preview" style="font-family: 'Consolas', 'Monaco', monospace; font-size: 10px; color: #333; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: 40px; line-height: 1.3;">${preview}</div>
                             </div>
                         `;
                     } catch (error) {

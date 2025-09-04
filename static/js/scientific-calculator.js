@@ -927,9 +927,11 @@ class ScientificCalculator {
                         <div class="history-item-content">
                             <input type="checkbox" class="history-checkbox" data-id="${entry.id}">
                             <div class="history-meta">
-                                <span class="history-id">ID: ${entry.id}</span>
+                                <div class="history-id-tool" style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="history-id">ID: ${entry.id}</span>
+                                    <span class="tool-label" style="background-color: ${toolColor}; font-family: 'Consolas', 'Monaco', monospace; font-size: 9px; padding: 2px 6px; border-radius: 8px; color: white; font-weight: bold; text-transform: uppercase;">${entry.tool_name}</span>
+                                </div>
                                 <span class="history-date">${this.formatTimestamp(entry.timestamp)} - ${entry.operation}</span>
-                                <span class="tool-label" style="background-color: ${toolColor};">${entry.tool_name}</span>
                             </div>
                         </div>
                         <button class="history-delete-btn" onclick="calculator.deleteGlobalHistoryItem('${entry.id}')">×</button>
