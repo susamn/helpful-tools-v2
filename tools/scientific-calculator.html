@@ -330,25 +330,64 @@
             align-items: center;
             gap: 6px;
             margin: 2px 0;
-            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
         }
         .legend-item:hover {
             background: #f0f0f0;
         }
-        .legend-color {
-            width: 16px;
-            height: 3px;
-            border: 1px solid #666;
+        .legend-item-hidden {
+            opacity: 0.5;
+        }
+        .legend-type-icon {
+            font-size: 12px;
+            font-weight: bold;
+            width: 20px;
+            text-align: center;
+            color: #666;
+        }
+        .legend-color-picker {
+            width: 20px;
+            height: 20px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            padding: 0;
         }
         .legend-text {
             flex: 1;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        .legend-text:hover {
+            background: rgba(74, 144, 226, 0.1);
+            color: #4a90e2;
+        }
+        .legend-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 2px;
+            border-radius: 2px;
+        }
+        .legend-toggle:hover {
+            background: rgba(0,0,0,0.1);
         }
         .legend-remove {
             color: #cc0000;
             cursor: pointer;
             font-weight: bold;
-            padding: 0 4px;
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 14px;
+        }
+        .legend-remove:hover {
+            background: rgba(204, 0, 0, 0.1);
         }
         .coordinate-display {
             position: absolute;
@@ -644,6 +683,9 @@
                             <button class="btn" onclick="loadExample('sine')">sin(x)</button>
                             <button class="btn" onclick="loadExample('exponential')">e^x</button>
                             <button class="btn" onclick="loadExample('logarithmic')">ln(x)</button>
+                            <button class="btn" onclick="loadExample('circle')" title="Circle parametric equation">(5cos(t), 5sin(t))</button>
+                            <button class="btn" onclick="loadExample('ellipse')" title="Ellipse parametric equation">(3cos(t), 2sin(t))</button>
+                            <button class="btn" onclick="loadExample('spiral')" title="Spiral parametric equation">(t*cos(t), t*sin(t))</button>
                         </div>
                         <div class="zoom-controls">
                             <span>X:</span>

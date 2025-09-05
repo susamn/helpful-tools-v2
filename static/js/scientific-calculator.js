@@ -30,7 +30,10 @@ class ScientificCalculator {
             polynomial: 'x^3 - 2*x^2 + x - 1',
             trigonometric: 'sin(x) + cos(2*x)',
             rational: '1/x',
-            absolute: 'abs(x)'
+            absolute: 'abs(x)',
+            circle: '(5*cos(t), 5*sin(t))',
+            ellipse: '(3*cos(t), 2*sin(t))',
+            spiral: '(t*cos(t), t*sin(t))'
         };
 
         this.init();
@@ -362,7 +365,19 @@ class ScientificCalculator {
             return;
         }
 
-        this.graphFunctions = [{ expr: input.value.trim(), color: '#4a90e2', id: Date.now() }];
+        const functionObj = { 
+            expr: input.value.trim(), 
+            color: '#4a90e2', 
+            id: Date.now(),
+            type: validation.type || 'regular'
+        };
+        
+        if (validation.type === 'parametric') {
+            functionObj.xExpr = validation.xExpr;
+            functionObj.yExpr = validation.yExpr;
+        }
+
+        this.graphFunctions = [functionObj];
         this.plotAllFunctions();
         this.updateLegend();
         this.saveToHistory(input.value.trim(), 'plot');
@@ -381,7 +396,20 @@ class ScientificCalculator {
         const colors = ['#4a90e2', '#ff6b35', '#388e3c', '#9c27b0', '#ff9800', '#e91e63', '#00bcd4', '#8bc34a'];
         const color = colors[this.graphFunctions.length % colors.length];
 
-        this.graphFunctions.push({ expr: input.value.trim(), color: color, id: Date.now() });
+        const functionObj = { 
+            expr: input.value.trim(), 
+            color: color, 
+            id: Date.now(),
+            type: validation.type || 'regular',
+            visible: true
+        };
+        
+        if (validation.type === 'parametric') {
+            functionObj.xExpr = validation.xExpr;
+            functionObj.yExpr = validation.yExpr;
+        }
+
+        this.graphFunctions.push(functionObj);
         this.plotAllFunctions();
         this.updateLegend();
         this.saveToHistory(input.value.trim(), 'add');
@@ -391,10 +419,17 @@ class ScientificCalculator {
         this.drawGrid();
         
         this.graphFunctions.forEach(func => {
-            this.plotSingleFunction(func, func.color);
+            if (func.visible !== false) {  // Plot if visible is true or undefined
+                if (func.type === 'parametric') {
+                    this.plotParametricFunction(func, func.color);
+                } else {
+                    this.plotSingleFunction(func, func.color);
+                }
+            }
         });
 
-        this.setStatusText(`Plotted ${this.graphFunctions.length} function(s)`);
+        const visibleCount = this.graphFunctions.filter(f => f.visible !== false).length;
+        this.setStatusText(`Plotted ${visibleCount} function(s)`);
     }
 
     plotSingleFunction(functionObj, color) {
@@ -470,6 +505,65 @@ class ScientificCalculator {
         }
     }
 
+    plotParametricFunction(functionObj, color) {
+        const canvas = document.getElementById('graphCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        
+        try {
+            const xExpr = functionObj.xExpr.replace(/\^/g, '^').replace(/pi/g, 'pi').replace(/×/g, '*').replace(/÷/g, '/');
+            const yExpr = functionObj.yExpr.replace(/\^/g, '^').replace(/pi/g, 'pi').replace(/×/g, '*').replace(/÷/g, '/');
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            
+            let firstPoint = true;
+            const steps = 1000;
+            const tMin = 0;
+            const tMax = 2 * Math.PI;
+            const tStep = (tMax - tMin) / steps;
+            
+            for (let i = 0; i <= steps; i++) {
+                const t = tMin + i * tStep;
+                
+                try {
+                    const x = math.evaluate(xExpr, { t: t });
+                    const y = math.evaluate(yExpr, { t: t });
+                    
+                    if (typeof x === 'number' && typeof y === 'number' && 
+                        isFinite(x) && isFinite(y)) {
+                        
+                        const canvasX = ((x - this.graphState.xMin) / (this.graphState.xMax - this.graphState.xMin)) * canvas.width;
+                        const canvasY = canvas.height - ((y - this.graphState.yMin) / (this.graphState.yMax - this.graphState.yMin)) * canvas.height;
+                        
+                        if (canvasX >= -100 && canvasX <= canvas.width + 100 && 
+                            canvasY >= -100 && canvasY <= canvas.height + 100) {
+                            if (firstPoint) {
+                                ctx.moveTo(canvasX, canvasY);
+                                firstPoint = false;
+                            } else {
+                                ctx.lineTo(canvasX, canvasY);
+                            }
+                        } else {
+                            firstPoint = true;
+                        }
+                    } else {
+                        firstPoint = true;
+                    }
+                } catch (e) {
+                    firstPoint = true;
+                }
+            }
+            
+            ctx.stroke();
+            
+        } catch (error) {
+            this.setStatusText('Error plotting parametric function: ' + error.message);
+        }
+    }
+
     clearGraph() {
         this.graphFunctions = [];
         this.drawGrid();
@@ -521,10 +615,17 @@ class ScientificCalculator {
             const lineStyle = func.isDerivative ? 
                 'border-bottom: 2px dashed;' : 
                 '';
+            const hiddenClass = func.visible === false ? ' legend-item-hidden' : '';
+            const typeIcon = this.getTypeIcon(func.type);
             
-            return `<div class="legend-item">
-                <div class="legend-color" style="background-color: ${func.color}; ${lineStyle}"></div>
-                <div class="legend-text">${displayExpr}</div>
+            return `<div class="legend-item${hiddenClass}">
+                <span class="legend-type-icon">${typeIcon}</span>
+                <input type="color" class="legend-color-picker" value="${func.color}" 
+                       onchange="calculator.changeColor(${func.id}, this.value)" title="Change color">
+                <div class="legend-text" onclick="calculator.editFunction(${func.id})" 
+                     title="Click to edit">${displayExpr}</div>
+                <button class="legend-toggle" onclick="calculator.toggleVisibility(${func.id})" 
+                        title="Toggle visibility">${func.visible === false ? '👁️‍🗨️' : '👁️'}</button>
                 <div class="legend-remove" onclick="calculator.removeFunction(${func.id})" title="Remove function">×</div>
             </div>`;
         }).join('');
@@ -534,6 +635,43 @@ class ScientificCalculator {
         this.graphFunctions = this.graphFunctions.filter(func => func.id !== id);
         this.plotAllFunctions();
         this.updateLegend();
+    }
+
+    getTypeIcon(type) {
+        switch (type) {
+            case 'parametric': return '📐';
+            case 'regular': 
+            default: return 'f(x)';
+        }
+    }
+
+    changeColor(id, newColor) {
+        const func = this.graphFunctions.find(f => f.id === id);
+        if (func) {
+            func.color = newColor;
+            this.plotAllFunctions();
+            this.updateLegend();
+        }
+    }
+
+    toggleVisibility(id) {
+        const func = this.graphFunctions.find(f => f.id === id);
+        if (func) {
+            func.visible = func.visible === false ? true : false;
+            this.plotAllFunctions();
+            this.updateLegend();
+        }
+    }
+
+    editFunction(id) {
+        const func = this.graphFunctions.find(f => f.id === id);
+        if (func) {
+            const input = document.getElementById('functionInput');
+            if (input) {
+                input.value = func.expr;
+                input.focus();
+            }
+        }
     }
 
     loadExample(type) {
@@ -762,7 +900,13 @@ class ScientificCalculator {
         try {
             if (!expr.trim()) return { valid: false, error: 'Empty function' };
             
-            // Test evaluation at a few points
+            // Check if it's a parametric equation: (x(t), y(t))
+            const parametricMatch = expr.match(/^\s*\(\s*([^,]+)\s*,\s*([^,]+)\s*\)\s*$/);
+            if (parametricMatch) {
+                return this.validateParametric(parametricMatch[1].trim(), parametricMatch[2].trim());
+            }
+            
+            // Regular function validation
             const testPoints = [0, 1, -1, 0.5, 2];
             let validPoints = 0;
             
@@ -781,10 +925,39 @@ class ScientificCalculator {
                 return { valid: false, error: 'Function produces no valid values' };
             }
             
-            return { valid: true, error: null };
+            return { valid: true, type: 'regular', error: null };
             
         } catch (error) {
             return { valid: false, error: error.message };
+        }
+    }
+
+    validateParametric(xExpr, yExpr) {
+        try {
+            // Test parametric equations with t parameter
+            const testPoints = [0, 1, -1, 0.5, Math.PI, Math.PI/2];
+            let validPoints = 0;
+            
+            for (const t of testPoints) {
+                try {
+                    const x = math.evaluate(xExpr.replace(/\^/g, '^'), { t: t });
+                    const y = math.evaluate(yExpr.replace(/\^/g, '^'), { t: t });
+                    if (typeof x === 'number' && typeof y === 'number' && 
+                        isFinite(x) && isFinite(y)) {
+                        validPoints++;
+                    }
+                } catch (e) {
+                    // Some functions might not be defined at certain points
+                }
+            }
+            
+            if (validPoints === 0) {
+                return { valid: false, error: 'Parametric equations produce no valid values' };
+            }
+            
+            return { valid: true, type: 'parametric', xExpr: xExpr, yExpr: yExpr };
+        } catch (error) {
+            return { valid: false, error: 'Invalid parametric equation: ' + error.message };
         }
     }
 
