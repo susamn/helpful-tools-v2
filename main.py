@@ -26,49 +26,56 @@ TOOLS = [
         "description": "Format, validate, and minify JSON data with history tracking",
         "path": "/tools/json-formatter",
         "tags": ["formatter", "json", "validator"],
-        "has_history": True
+        "has_history": True,
+        "icon": "📄"
     },
     {
         "name": "JSON-YAML-XML Converter",
         "description": "Bidirectional conversion between JSON, YAML, and XML formats with syntax highlighting",
         "path": "/tools/json-yaml-xml-converter",
         "tags": ["converter", "json", "yaml", "xml", "format"],
-        "has_history": True
+        "has_history": True,
+        "icon": "🔄"
     },
     {
         "name": "Text Diff Tool",
         "description": "Compare two text files side-by-side with inline highlighting of differences",
         "path": "/tools/text-diff",
         "tags": ["diff", "compare", "text", "files"],
-        "has_history": True
+        "has_history": True,
+        "icon": "⚖️"
     },
     {
         "name": "Regex Tester",
         "description": "Interactive regex testing tool with live highlighting, group visualization, and match details",
         "path": "/tools/regex-tester",
         "tags": ["regex", "pattern", "match", "test", "validation"],
-        "has_history": True
+        "has_history": True,
+        "icon": "🔍"
     },
     {
         "name": "Cron Parser",
         "description": "Parse and analyze cron expressions with human-readable descriptions and next execution times",
         "path": "/tools/cron-parser",
         "tags": ["cron", "scheduler", "parser", "time", "unix"],
-        "has_history": True
+        "has_history": True,
+        "icon": "⏰"
     },
     {
         "name": "Scientific Calculator",
         "description": "Advanced calculator with scientific functions and interactive graph plotter for mathematical expressions",
         "path": "/tools/scientific-calculator",
         "tags": ["calculator", "math", "science", "graph", "plotter", "functions"],
-        "has_history": True
+        "has_history": True,
+        "icon": "🧮"
     },
     {
         "name": "JWT Decoder",
         "description": "Decode and analyze JWT (JSON Web Tokens) with syntax highlighting, validation, and timestamp formatting",
         "path": "/tools/jwt-decoder",
         "tags": ["jwt", "decoder", "token", "security", "json", "auth"],
-        "has_history": True
+        "has_history": True,
+        "icon": "🔑"
     }
 ]
 
@@ -245,7 +252,7 @@ DASHBOARD_TEMPLATE = '''
             {% if tools %}
                 {% for tool in tools %}
                 <div class="tool-card" onclick="openTool('{{ tool.path }}')">
-                    <h3>{{ tool.name }}</h3>
+                    <h3>{{ tool.icon }} {{ tool.name }}</h3>
                     <p>{{ tool.description }}</p>
                     <div class="tool-tags">
                         {% for tag in tool.tags %}
