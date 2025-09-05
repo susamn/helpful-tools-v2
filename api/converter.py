@@ -9,6 +9,19 @@ import xml.etree.ElementTree as ET
 import xmltodict
 from typing import Dict, Any, Union
 from xml.dom import minidom
+import datetime
+
+
+# Create a custom YAML loader that doesn't auto-convert dates to date objects
+class StringLoader(yaml.SafeLoader):
+    """Custom YAML loader that treats dates as strings."""
+    pass
+
+# Remove the implicit timestamp resolver so dates stay as strings
+StringLoader.yaml_implicit_resolvers = {
+    key: [resolver for resolver in resolvers if resolver[0] != 'tag:yaml.org,2002:timestamp']
+    for key, resolvers in StringLoader.yaml_implicit_resolvers.items()
+}
 
 
 class FormatConverter:
@@ -16,7 +29,7 @@ class FormatConverter:
     
     def __init__(self):
         # Configure PyYAML to handle various data types properly
-        self.yaml_loader = yaml.SafeLoader
+        self.yaml_loader = StringLoader
         self.yaml_dumper = yaml.SafeDumper
         
     def detect_format(self, data: str) -> str:
@@ -41,7 +54,7 @@ class FormatConverter:
         
         # Check for YAML (most permissive, so check last)
         try:
-            yaml.safe_load(data)
+            yaml.load(data, Loader=self.yaml_loader)
             # Additional check to avoid false positives
             if ':' in data or '-' in data:
                 return 'yaml'
@@ -61,7 +74,7 @@ class FormatConverter:
     def yaml_to_json(self, yaml_str: str) -> str:
         """Convert YAML string to JSON string."""
         try:
-            data = yaml.safe_load(yaml_str)
+            data = yaml.load(yaml_str, Loader=self.yaml_loader)
             return json.dumps(data, indent=2, ensure_ascii=False)
         except (yaml.YAMLError, TypeError) as e:
             raise ValueError(f"YAML to JSON conversion failed: {str(e)}")
@@ -122,7 +135,7 @@ class FormatConverter:
     def format_yaml(self, yaml_str: str) -> str:
         """Format/prettify YAML string."""
         try:
-            data = yaml.safe_load(yaml_str)
+            data = yaml.load(yaml_str, Loader=self.yaml_loader)
             return yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
         except yaml.YAMLError as e:
             raise ValueError(f"YAML formatting failed: {str(e)}")
@@ -278,7 +291,7 @@ def validate_format(data: str, format_type: str) -> Dict[str, Any]:
             json.loads(data)
             return {'valid': True, 'format': 'json'}
         elif format_type == 'yaml':
-            yaml.safe_load(data)
+            yaml.load(data, Loader=StringLoader)
             return {'valid': True, 'format': 'yaml'}
         elif format_type == 'xml':
             ET.fromstring(data)
