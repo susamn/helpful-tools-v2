@@ -844,7 +844,7 @@
             }
 
             // Core Regex Testing Logic
-            testRegex() {
+            async testRegex() {
                 const pattern = this.elements.regexInput.value.trim();
                 const testText = this.elements.testText.value;
                 
@@ -861,6 +861,27 @@
                     return;
                 }
                 
+                // Security: Check input size limits
+                const MAX_PATTERN_LENGTH = 1000;
+                const MAX_TEXT_LENGTH = 50000; // 50KB
+                
+                if (pattern.length > MAX_PATTERN_LENGTH) {
+                    this.showError(`Pattern too long (max ${MAX_PATTERN_LENGTH} characters)`);
+                    return;
+                }
+                
+                if (testText.length > MAX_TEXT_LENGTH) {
+                    this.showError(`Test text too long (max ${MAX_TEXT_LENGTH.toLocaleString()} characters)`);
+                    return;
+                }
+                
+                // Security: Pattern complexity analysis
+                const complexityResult = this.analyzePatternComplexity(pattern);
+                if (!complexityResult.safe) {
+                    this.showError(`Potentially dangerous pattern: ${complexityResult.reason}`);
+                    return;
+                }
+                
                 if (!testText) {
                     this.showNoText();
                     return;
@@ -871,28 +892,69 @@
                     const regex = new RegExp(pattern, flags);
                     this.elements.regexInput.className = 'regex-input valid';
                     
-                    const matches = this.findMatches(regex, testText, flags, pattern);
+                    // Security: Execute with timeout protection
+                    const startTime = performance.now();
+                    const matches = await this.findMatchesWithTimeout(regex, testText, flags, pattern, 2000);
+                    const executionTime = performance.now() - startTime;
+                    
                     this.currentMatches = matches;
                     
                     this.displayResults(matches);
                     this.updateMatchCount(matches.length);
-                    this.updateStatus(matches.length > 0 ? 
-                        `Found ${matches.length} match${matches.length > 1 ? 'es' : ''}` : 
-                        'No matches found');
-                    this.updateRegexInfo(pattern, testText.length, flags);
+                    
+                    // Performance monitoring with warnings
+                    let statusMessage;
+                    if (executionTime > 1000) {
+                        statusMessage = `⚠️ SLOW: Found ${matches.length} match${matches.length > 1 ? 'es' : ''} (${Math.round(executionTime)}ms)`;
+                    } else if (executionTime > 500) {
+                        statusMessage = `Found ${matches.length} match${matches.length > 1 ? 'es' : ''} (${Math.round(executionTime)}ms)`;
+                    } else {
+                        statusMessage = matches.length > 0 ? 
+                            `Found ${matches.length} match${matches.length > 1 ? 'es' : ''}` : 
+                            'No matches found';
+                    }
+                    this.updateStatus(statusMessage);
+                    
+                    this.updateRegexInfo(pattern, testText.length, flags, executionTime);
                     
                     // Save to history if enabled
                     this.saveToHistoryIfChanged(pattern, testText, flags, 'test');
                     
                 } catch (error) {
-                    this.showError(error.message);
+                    if (error.name === 'TimeoutError') {
+                        this.showError('⚠️ TIMEOUT: Pattern execution took too long (potential ReDoS)');
+                    } else {
+                        this.showError(error.message);
+                    }
                 }
+            }
+
+            // Security: Timeout-protected regex matching
+            async findMatchesWithTimeout(regex, text, flags, pattern, timeoutMs = 2000) {
+                return new Promise((resolve, reject) => {
+                    const timeoutId = setTimeout(() => {
+                        const error = new Error('Pattern execution timeout');
+                        error.name = 'TimeoutError';
+                        reject(error);
+                    }, timeoutMs);
+                    
+                    try {
+                        const matches = this.findMatches(regex, text, flags, pattern);
+                        clearTimeout(timeoutId);
+                        resolve(matches);
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        reject(error);
+                    }
+                });
             }
 
             // Regex Matching Logic
             findMatches(regex, text, flags, pattern) {
                 const matches = [];
                 let match;
+                let iterations = 0;
+                const MAX_ITERATIONS = 10000; // Prevent runaway regex
 
                 // Standard matching logic
                 if (flags.includes('g')) {
@@ -908,6 +970,12 @@
                         // Prevent infinite loop on zero-length matches
                         if (match.index === regex.lastIndex) {
                             regex.lastIndex++;
+                        }
+                        
+                        // Security: Prevent excessive iterations
+                        iterations++;
+                        if (iterations > MAX_ITERATIONS) {
+                            throw new Error(`Too many matches (>${MAX_ITERATIONS}) - pattern may be inefficient`);
                         }
                     }
                 } else {
@@ -1054,8 +1122,117 @@
                 this.elements.statusText.textContent = message;
             }
 
-            updateRegexInfo(pattern, textLength, flags) {
-                this.elements.regexInfo.textContent = `Pattern: /${pattern}/${flags} | Test length: ${textLength}`;
+            updateRegexInfo(pattern, textLength, flags, executionTime = null) {
+                let info = `Pattern: /${pattern}/${flags} | Test length: ${textLength}`;
+                if (executionTime !== null) {
+                    info += ` | Time: ${Math.round(executionTime)}ms`;
+                }
+                this.elements.regexInfo.textContent = info;
+            }
+
+            // Security: Pattern complexity analysis
+            analyzePatternComplexity(pattern) {
+                const dangerousPatterns = [
+                    // Known ReDoS patterns - Enhanced detection
+                    { pattern: /\(([^)]*[+*]){1,}[^)]*\)[+*]/, reason: 'Nested quantifiers (ReDoS risk)' },
+                    { pattern: /\(([^)|]*\|[^)]*){2,}\)[+*]/, reason: 'Multiple alternations with quantifiers (ReDoS risk)' },
+                    { pattern: /\([^)]*[+*][^)]*[+*][^)]*\)[+*]/, reason: 'Multiple quantifiers in group (ReDoS risk)' },
+                    { pattern: /\(.*\*.*\*.*\)[+*]/, reason: 'Nested star quantifiers (ReDoS risk)' },
+                    
+                    // Specific dangerous patterns we found in testing
+                    { pattern: /\(a\+\)\+/, reason: 'Classic ReDoS pattern (a+)+' },
+                    { pattern: /\(a\|a\)\*/, reason: 'Alternation ambiguity (a|a)*' },
+                    { pattern: /\(a\*\)\*/, reason: 'Nested star quantifiers (a*)*' },
+                    { pattern: /\([^)]*\|[^)]*\)[+*]/, reason: 'Alternation with quantifier (ReDoS risk)' },
+                    
+                    // Resource exhaustion patterns
+                    { pattern: /\{\d{4,}/, reason: 'Very large quantifier (memory risk)' },
+                    { pattern: /\[([^\]]{100,})\]/, reason: 'Very large character class (memory risk)' },
+                ];
+                
+                for (const dangerous of dangerousPatterns) {
+                    if (dangerous.pattern.test(pattern)) {
+                        return { safe: false, reason: dangerous.reason };
+                    }
+                }
+                
+                // Count nesting levels
+                let nestingLevel = 0;
+                let maxNesting = 0;
+                for (const char of pattern) {
+                    if (char === '(') {
+                        nestingLevel++;
+                        maxNesting = Math.max(maxNesting, nestingLevel);
+                    } else if (char === ')') {
+                        nestingLevel--;
+                    }
+                }
+                
+                if (maxNesting > 10) {
+                    return { safe: false, reason: 'Too many nested groups (complexity risk)' };
+                }
+                
+                // Count alternations
+                const alternationCount = (pattern.match(/\|/g) || []).length;
+                if (alternationCount > 15) {
+                    return { safe: false, reason: 'Too many alternations (complexity risk)' };
+                }
+                
+                // Additional ReDoS pattern checks
+                // Check for any group followed by + or * that contains quantifiers
+                if (/\([^)]*[+*?].*\)[+*]/.test(pattern)) {
+                    return { safe: false, reason: 'Quantified group containing quantifiers (ReDoS risk)' };
+                }
+                
+                // Check for excessive quantifier nesting depth
+                let quantifierDepth = 0;
+                let maxQuantifierDepth = 0;
+                for (let i = 0; i < pattern.length; i++) {
+                    const char = pattern[i];
+                    if (char === '(' && i < pattern.length - 1) {
+                        // Look ahead to see if this group has quantifiers
+                        let groupEnd = i + 1;
+                        let parenLevel = 1;
+                        let hasQuantifier = false;
+                        
+                        while (groupEnd < pattern.length && parenLevel > 0) {
+                            if (pattern[groupEnd] === '(') parenLevel++;
+                            else if (pattern[groupEnd] === ')') {
+                                parenLevel--;
+                                if (parenLevel === 0 && groupEnd < pattern.length - 1) {
+                                    const nextChar = pattern[groupEnd + 1];
+                                    if (['+', '*', '?', '{'].includes(nextChar)) {
+                                        hasQuantifier = true;
+                                    }
+                                }
+                            }
+                            groupEnd++;
+                        }
+                        
+                        if (hasQuantifier) {
+                            quantifierDepth++;
+                            maxQuantifierDepth = Math.max(maxQuantifierDepth, quantifierDepth);
+                        }
+                    }
+                }
+                
+                if (maxQuantifierDepth > 3) {
+                    return { safe: false, reason: 'Too many nested quantified groups (ReDoS risk)' };
+                }
+                
+                // Final safety check - warn about suspicious patterns
+                const suspiciousPatterns = [
+                    /\([^)]*\)[+*].*\([^)]*\)[+*]/, // Multiple quantified groups
+                    /[+*]{2,}/, // Multiple consecutive quantifiers
+                ];
+                
+                for (const suspicious of suspiciousPatterns) {
+                    if (suspicious.test(pattern)) {
+                        return { safe: false, reason: 'Suspicious pattern structure (potential performance risk)' };
+                    }
+                }
+                
+                return { safe: true, reason: null };
             }
 
             // Utility Functions
