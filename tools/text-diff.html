@@ -138,34 +138,60 @@
         }
         .navigation-controls {
             display: flex;
-            gap: 4px;
+            gap: 8px;
             align-items: center;
             margin-left: auto;
+            background: linear-gradient(to bottom, #fff8dc, #f0e68c);
+            border: 2px solid #daa520;
+            border-radius: 6px;
+            padding: 6px 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .nav-btn {
-            background: linear-gradient(to bottom, #e6f3ff, #b3d9ff);
-            border: 1px solid #4a90e2;
-            color: #1565c0;
-            width: 28px;
-            height: 24px;
+            background: linear-gradient(to bottom, #ff6b35, #e55a2b);
+            border: 2px solid #cc4a1f;
+            color: white;
+            width: 36px;
+            height: 32px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         .nav-btn:hover {
-            background: linear-gradient(to bottom, #ffffff, #d9eaff);
+            background: linear-gradient(to bottom, #ff7f4d, #ff6b35);
+            border-color: #e55a2b;
+            transform: translateY(-1px);
+            box-shadow: 0 3px 6px rgba(0,0,0,0.25);
+        }
+        .nav-btn:active {
+            transform: translateY(0px);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
         .nav-btn:disabled {
-            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
-            border-color: #a0a0a0;
-            color: #999;
+            background: linear-gradient(to bottom, #cccccc, #b8b8b8);
+            border-color: #999999;
+            color: #666;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
         .diff-counter {
-            font-size: 10px;
-            color: #666;
-            margin: 0 4px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #8b6914;
+            margin: 0 8px;
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 4px;
+            border: 1px solid #daa520;
+            min-width: 50px;
+            text-align: center;
         }
         .toolbar button {
             background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
