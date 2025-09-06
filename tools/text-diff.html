@@ -958,8 +958,8 @@
                 }
 
                 updateLineCount() {
-                    const lines1 = this.elements.text1.value.split('\\n').length;
-                    const lines2 = this.elements.text2.value.split('\\n').length;
+                    const lines1 = this.elements.text1.value.split('\n').length;
+                    const lines2 = this.elements.text2.value.split('\n').length;
                     this.elements.leftStats.textContent = `${lines1} lines`;
                     this.elements.rightStats.textContent = `${lines2} lines`;
                 }
