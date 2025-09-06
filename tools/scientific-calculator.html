@@ -547,7 +547,7 @@
                 <button id="fontIncreaseBtn" title="Increase font size">+</button>
             </div>
             <div class="history-container" style="position: relative; display: inline-block;">
-                <button class="global-history-btn" id="globalHistoryBtn">🌐 Global History</button>
+                <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
                 <div class="history-popup" id="globalHistoryPopup">
                     <div class="history-header">
                         <span>Global History</span>
@@ -650,8 +650,10 @@
                 <div class="panel-content" style="display: flex; flex-direction: column;">
                     <!-- Graph Controls -->
                     <div style="padding: 8px; background: #f8f8f8; border-bottom: 1px solid #c0c0c0; display: flex; align-items: center; gap: 8px;">
+                        <button class="btn" onclick="clearGraph()">Clear Graph</button>
+                        <button class="btn" onclick="resetZoom()">Reset Zoom</button>
                         <div class="history-container" style="position: relative; display: inline-block;">
-                            <button class="btn" id="historyToggle">📊 History</button>
+                            <button class="btn" id="historyToggle">📋 History</button>
                             <div class="history-popup" id="historyPopup">
                                 <div class="history-header">
                                     <span>Plotting History</span>
@@ -666,8 +668,7 @@
                                 </div>
                             </div>
                         </div>
-                        <button class="btn" onclick="clearGraph()">Clear Graph</button>
-                        <button class="btn" onclick="resetZoom()">Reset Zoom</button>
+
                     </div>
                     
                     <div class="function-input-panel">
