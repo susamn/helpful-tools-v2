@@ -12,11 +12,9 @@ class JsonFormatter {
         this.markupEnabled = true;
         this.indentPrefs = { type: 'spaces', size: 2 };
         this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '12');
-        this.historyEnabled = localStorage.getItem(`${this.toolName}-historyEnabled`) !== 'false';
         this.initializeElements();
         this.attachEventListeners();
-        this.loadHistory();
-        this.initializeHistoryToggle();
+        this.initializeHistoryManager();
         this.applyFontSize();
     }
 
@@ -47,17 +45,6 @@ class JsonFormatter {
             fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
             jsonPathInput: document.getElementById('jsonPathInput'),
             clearSearchBtn: document.getElementById('clearSearchBtn'),
-            
-            // History
-            historyBtn: document.getElementById('historyBtn'),
-            historyToggleBtn: document.getElementById('historyToggleBtn'),
-            historyPopup: document.getElementById('historyPopup'),
-            historyList: document.getElementById('historyList'),
-            
-            // Global History
-            globalHistoryBtn: document.getElementById('globalHistoryBtn'),
-            globalHistoryPopup: document.getElementById('globalHistoryPopup'),
-            globalHistoryList: document.getElementById('globalHistoryList'),
             
             // Status
             statusMessages: document.getElementById('statusMessages'),
@@ -95,16 +82,6 @@ class JsonFormatter {
         });
         this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
 
-        // History functionality
-        this.elements.historyBtn.addEventListener('click', () => this.toggleHistory());
-        this.elements.historyToggleBtn.addEventListener('click', () => this.toggleHistoryEnabled());
-        this.elements.globalHistoryBtn.addEventListener('click', () => this.toggleGlobalHistory());
-        document.addEventListener('click', (e) => this.handleOutsideClick(e));
-
-        // History tabs
-        document.querySelectorAll('.history-tab').forEach(tab => {
-            tab.addEventListener('click', (e) => this.switchHistoryTab(e));
-        });
 
         // Input change detection for real-time stats
         this.elements.jsonInput.addEventListener('input', () => this.updateJsonStats());
@@ -142,7 +119,7 @@ class JsonFormatter {
                 
                 this.displayOutput(formatted, parsed);
                 this.showMessage('JSON formatted successfully!', 'success');
-                this.saveToHistoryIfChanged(input, 'format');
+                this.saveToHistory(input, 'format');
             }
         } catch (error) {
             this.handleJsonError(error);
@@ -180,7 +157,7 @@ class JsonFormatter {
             const combinedStats = this.analyzeCombinedJsonStructure(jsonObjects);
             this.displayOutput(formatted, { combined: true, stats: combinedStats });
             this.showMessage(`JSONL formatted successfully! ${jsonObjects.length} objects processed.`, 'success');
-            this.saveToHistoryIfChanged(input, 'format-jsonl');
+            this.saveToHistory(input, 'format-jsonl');
             
         } catch (error) {
             this.handleJsonError(error);
@@ -396,7 +373,7 @@ class JsonFormatter {
             
             this.displayOutput(minified, parsed);
             this.showMessage(`JSON minified successfully! Reduced from ${input.length} to ${minified.length} characters.`, 'success');
-            this.saveToHistoryIfChanged(input, 'minify');
+            this.saveToHistory(input, 'minify');
             
         } catch (error) {
             this.handleJsonError(error);
@@ -433,7 +410,7 @@ class JsonFormatter {
             
             this.displayOutput(minified, { combined: true, stats: combinedStats });
             this.showMessage(`JSONL minified successfully! ${jsonObjects.length} objects processed. Reduced from ${input.length} to ${minified.length} characters.`, 'success');
-            this.saveToHistoryIfChanged(input, 'minify-jsonl');
+            this.saveToHistory(input, 'minify-jsonl');
             
         } catch (error) {
             this.handleJsonError(error);
@@ -458,7 +435,7 @@ class JsonFormatter {
             
             this.displayOutput(stringified, parsed);
             this.showMessage('JSON stringified successfully!', 'success');
-            this.saveToHistoryIfChanged(input, 'stringify');
+            this.saveToHistory(input, 'stringify');
             
         } catch (error) {
             this.handleJsonError(error);
@@ -1097,6 +1074,32 @@ class JsonFormatter {
     }
 
     /**
+     * Initialize history manager
+     */
+    initializeHistoryManager() {
+        // Create history manager with callback to load data into input
+        this.historyManager = window.createHistoryManager(this.toolName, (data) => {
+            this.elements.jsonInput.value = data;
+            this.lastInputData = data;
+            this.updateJsonStats();
+        });
+        
+        // Make it globally accessible for HTML onclick handlers
+        window.historyManager = this.historyManager;
+    }
+
+    /**
+     * Save input to history
+     */
+    async saveToHistory(data, operation) {
+        // Only save if the data is different from the last saved data
+        if (data !== this.lastInputData) {
+            this.lastInputData = data;
+            await this.historyManager.addHistoryEntry(data, operation);
+        }
+    }
+
+    /**
      * Show status message to user
      */
     showMessage(message, type = 'info') {
@@ -1115,435 +1118,25 @@ class JsonFormatter {
         }, 5000);
     }
 
-    /**
-     * Save input to history only if data has changed
-     */
-    async saveToHistoryIfChanged(data, operation) {
-        // Only save if the data is different from the last saved data
-        if (data !== this.lastInputData) {
-            this.lastInputData = data;
-            await this.saveToHistory(data, operation);
-        }
-    }
-
-    /**
-     * Save input to history via API
-     */
-    async saveToHistory(data, operation) {
-        if (!this.historyEnabled) {
-            return; // Skip saving if history is disabled
-        }
-        
-        try {
-            const response = await fetch(`/api/history/${this.toolName}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    data: data,
-                    operation: operation
-                })
-            });
-
-            if (response.ok) {
-                this.loadHistory(); // Refresh history display
-            }
-        } catch (error) {
-            console.error('Error saving history:', error);
-        }
-    }
-
-    /**
-     * Load history from API
-     */
-    async loadHistory() {
-        try {
-            const response = await fetch(`/api/history/${this.toolName}?limit=20`);
-            const result = await response.json();
-            
-            this.displayHistory(result.history || []);
-        } catch (error) {
-            console.error('Error loading history:', error);
-            this.elements.historyList.innerHTML = '<div class="history-item">Failed to load history</div>';
-        }
-    }
-
-    /**
-     * Display history items in the popup
-     */
-    displayHistory(history) {
-        if (history.length === 0) {
-            this.elements.historyList.innerHTML = '<div class="history-item">No history available</div>';
-            return;
-        }
-
-        const historyHtml = history.map(item => `
-            <div class="history-item" data-id="${item.id}">
-                <div class="history-item-header">
-                    <div class="history-item-content">
-                        <input type="checkbox" class="history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
-                        <div class="history-meta">
-                            <span class="history-id">ID: ${item.id}</span>
-                            <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
-                        </div>
-                    </div>
-                    <button class="history-delete-btn" onclick="window.jsonFormatter.deleteHistoryItem('${item.id}'); event.stopPropagation();">×</button>
-                </div>
-                <div class="history-preview">${item.preview}</div>
-            </div>
-        `).join('');
-
-        this.elements.historyList.innerHTML = historyHtml;
-
-        // Add click listeners to history items (excluding checkbox clicks)
-        this.elements.historyList.querySelectorAll('.history-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                if (e.target.type !== 'checkbox') {
-                    this.loadHistoryEntry(item.dataset.id);
-                }
-            });
-        });
-
-        // Add checkbox event listeners
-        this.elements.historyList.querySelectorAll('.history-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                this.handleHistorySelection(e.target.dataset.id, e.target.checked);
-            });
-        });
-    }
-
-    /**
-     * Format timestamp for display
-     */
-    formatTimestamp(isoTimestamp) {
-        try {
-            const date = new Date(isoTimestamp);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMs / 3600000);
-            const diffDays = Math.floor(diffMs / 86400000);
-            
-            if (diffDays > 0) {
-                return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-            } else if (diffHours > 0) {
-                return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-            } else if (diffMins > 0) {
-                return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-            } else {
-                return 'Just now';
-            }
-        } catch (error) {
-            // Fallback to basic date formatting
-            try {
-                return new Date(isoTimestamp).toLocaleString();
-            } catch (e) {
-                return 'Unknown time';
-            }
-        }
-    }
-
-    /**
-     * Handle history item selection
-     */
-    handleHistorySelection(entryId, isSelected) {
-        if (!this.selectedHistoryItems) {
-            this.selectedHistoryItems = new Set();
-        }
-        
-        if (isSelected) {
-            this.selectedHistoryItems.add(entryId);
-        } else {
-            this.selectedHistoryItems.delete(entryId);
-        }
-        
-        // Update selection UI or enable/disable bulk actions
-        this.updateHistorySelectionUI();
-    }
-
-    /**
-     * Update UI based on history selections
-     */
-    updateHistorySelectionUI() {
-        const selectedCount = this.selectedHistoryItems ? this.selectedHistoryItems.size : 0;
-        
-        // Add/update selection counter and action buttons if needed
-        let selectionInfo = document.querySelector('.history-selection-info');
-        if (!selectionInfo) {
-            selectionInfo = document.createElement('div');
-            selectionInfo.className = 'history-selection-info';
-            this.elements.historyPopup.insertBefore(selectionInfo, this.elements.historyPopup.firstChild);
-        }
-        
-        if (selectedCount > 0) {
-            selectionInfo.innerHTML = `
-                <div style="padding: 8px; background: #e3f2fd; border-bottom: 1px solid #90caf9; font-size: 11px;">
-                    ${selectedCount} item${selectedCount > 1 ? 's' : ''} selected
-                    <button onclick="window.jsonFormatter.clearHistorySelection()" style="float: right; background: none; border: none; color: #1976d2; cursor: pointer;">Clear</button>
-                </div>
-            `;
-        } else {
-            selectionInfo.innerHTML = '';
-        }
-    }
-
-    /**
-     * Clear history selection
-     */
-    clearHistorySelection() {
-        this.selectedHistoryItems?.clear();
-        // Uncheck all checkboxes
-        this.elements.historyList.querySelectorAll('.history-checkbox').forEach(checkbox => {
-            checkbox.checked = false;
-        });
-        this.updateHistorySelectionUI();
-    }
-
-    /**
-     * Load specific history entry
-     */
-    async loadHistoryEntry(entryId) {
-        try {
-            const response = await fetch(`/api/history/${this.toolName}/${entryId}`);
-            const entry = await response.json();
-            
-            if (entry.data) {
-                this.elements.jsonInput.value = entry.data;
-                this.lastInputData = entry.data; // Update tracking to prevent duplicate save
-                this.updateJsonStats();
-                this.toggleHistory(); // Close history popup
-                this.showMessage('History entry loaded!', 'success');
-            }
-        } catch (error) {
-            console.error('Error loading history entry:', error);
-            this.showMessage('Failed to load history entry', 'error');
-        }
-    }
-
-    /**
-     * Toggle history popup visibility
-     */
-    toggleHistory() {
-        this.elements.historyPopup.classList.toggle('show');
-        if (this.elements.historyPopup.classList.contains('show')) {
-            this.loadHistory(); // Refresh when opening
-        }
-    }
-
-    /**
-     * Toggle history enabled/disabled state
-     */
-    toggleHistoryEnabled() {
-        this.historyEnabled = !this.historyEnabled;
-        localStorage.setItem(`${this.toolName}-historyEnabled`, this.historyEnabled.toString());
-        
-        const btn = this.elements.historyToggleBtn;
-        if (this.historyEnabled) {
-            btn.textContent = '📝 History On';
-            btn.classList.remove('disabled');
-            btn.title = 'History Enabled - Click to Disable';
-            this.showMessage('History enabled', 'success');
-        } else {
-            btn.textContent = '📝 History Off';
-            btn.classList.add('disabled');
-            btn.title = 'History Disabled - Click to Enable';
-            this.showMessage('History disabled - operations will not be saved', 'warning');
-        }
-    }
-
-    /**
-     * Initialize history toggle button state
-     */
-    initializeHistoryToggle() {
-        const btn = this.elements.historyToggleBtn;
-        if (this.historyEnabled) {
-            btn.textContent = '📝 History On';
-            btn.classList.remove('disabled');
-            btn.title = 'History Enabled - Click to Disable';
-        } else {
-            btn.textContent = '📝 History Off';
-            btn.classList.add('disabled');
-            btn.title = 'History Disabled - Click to Enable';
-        }
-    }
-
-    /**
-     * Handle clicks outside history popup
-     */
-    handleOutsideClick(event) {
-        if (!this.elements.historyPopup.contains(event.target) && 
-            !this.elements.historyBtn.contains(event.target)) {
-            this.elements.historyPopup.classList.remove('show');
-        }
-        
-        // Also handle global history popup
-        if (!this.elements.globalHistoryPopup.contains(event.target) && 
-            !this.elements.globalHistoryBtn.contains(event.target)) {
-            this.elements.globalHistoryPopup.classList.remove('show');
-        }
-    }
-
-    /**
-     * Switch between history tabs
-     */
-    switchHistoryTab(event) {
-        const tabName = event.target.dataset.tab;
-        
-        // Update tab buttons
-        document.querySelectorAll('.history-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        event.target.classList.add('active');
-
-        // Update tab content
-        const historyTab = document.getElementById('historyTab');
-        const copyTab = document.getElementById('copyTab');
-        
-        if (tabName === 'history') {
-            historyTab.style.display = 'block';
-            copyTab.style.display = 'none';
-        } else {
-            historyTab.style.display = 'none';
-            copyTab.style.display = 'block';
-        }
-    }
-
-    /**
-     * Toggle global history popup
-     */
-    toggleGlobalHistory() {
-        if (this.elements.globalHistoryPopup.classList.contains('show')) {
-            this.elements.globalHistoryPopup.classList.remove('show');
-        } else {
-            this.elements.globalHistoryPopup.classList.add('show');
-            this.loadGlobalHistory(); // Refresh when opening
-        }
-    }
-
-    /**
-     * Load global history from API
-     */
-    async loadGlobalHistory() {
-        try {
-            const response = await fetch(`/api/global-history?limit=50`);
-            const result = await response.json();
-            
-            this.displayGlobalHistory(result.history || []);
-        } catch (error) {
-            console.error('Error loading global history:', error);
-            this.elements.globalHistoryList.innerHTML = '<div class="global-history-item">Failed to load global history</div>';
-        }
-    }
-
-    /**
-     * Display global history items
-     */
-    displayGlobalHistory(history) {
-        if (history.length === 0) {
-            this.elements.globalHistoryList.innerHTML = '<div class="global-history-item">No global history available</div>';
-            return;
-        }
-
-        const historyHtml = history.map(item => `
-            <div class="global-history-item" data-id="${item.id}" data-tool="${item.tool_name}">
-                <div class="global-history-item-header">
-                    <input type="checkbox" class="global-history-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
-                    <div class="global-history-item-meta">
-                        <div class="global-history-id-tool">
-                            <span class="history-id">ID: ${item.id}</span>
-                            <span class="global-history-tool-label" style="background-color: ${getToolColor(item.tool_name)}">${item.tool_name}</span>
-                        </div>
-                        <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
-                    </div>
-                    <button class="history-delete-btn" onclick="window.jsonFormatter.deleteGlobalHistoryItem('${item.id}'); event.stopPropagation();">×</button>
-                </div>
-                <div class="history-preview">${item.preview}</div>
-            </div>
-        `).join('');
-
-        this.elements.globalHistoryList.innerHTML = historyHtml;
-
-        // Add click listeners to global history items (allow cross-tool loading)
-        this.elements.globalHistoryList.querySelectorAll('.global-history-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                if (e.target.type !== 'checkbox') {
-                    this.loadGlobalHistoryEntry(item.dataset.id, item.dataset.tool);
-                }
-            });
-        });
-    }
-
-    /**
-     * Load specific global history entry
-     */
-    async loadGlobalHistoryEntry(entryId, toolName) {
-        try {
-            const response = await fetch(`/api/global-history/${entryId}`);
-            const entry = await response.json();
-            
-            if (entry.data) {
-                this.elements.jsonInput.value = entry.data;
-                this.lastInputData = entry.data;
-                this.updateJsonStats();
-                this.toggleGlobalHistory(); // Close popup
-                
-                if (toolName === this.toolName) {
-                    this.showMessage('Global history entry loaded!', 'success');
-                } else {
-                    this.showMessage(`Loaded ${toolName} data into JSON formatter`, 'success');
-                }
-            }
-        } catch (error) {
-            console.error('Error loading global history entry:', error);
-            this.showMessage('Failed to load global history entry', 'error');
-        }
-    }
 
 
-    /**
-     * Delete individual global history item
-     */
-    async deleteGlobalHistoryItem(entryId) {
-        try {
-            const response = await fetch(`/api/global-history/${entryId}`, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                this.showMessage('History item deleted', 'success');
-                this.loadHistory(); // Refresh local history list
-                this.loadGlobalHistory(); // Refresh global history list
-            } else {
-                this.showMessage('Failed to delete history item', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting global history item:', error);
-            this.showMessage('Failed to delete history item', 'error');
-        }
-    }
 
-    /**
-     * Delete individual local history item
-     */
-    async deleteHistoryItem(entryId) {
-        try {
-            const response = await fetch(`/api/history/${this.toolName}/${entryId}`, {
-                method: 'DELETE'
-            });
-            
-            if (response.ok) {
-                this.showMessage('History item deleted', 'success');
-                this.loadHistory(); // Refresh local history list
-                this.loadGlobalHistory(); // Refresh global history list
-            } else {
-                this.showMessage('Failed to delete history item', 'error');
-            }
-        } catch (error) {
-            console.error('Error deleting history item:', error);
-            this.showMessage('Failed to delete history item', 'error');
-        }
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Handle keyboard shortcuts
@@ -1565,7 +1158,7 @@ class JsonFormatter {
                     break;
                 case 'h':
                     event.preventDefault();
-                    this.toggleHistory();
+                    this.historyManager?.toggleHistory();
                     break;
                 case 'f':
                     if (event.shiftKey) {

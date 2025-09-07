@@ -1,0 +1,446 @@
+/**
+ * Standalone History Component CSS
+ * Extracted from JSON formatter for reusability across all tools
+ * Uses unique prefixes to prevent class name clashes
+ */
+
+/* History container and button styling */
+.hist-container {
+    position: relative;
+}
+
+.hist-btn {
+    background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+    border: 1px solid #a0a0a0;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 2px;
+    color: #333;
+}
+
+.hist-btn:hover {
+    background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+}
+
+.hist-toggle-btn {
+    background: linear-gradient(to bottom, #f0f8ff, #d1e7ff);
+    border: 1px solid #4a90e2;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 2px;
+    color: #1565c0;
+}
+
+.hist-toggle-btn:hover {
+    background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+}
+
+.hist-toggle-btn.disabled {
+    background: linear-gradient(to bottom, #fff0f0, #fdd8d8);
+    border-color: #dc3545;
+    color: #c82333;
+}
+
+.hist-toggle-btn.disabled:hover {
+    background: linear-gradient(to bottom, #fff5f5, #ffe0e0);
+}
+
+.hist-global-btn {
+    background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+    border: 1px solid #a0a0a0;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 2px;
+    color: #333;
+}
+
+.hist-global-btn:hover {
+    background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+}
+
+/* Local History popup */
+.hist-popup {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid #a0a0a0;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    width: 300px;
+    max-height: 400px;
+    z-index: 1000;
+    display: none;
+    margin-top: 2px;
+}
+
+.hist-popup.show {
+    display: block;
+}
+
+.hist-tabs {
+    display: flex;
+    border-bottom: 1px solid #c0c0c0;
+    background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+}
+
+.hist-tab {
+    flex: 1;
+    padding: 4px 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    color: #555;
+}
+
+.hist-tab.active {
+    background: white;
+    border-bottom: 1px solid white;
+    color: #333;
+}
+
+.hist-content {
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+.hist-item {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.hist-item:hover {
+    background: #f8f8f8;
+}
+
+.hist-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hist-item-content {
+    flex: 1;
+}
+
+.hist-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.hist-checkbox {
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+.hist-meta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hist-id {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 10px;
+    color: #666;
+    background: #f5f5f5;
+    padding: 1px 4px;
+    border-radius: 2px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.hist-date {
+    color: #666;
+    font-size: 10px;
+    margin-bottom: 2px;
+}
+
+.hist-preview {
+    color: #333;
+    font-family: 'Consolas', 'Monaco', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hist-selection-info {
+    font-size: 11px;
+    color: #333;
+}
+
+.hist-delete-btn {
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 2px;
+    padding: 2px 6px;
+    font-size: 10px;
+    cursor: pointer;
+    margin-left: 8px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.hist-delete-btn:hover {
+    opacity: 1;
+    background: #cc3333;
+}
+
+/* Global History popup */
+.hist-global-popup {
+    position: fixed;
+    top: 50px;
+    right: 16px;
+    background: white;
+    border: 1px solid #a0a0a0;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    width: 400px;
+    max-height: 500px;
+    z-index: 2000;
+    display: none;
+    margin-top: 2px;
+}
+
+.hist-global-popup.show {
+    display: block;
+}
+
+.hist-global-header {
+    background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+    border-bottom: 1px solid #c0c0c0;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hist-global-content {
+    max-height: 450px;
+    overflow-y: auto;
+}
+
+.hist-global-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.hist-global-item:hover {
+    background: #f8f8f8;
+}
+
+.hist-global-item-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.hist-global-item-meta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hist-global-id-tool {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hist-global-tool-label {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.hist-global-checkbox {
+    margin-top: 2px;
+    cursor: pointer;
+}
+
+/* Header actions styling for integration */
+.hist-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Close button styling */
+.hist-close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: #666;
+    padding: 2px;
+    line-height: 1;
+}
+
+.hist-close-btn:hover {
+    color: #333;
+}
+
+/* Tab content styling */
+.hist-tab-content {
+    display: none;
+}
+
+.hist-tab-content.active {
+    display: block;
+}
+
+/* Scrollbar styling for better appearance */
+.hist-content::-webkit-scrollbar,
+.hist-global-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.hist-content::-webkit-scrollbar-track,
+.hist-global-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.hist-content::-webkit-scrollbar-thumb,
+.hist-global-content::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.hist-content::-webkit-scrollbar-thumb:hover,
+.hist-global-content::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Loading and empty state styling */
+.hist-loading,
+.hist-empty {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+}
+
+/* Selection styling */
+.hist-selection-info {
+    background: #e3f2fd;
+    border-bottom: 1px solid #90caf9;
+    padding: 8px;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hist-clear-selection {
+    background: none;
+    border: none;
+    color: #1976d2;
+    cursor: pointer;
+    font-size: 11px;
+    text-decoration: underline;
+}
+
+.hist-clear-selection:hover {
+    color: #1565c0;
+}
+
+/* Error state styling */
+.hist-error {
+    padding: 20px;
+    text-align: center;
+    color: #d32f2f;
+    font-size: 11px;
+}
+
+/* Animation for smooth transitions */
+.hist-popup,
+.hist-global-popup {
+    transition: opacity 0.2s ease-in-out;
+}
+
+.hist-popup.show,
+.hist-global-popup.show {
+    animation: historySlideIn 0.2s ease-out;
+}
+
+@keyframes historySlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 768px) {
+    .hist-popup {
+        width: 280px;
+        right: -20px;
+    }
+    
+    .hist-global-popup {
+        width: 95vw;
+        right: 2.5vw;
+        max-height: 80vh;
+    }
+    
+    .hist-item,
+    .hist-global-item {
+        padding: 10px;
+    }
+}
+
+/* Dark mode support - Disabled by default
+   Uncomment the section below to enable dark mode support
+
+@media (prefers-color-scheme: dark) {
+    .hist-popup,
+    .hist-global-popup {
+        background: #2d2d2d;
+        border-color: #555;
+        color: #e0e0e0;
+    }
+    
+    .hist-tabs {
+        background: linear-gradient(to bottom, #3d3d3d, #2d2d2d);
+        border-bottom-color: #555;
+    }
+    
+    .hist-tab {
+        color: #ccc;
+    }
+    
+    .hist-tab.active {
+        background: #2d2d2d;
+        border-bottom-color: #2d2d2d;
+        color: #e0e0e0;
+    }
+    
+    .hist-item:hover,
+    .hist-global-item:hover {
+        background: #3d3d3d;
+    }
+}
+*/

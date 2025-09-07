@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSON Formatter - Helpful Tools v2</title>
     <link rel="stylesheet" href="/static/css/common-enhancements.css">
+    <link rel="stylesheet" href="/static/css/history.css">
     <style>
         * {
             margin: 0;
@@ -83,100 +84,8 @@
             background: #c0c0c0;
             margin: 0 2px;
         }
-        .history-container {
+        .hist-container {
             position: relative;
-        }
-        .history-btn {
-            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
-            border: 1px solid #a0a0a0;
-            padding: 4px 8px;
-            font-size: 11px;
-            cursor: pointer;
-            border-radius: 2px;
-            color: #333;
-        }
-        .history-btn:hover {
-            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
-        }
-        .history-toggle-btn {
-            background: linear-gradient(to bottom, #f0f8ff, #d1e7ff);
-            border: 1px solid #4a90e2;
-            padding: 4px 8px;
-            font-size: 11px;
-            cursor: pointer;
-            border-radius: 2px;
-            color: #1565c0;
-        }
-        .history-toggle-btn:hover {
-            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
-        }
-        .history-toggle-btn.disabled {
-            background: linear-gradient(to bottom, #fff0f0, #fdd8d8);
-            border-color: #dc3545;
-            color: #c82333;
-        }
-        .history-toggle-btn.disabled:hover {
-            background: linear-gradient(to bottom, #fff5f5, #ffe0e0);
-        }
-        .history-popup {
-            position: absolute;
-            top: 100%;
-            right: 0;
-            background: white;
-            border: 1px solid #a0a0a0;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            width: 300px;
-            max-height: 400px;
-            z-index: 1000;
-            display: none;
-            margin-top: 2px;
-        }
-        .history-popup.show {
-            display: block;
-        }
-        .history-tabs {
-            display: flex;
-            border-bottom: 1px solid #c0c0c0;
-            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
-        }
-        .history-tab {
-            flex: 1;
-            padding: 4px 8px;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 11px;
-            color: #555;
-        }
-        .history-tab.active {
-            background: white;
-            border-bottom: 1px solid white;
-            color: #333;
-        }
-        .history-content {
-            max-height: 350px;
-            overflow-y: auto;
-        }
-        .history-item {
-            padding: 6px 8px;
-            border-bottom: 1px solid #f0f0f0;
-            cursor: pointer;
-            font-size: 11px;
-        }
-        .history-item:hover {
-            background: #f8f8f8;
-        }
-        .history-date {
-            color: #666;
-            font-size: 10px;
-            margin-bottom: 2px;
-        }
-        .history-preview {
-            color: #333;
-            font-family: 'Consolas', 'Monaco', monospace;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         .main-container {
             height: calc(100vh - 80px);
@@ -433,46 +342,6 @@
             white-space: pre-wrap;
         }
         
-        /* Enhanced history styles */
-        .history-header {
-            display: flex;
-            align-items: flex-start;
-            gap: 6px;
-            margin-bottom: 3px;
-        }
-        
-        .history-checkbox {
-            margin-top: 2px;
-            cursor: pointer;
-        }
-        
-        .history-meta {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        
-        .history-id {
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 10px;
-            color: #666;
-            background: #f5f5f5;
-            padding: 1px 4px;
-            border-radius: 2px;
-            display: inline-block;
-            width: fit-content;
-        }
-        
-        .history-date {
-            font-size: 10px;
-            color: #666;
-        }
-        
-        .history-selection-info {
-            font-size: 11px;
-            color: #333;
-        }
         
         /* Header actions styling */
         .header-actions {
@@ -481,129 +350,6 @@
             gap: 12px;
         }
         
-        .global-history-btn {
-            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
-            border: 1px solid #a0a0a0;
-            padding: 4px 8px;
-            font-size: 11px;
-            cursor: pointer;
-            border-radius: 2px;
-            color: #333;
-        }
-        
-        .global-history-btn:hover {
-            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
-        }
-        
-        /* Global history popup */
-        .global-history-popup {
-            position: fixed;
-            top: 50px;
-            right: 16px;
-            background: white;
-            border: 1px solid #a0a0a0;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            width: 400px;
-            max-height: 500px;
-            z-index: 2000;
-            display: none;
-            margin-top: 2px;
-        }
-        
-        .global-history-popup.show {
-            display: block;
-        }
-        
-        .global-history-header {
-            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
-            border-bottom: 1px solid #c0c0c0;
-            padding: 8px 12px;
-            font-size: 12px;
-            font-weight: bold;
-            color: #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .global-history-content {
-            max-height: 450px;
-            overflow-y: auto;
-        }
-        
-        .global-history-item {
-            padding: 8px 12px;
-            border-bottom: 1px solid #f0f0f0;
-            cursor: pointer;
-            font-size: 11px;
-        }
-        
-        .global-history-item:hover {
-            background: #f8f8f8;
-        }
-        
-        .global-history-item-header {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            margin-bottom: 4px;
-        }
-        
-        .global-history-item-meta {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        
-        .global-history-id-tool {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .global-history-tool-label {
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 9px;
-            padding: 2px 6px;
-            border-radius: 8px;
-            color: white;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        
-        .global-history-checkbox {
-            margin-top: 2px;
-            cursor: pointer;
-        }
-        
-        .history-delete-btn {
-            background: #ff4444;
-            color: white;
-            border: none;
-            border-radius: 2px;
-            padding: 2px 6px;
-            font-size: 10px;
-            cursor: pointer;
-            margin-left: 8px;
-            opacity: 0.7;
-            transition: opacity 0.2s;
-        }
-        
-        .history-delete-btn:hover {
-            opacity: 1;
-            background: #cc3333;
-        }
-        
-        .history-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .history-item-content {
-            flex: 1;
-        }
     </style>
 </head>
 <body>
@@ -615,8 +361,8 @@
                 <button id="fontDecreaseBtn" title="Decrease font size">−</button>
                 <button id="fontIncreaseBtn" title="Increase font size">+</button>
             </div>
-            <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
-            <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
+            <button class="hist-toggle-btn" id="historyToggleBtn">📝 History On</button>
+            <button class="hist-global-btn" id="globalHistoryBtn">📚 Global History</button>
             <a href="/">← Back to Tools</a>
         </div>
     </div>
@@ -654,21 +400,21 @@
             <button id="clearSearchBtn">Clear</button>
         </div>
         <div class="separator"></div>
-        <div class="history-container">
-            <button class="history-btn" id="historyBtn">📋 History</button>
-            <div class="history-popup" id="historyPopup">
-                <div class="history-tabs">
-                    <button class="history-tab active" data-tab="history">History</button>
-                    <button class="history-tab" data-tab="copy">Copy</button>
+        <div class="hist-container">
+            <button class="hist-btn" id="historyBtn">📋 History</button>
+            <div class="hist-popup" id="historyPopup">
+                <div class="hist-tabs">
+                    <button class="hist-tab active" data-tab="history">History</button>
+                    <button class="hist-tab" data-tab="copy">Copy</button>
                 </div>
-                <div class="history-content" id="historyContent">
-                    <div class="tab-content active" id="historyTab">
+                <div class="hist-content" id="historyContent">
+                    <div class="hist-tab-content active" id="historyTab">
                         <div id="historyList">
-                            <div class="history-item">No history available</div>
+                            <div class="hist-item">No history available</div>
                         </div>
                     </div>
-                    <div class="tab-content" id="copyTab" style="display: none;">
-                        <div class="history-item">Copy features coming soon</div>
+                    <div class="hist-tab-content" id="copyTab" style="display: none;">
+                        <div class="hist-item">Copy features coming soon</div>
                     </div>
                 </div>
             </div>
@@ -749,19 +495,20 @@ Example:
     <div class="status-messages" id="statusMessages"></div>
 
     <!-- Global History Popup -->
-    <div class="global-history-popup" id="globalHistoryPopup">
-        <div class="global-history-header">
+    <div class="hist-global-popup" id="globalHistoryPopup">
+        <div class="hist-global-header">
             <span>Global History - All Tools</span>
-            <button onclick="window.jsonFormatter?.toggleGlobalHistory()" style="background: none; border: none; cursor: pointer; font-size: 16px;">×</button>
+            <button class="hist-close-btn" onclick="window.historyManager?.toggleGlobalHistory()">×</button>
         </div>
-        <div class="global-history-content">
+        <div class="hist-global-content">
             <div id="globalHistoryList">
-                <div class="global-history-item">Loading...</div>
+                <div class="hist-global-item">Loading...</div>
             </div>
         </div>
     </div>
 
     <script src="/static/js/common-functions.js"></script>
-<script src="/static/js/json-formatter.js"></script>
+    <script src="/static/js/history.js"></script>
+    <script src="/static/js/json-formatter.js"></script>
 </body>
 </html>
