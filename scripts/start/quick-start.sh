@@ -2,8 +2,9 @@
 
 VENV_DIR="venv"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_FILE="$SCRIPT_DIR/helpful-tools-v2.pid"
-LOG_FILE="$SCRIPT_DIR/helpful-tools-v2.log"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PID_FILE="$PROJECT_DIR/helpful-tools-v2.pid"
+LOG_FILE="$PROJECT_DIR/helpful-tools-v2.log"
 
 # Function to check if process is running
 is_running() {
@@ -29,24 +30,24 @@ start_app() {
     fi
 
     # Create venv if it doesn't exist
-    if [ ! -d "$SCRIPT_DIR/$VENV_DIR" ]; then
+    if [ ! -d "$PROJECT_DIR/$VENV_DIR" ]; then
         echo "📦 Creating virtual environment..."
-        python3 -m venv "$SCRIPT_DIR/$VENV_DIR"
+        python3 -m venv "$PROJECT_DIR/$VENV_DIR"
         echo "📋 Installing dependencies..."
-        "$SCRIPT_DIR/$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
+        "$PROJECT_DIR/$VENV_DIR/bin/pip" install -r "$PROJECT_DIR/requirements.txt"
     fi
 
     # Check if dependencies are installed
-    if ! "$SCRIPT_DIR/$VENV_DIR/bin/python" -c "import flask" 2>/dev/null; then
+    if ! "$PROJECT_DIR/$VENV_DIR/bin/python" -c "import flask" 2>/dev/null; then
         echo "📋 Installing missing dependencies..."
-        "$SCRIPT_DIR/$VENV_DIR/bin/pip" install -r "$SCRIPT_DIR/requirements.txt"
+        "$PROJECT_DIR/$VENV_DIR/bin/pip" install -r "$PROJECT_DIR/requirements.txt"
     fi
 
     echo "🚀 Starting Helpful-Tools-v2 in background..."
-    cd "$SCRIPT_DIR"
 
     # Start in background
-    nohup "$SCRIPT_DIR/$VENV_DIR/bin/python" "$SCRIPT_DIR/main.py" > "$LOG_FILE" 2>&1 &
+    cd "$PROJECT_DIR"
+    nohup "$PROJECT_DIR/$VENV_DIR/bin/python" "$PROJECT_DIR/app.py" > "$LOG_FILE" 2>&1 &
     local pid=$!
 
     # Save PID

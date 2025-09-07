@@ -10,14 +10,19 @@ from api.converter import convert_format, validate_format, converter
 import difflib
 from typing import List, Dict, Any
 
-app = Flask(__name__)
+# Configure Flask to use the correct static folder with absolute path
+static_dir = Path(__file__).parent.parent / "frontend" / "static"
+app = Flask(__name__, 
+            static_folder=str(static_dir),
+            static_url_path='/static')
 
-# Create directories
-os.makedirs("static", exist_ok=True)
-os.makedirs("static/css", exist_ok=True)
-os.makedirs("static/js", exist_ok=True)
-os.makedirs("logs", exist_ok=True)
-os.makedirs("tools", exist_ok=True)
+# Create directories using absolute paths
+app_root = Path(__file__).parent.parent
+os.makedirs(app_root / "frontend" / "static", exist_ok=True)
+os.makedirs(app_root / "frontend" / "static" / "css", exist_ok=True)
+os.makedirs(app_root / "frontend" / "static" / "js", exist_ok=True)
+os.makedirs(app_root / "logs", exist_ok=True)
+os.makedirs(app_root / "frontend" / "tools", exist_ok=True)
 
 # Store for tools configuration
 TOOLS = [
@@ -694,18 +699,15 @@ def generate_character_diff(text1: str, text2: str) -> List[Dict[str, Any]]:
 @app.route('/tools/<tool_name>')
 def serve_tool(tool_name):
     # Get the directory where main.py is located
-    app_dir = Path(__file__).parent
-    tool_file = app_dir / "tools" / f"{tool_name}.html"
+    app_dir = Path(__file__).parent.parent
+    tool_file = app_dir / "frontend" / "tools" / f"{tool_name}.html"
     if not tool_file.exists():
         abort(404)
     
     with open(tool_file, 'r', encoding='utf-8') as f:
         return f.read()
 
-# Static file routes
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    return send_file(f"static/{filename}")
+# Static files are now handled automatically by Flask's built-in static file serving
 
 @app.route('/health')
 def health():

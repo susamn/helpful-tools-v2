@@ -1,0 +1,54 @@
+ * Serving Flask app 'main'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:8000
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 138-827-010
+127.0.0.1 - - [06/Sep/2025 23:10:55] "GET /tools/jwt-decoder HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:10:55] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:10:55] "GET /static/css/common-enhancements.css HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:10:55] "GET /static/js/jwt-decoder.js HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:10:55] "GET /api/history/jwt-decoder?limit=20 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:10:59] "POST /api/history/jwt-decoder HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:01] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:01] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:03] "GET /tools/json-formatter HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:03] "[36mGET /static/css/common-enhancements.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [06/Sep/2025 23:11:03] "GET /static/js/json-formatter.js HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:03] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:03] "GET /api/history/json-formatter?limit=20 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:08] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:08] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:10] "GET /tools/json-yaml-xml-converter HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:10] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:10] "[36mGET /static/css/common-enhancements.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [06/Sep/2025 23:11:10] "GET /api/history/json-yaml-xml-converter?limit=20 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:17] "POST /api/convert HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:17] "POST /api/history/json-yaml-xml-converter HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:17] "GET /api/history/json-yaml-xml-converter?limit=20 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:19] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:19] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:22] "GET /tools/text-diff HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:22] "[36mGET /static/css/common-enhancements.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [06/Sep/2025 23:11:22] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:23] "GET /api/history/text-diff?limit=20 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:25] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:25] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:27] "GET /tools/cron-parser HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:27] "[36mGET /static/css/common-enhancements.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [06/Sep/2025 23:11:27] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [06/Sep/2025 23:11:35] "POST /api/history/cron-parser HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:38] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:42] "GET /tools/scientific-calculator HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:42] "[36mGET /static/css/common-enhancements.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [06/Sep/2025 23:11:42] "GET /static/js/scientific-calculator.js HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:47] "POST /api/history/scientific-calculator HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:50] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:53] "GET /tools/jwt-decoder HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:53] "[36mGET /static/css/common-enhancements.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [06/Sep/2025 23:11:53] "[36mGET /static/js/jwt-decoder.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [06/Sep/2025 23:11:53] "GET /api/history/jwt-decoder?limit=20 HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:11:55] "POST /api/history/jwt-decoder HTTP/1.1" 200 -
+127.0.0.1 - - [06/Sep/2025 23:12:04] "GET / HTTP/1.1" 200 -

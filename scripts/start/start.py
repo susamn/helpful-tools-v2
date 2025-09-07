@@ -5,7 +5,10 @@ import os
 from pathlib import Path
 
 def setup_venv():
-    venv_path = Path("venv")
+    # Get project root directory (two levels up from this script)
+    project_root = Path(__file__).parent.parent.parent
+    os.chdir(project_root)
+    venv_path = project_root / "venv"
     
     if not venv_path.exists():
         print("Creating virtual environment...")
@@ -45,7 +48,7 @@ def start_server():
         print("="*50 + "\n")
         
         # Start the Flask app
-        subprocess.run([str(python_path), "main.py"])
+        subprocess.run([str(python_path), "app.py"])
         
     except KeyboardInterrupt:
         print("\n⏹️  Server stopped by user")
