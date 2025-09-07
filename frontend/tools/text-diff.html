@@ -1188,7 +1188,7 @@
                                 <div class="global-history-item-meta">
                                     <div class="global-history-id-tool">
                                         <span class="history-id">ID: ${item.id}</span>
-                                        <span class="global-history-tool-label" style="background-color: ${this.getToolColor(item.tool_name)}">${item.tool_name}</span>
+                                        <span class="global-history-tool-label" style="background-color: ${getToolColor(item.tool_name)}">${item.tool_name}</span>
                                     </div>
                                     <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
                                 </div>
@@ -1244,18 +1244,6 @@
                     }
                 }
 
-                getToolColor(toolName) {
-                    const colors = {
-                        'json-formatter': '#2196F3',
-                        'json-yaml-xml-converter': '#4CAF50', 
-                        'text-diff': '#FF5722',
-                        'base64-encoder-decoder': '#FF9800',
-                        'url-encoder-decoder': '#9C27B0',
-                        'hash-generator': '#F44336',
-                        'qr-code-generator': '#607D8B'
-                    };
-                    return colors[toolName] || '#757575';
-                }
 
                 async deleteHistoryItem(entryId) {
                     try {
@@ -1534,5 +1522,6 @@
             window.textDiffTool = new TextDiffTool();
         });
     </script>
+    <script src="/static/js/common-functions.js"></script>
 </body>
 </html>

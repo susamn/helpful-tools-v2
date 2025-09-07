@@ -1092,7 +1092,7 @@ class ScientificCalculator {
         }
 
         const historyHtml = history.map(entry => {
-            const toolColor = this.getToolColor(entry.tool_name);
+            const toolColor = getToolColor(entry.tool_name);
             
             return `
                 <div class="history-item" data-id="${entry.id}">
@@ -1265,16 +1265,6 @@ class ScientificCalculator {
         }
     }
 
-    getToolColor(toolName) {
-        const colors = {
-            'scientific-calculator': '#4a90e2',
-            'json-formatter': '#388e3c',
-            'regex-tester': '#9c27b0',
-            'text-diff': '#ff9800',
-            'cron-parser': '#e91e63'
-        };
-        return colors[toolName] || '#6b7280';
-    }
 
     setStatusText(text) {
         const statusEl = document.getElementById('statusText');

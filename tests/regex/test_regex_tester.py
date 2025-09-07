@@ -43,8 +43,8 @@ class TestRegexTesterUI:
         wait = WebDriverWait(driver, 10)
         
         # Check basic elements exist
-        pattern_input = wait.until(EC.presence_of_element_located((By.ID, "patternInput")))
-        test_input = driver.find_element(By.ID, "testInput")
+        pattern_input = wait.until(EC.presence_of_element_located((By.ID, "regexInput")))
+        test_input = driver.find_element(By.ID, "testText")
         assert pattern_input is not None
         assert test_input is not None
     
@@ -54,16 +54,16 @@ class TestRegexTesterUI:
         wait = WebDriverWait(driver, 10)
         
         # Enter simple email regex
-        pattern_input = wait.until(EC.presence_of_element_located((By.ID, "patternInput")))
-        test_input = driver.find_element(By.ID, "testInput")
+        pattern_input = wait.until(EC.presence_of_element_located((By.ID, "regexInput")))
+        test_input = driver.find_element(By.ID, "testText")
         
         pattern_input.send_keys(r"\w+@\w+\.\w+")
         test_input.send_keys("test@example.com")
         
         time.sleep(1)  # Wait for processing
         
-        # Check that some results are displayed
-        results = driver.find_elements(By.CLASS_NAME, "match-highlight")
+        # Check that some results are displayed (using correct class name from simplified code)
+        results = driver.find_elements(By.CLASS_NAME, "regex-match")
         assert len(results) > 0
 
 class TestHistoryIntegration:

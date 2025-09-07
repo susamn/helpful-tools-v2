@@ -1357,7 +1357,7 @@
                                 <div class="global-history-item-meta">
                                     <div class="global-history-id-tool">
                                         <span class="history-id">ID: ${entry.id}</span>
-                                        <span class="global-history-tool-label" style="background-color: ${this.getToolColor(entry.tool_name)}">${entry.tool_name}</span>
+                                        <span class="global-history-tool-label" style="background-color: ${getToolColor(entry.tool_name)}">${entry.tool_name}</span>
                                     </div>
                                     <span class="history-date">${this.formatTimestamp(entry.timestamp)} - ${entry.operation || 'parse'}</span>
                                 </div>
@@ -1428,16 +1428,6 @@
                 }
             }
 
-            getToolColor(toolName) {
-                const colors = {
-                    'json-formatter': '#2196F3',
-                    'json-yaml-xml-converter': '#4CAF50',
-                    'regex-tester': '#FF9800',
-                    'text-diff': '#9C27B0',
-                    'cron-parser': '#607D8B'
-                };
-                return colors[toolName] || '#757575';
-            }
 
             async deleteHistoryItem(entryId) {
                 try {
@@ -1501,5 +1491,6 @@
         const cronParser = new CronParser();
         cronParser.clearResults();
     </script>
+    <script src="/static/js/common-functions.js"></script>
 </body>
 </html>

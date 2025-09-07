@@ -496,7 +496,7 @@ class JwtDecoder {
                     <div class="global-history-item-meta">
                         <div class="global-history-id-tool">
                             <span class="history-id">ID: ${item.id}</span>
-                            <span class="global-history-tool-label" style="background-color: ${this.getToolColor(item.tool_name)}">${item.tool_name}</span>
+                            <span class="global-history-tool-label" style="background-color: ${getToolColor(item.tool_name)}">${item.tool_name}</span>
                         </div>
                         <span class="history-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
                     </div>
@@ -638,18 +638,6 @@ class JwtDecoder {
         localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
     }
 
-    getToolColor(toolName) {
-        const colors = {
-            'json-formatter': '#2196F3',
-            'json-yaml-xml-converter': '#4CAF50', 
-            'text-diff': '#FF5722',
-            'regex-tester': '#9C27B0',
-            'cron-parser': '#FF9800',
-            'scientific-calculator': '#607D8B',
-            'jwt-decoder': '#795548'
-        };
-        return colors[toolName] || '#757575';
-    }
 
     async deleteGlobalHistoryItem(entryId) {
         try {
@@ -785,21 +773,6 @@ class JwtDecoder {
         }
     }
 
-    /**
-     * Get tool-specific color for global history items
-     */
-    getToolColor(toolName) {
-        const colors = {
-            'json-formatter': '#2196F3',
-            'json-yaml-xml-converter': '#4CAF50',
-            'text-diff': '#FF9800',
-            'regex-tester': '#9C27B0',
-            'cron-parser': '#F44336',
-            'scientific-calculator': '#607D8B',
-            'jwt-decoder': '#795548'
-        };
-        return colors[toolName] || '#757575';
-    }
 }
 
 // Global functions for onclick handlers
