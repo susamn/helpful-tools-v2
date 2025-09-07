@@ -10,6 +10,8 @@ import time
 import base64
 import hashlib
 import hmac
+import sys
+import os
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 from selenium import webdriver
@@ -19,7 +21,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.keys import Keys
 
-from main import app
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+
+from src.main import app
 
 
 class TestJWTDecoderIntegration:

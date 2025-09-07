@@ -7,7 +7,14 @@ import pytest
 import json
 import yaml
 import xml.etree.ElementTree as ET
-from api.converter import FormatConverter, convert_format, validate_format
+import sys
+import os
+
+# Add project root to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
+
+from src.api.converter import FormatConverter, convert_format, validate_format
 
 
 class TestFormatConverter:
@@ -420,3 +427,159 @@ class TestEdgeCases:
         # Should not throw XML parsing errors due to invalid tag names
         root = ET.fromstring(result['result'])
         assert root is not None
+
+class TestConverterRobustness:
+    """Test converter robustness with edge cases and malformed data"""
+    
+    def test_extremely_nested_json(self):
+        """Test with deeply nested JSON"""
+        nested_json = {"level": 1}
+        current = nested_json
+        for i in range(2, 51):  # Create 50 levels deep
+            current["level"] = {"level": i}
+            current = current["level"]
+        
+        json_str = json.dumps(nested_json)
+        result = convert_format(json_str, 'json', 'yaml')
+        
+        assert result['success'] is True
+        assert 'level' in result['result']
+    
+    def test_json_with_all_data_types(self):
+        """Test JSON with all possible data types"""
+        complex_json = {
+            "string": "test",
+            "integer": 42,
+            "float": 3.14159,
+            "boolean_true": True,
+            "boolean_false": False,
+            "null_value": None,
+            "empty_array": [],
+            "empty_object": {},
+            "array_mixed": [1, "two", True, None, {"nested": "value"}],
+            "unicode": "Hello 世界 🌍",
+            "special_chars": "!@#$%^&*()_+-={}[]|\\:;\"'<>?,./"
+        }
+        
+        json_str = json.dumps(complex_json, ensure_ascii=False)
+        
+        # Test JSON → YAML → JSON round trip
+        yaml_result = convert_format(json_str, 'json', 'yaml')
+        assert yaml_result['success'] is True
+        
+        json_result = convert_format(yaml_result['result'], 'yaml', 'json')
+        assert json_result['success'] is True
+        
+        # Should maintain data integrity
+        restored = json.loads(json_result['result'])
+        assert restored["unicode"] == "Hello 世界 🌍"
+        assert restored["float"] == 3.14159
+        assert restored["boolean_true"] is True
+    
+    def test_malformed_inputs(self):
+        """Test handling of malformed input data"""
+        malformed_cases = [
+            ('{"incomplete": json', 'json', 'yaml'),
+            ('invalid: yaml: structure: [', 'yaml', 'json'),
+            ('<incomplete><xml>', 'xml', 'json'),
+            ('', 'json', 'yaml'),  # Empty input
+            ('   \n\t   ', 'yaml', 'json'),  # Whitespace only
+        ]
+        
+        for data, source, target in malformed_cases:
+            result = convert_format(data, source, target)
+            # Should handle gracefully with error message
+            assert result['success'] is False
+            assert 'error' in result
+            assert len(result['error']) > 0
+    
+    def test_large_data_conversion(self):
+        """Test conversion of large datasets"""
+        large_array = [{"id": i, "data": f"Item {i}" * 10} for i in range(1000)]
+        large_json = {"items": large_array, "count": len(large_array)}
+        
+        json_str = json.dumps(large_json)
+        
+        # Should handle large data without timeout
+        result = convert_format(json_str, 'json', 'yaml')
+        assert result['success'] is True
+        
+        # Verify data integrity
+        yaml_back = convert_format(result['result'], 'yaml', 'json')
+        assert yaml_back['success'] is True
+        
+        restored = json.loads(yaml_back['result'])
+        assert restored['count'] == 1000
+        assert len(restored['items']) == 1000
+    
+    def test_xml_namespaces(self):
+        """Test XML with namespaces"""
+        namespaced_xml = '''<?xml version="1.0"?>
+        <root xmlns:ns1="http://example.com/ns1" xmlns:ns2="http://example.com/ns2">
+            <ns1:item id="1">Value 1</ns1:item>
+            <ns2:item id="2">Value 2</ns2:item>
+        </root>'''
+        
+        result = convert_format(namespaced_xml, 'xml', 'json')
+        assert result['success'] is True
+        
+        # Should handle namespaces without crashing
+        parsed = json.loads(result['result'])
+        assert 'root' in parsed
+
+class TestConverterAPIEndpoints:
+    """Test the actual API endpoints that serve conversion functionality"""
+    
+    def test_conversion_api_endpoint(self):
+        """Test /api/convert endpoint"""
+        import requests
+        
+        try:
+            payload = {
+                'data': '{"test": "value", "number": 42}',
+                'source_format': 'json',
+                'target_format': 'yaml'
+            }
+            
+            response = requests.post('http://127.0.0.1:8000/api/convert', json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data['success'] is True
+                assert 'result' in data
+                assert 'test: value' in data['result']
+                assert 'number: 42' in data['result']
+            else:
+                pytest.skip("Server not available for API testing")
+                
+        except requests.ConnectionError:
+            pytest.skip("Server not available for API testing")
+    
+    def test_validation_api_endpoint(self):
+        """Test /api/validate endpoint"""
+        import requests
+        
+        try:
+            # Test valid JSON
+            payload = {
+                'data': '{"valid": "json", "number": 123}',
+                'format': 'json'
+            }
+            
+            response = requests.post('http://127.0.0.1:8000/api/validate', json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data['valid'] is True
+                
+                # Test invalid JSON
+                payload['data'] = '{"invalid": json}'
+                response = requests.post('http://127.0.0.1:8000/api/validate', json=payload)
+                data = response.json()
+                assert data['valid'] is False
+                assert 'error' in data
+            else:
+                pytest.skip("Server not available for API testing")
+                
+        except requests.ConnectionError:
+            pytest.skip("Server not available for API testing")

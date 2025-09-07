@@ -8,7 +8,7 @@ from flask import Flask, render_template_string, request, jsonify, send_file, ab
 from api.history import history_manager, validate_tool_name, sanitize_data
 from api.converter import convert_format, validate_format, converter
 import difflib
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 # Configure Flask to use the correct static folder with absolute path
 static_dir = Path(__file__).parent.parent / "frontend" / "static"
@@ -675,25 +675,6 @@ def api_detect_format():
         
     except Exception as e:
         return jsonify({'format': 'unknown', 'error': f'Server error: {str(e)}'}), 500
-
-def generate_character_diff(text1: str, text2: str) -> List[Dict[str, Any]]:
-    """Generate character-level diff as a list of dictionaries."""
-    matcher = difflib.SequenceMatcher(None, text1, text2)
-    
-    result = []
-    
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
-            result.append({'type': 'equal', 'content': text1[i1:i2]})
-        elif tag == 'delete':
-            result.append({'type': 'delete', 'content': text1[i1:i2]})
-        elif tag == 'insert':
-            result.append({'type': 'insert', 'content': text2[j1:j2]})
-        elif tag == 'replace':
-            result.append({'type': 'delete', 'content': text1[i1:i2]})
-            result.append({'type': 'insert', 'content': text2[j1:j2]})
-            
-    return result
 
 # Tool Routes
 @app.route('/tools/<tool_name>')

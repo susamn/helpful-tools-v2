@@ -9,7 +9,6 @@ import xml.etree.ElementTree as ET
 import xmltodict
 from typing import Dict, Any, Union
 from xml.dom import minidom
-import datetime
 
 
 # Create a custom YAML loader that doesn't auto-convert dates to date objects

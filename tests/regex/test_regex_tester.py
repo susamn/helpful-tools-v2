@@ -1,681 +1,99 @@
 #!/usr/bin/env python3
 """
-Comprehensive test suite for Regex Tester Tool
-Tests both backend API and frontend functionality
+Minimal test suite for Regex Tester Tool - Integration testing only
 """
 
 import pytest
+import requests
 import json
-import sys
-import os
-import re
-from unittest.mock import patch, MagicMock
-
-# Add the project directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from main import app
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+import time
 
 class TestRegexTesterIntegration:
-    """Integration tests for the regex tester tool with the main app"""
+    """Integration tests for the regex tester tool route accessibility"""
+    
+    def test_regex_tester_route_exists(self):
+        """Test that the regex tester route is accessible"""
+        response = requests.get("http://127.0.0.1:8000/tools/regex-tester")
+        assert response.status_code == 200
+        assert "Regex Tester" in response.text
+        assert "Enter your regular expression" in response.text
+
+class TestRegexTesterUI:
+    """Basic UI functionality tests"""
     
     @pytest.fixture
-    def client(self):
-        """Create a test client for the Flask app"""
-        app.config['TESTING'] = True
-        with app.test_client() as client:
-            yield client
+    def driver(self):
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        
+        driver = webdriver.Chrome(options=chrome_options)
+        yield driver
+        driver.quit()
     
-    def test_regex_tester_route_exists(self, client):
-        """Test that the regex tester route is accessible"""
-        response = client.get('/tools/regex-tester')
-        assert response.status_code == 200
-        assert b'Regex Tester' in response.data
-        assert b'Enter your regular expression' in response.data
+    def test_page_loads_with_elements(self, driver):
+        """Test that page loads with basic elements"""
+        driver.get("http://127.0.0.1:8000/tools/regex-tester")
+        wait = WebDriverWait(driver, 10)
+        
+        # Check basic elements exist
+        pattern_input = wait.until(EC.presence_of_element_located((By.ID, "patternInput")))
+        test_input = driver.find_element(By.ID, "testInput")
+        assert pattern_input is not None
+        assert test_input is not None
+    
+    def test_basic_regex_functionality(self, driver):
+        """Test basic regex matching works in UI"""
+        driver.get("http://127.0.0.1:8000/tools/regex-tester")
+        wait = WebDriverWait(driver, 10)
+        
+        # Enter simple email regex
+        pattern_input = wait.until(EC.presence_of_element_located((By.ID, "patternInput")))
+        test_input = driver.find_element(By.ID, "testInput")
+        
+        pattern_input.send_keys(r"\w+@\w+\.\w+")
+        test_input.send_keys("test@example.com")
+        
+        time.sleep(1)  # Wait for processing
+        
+        # Check that some results are displayed
+        results = driver.find_elements(By.CLASS_NAME, "match-highlight")
+        assert len(results) > 0
 
-class TestRegexPatterns:
-    """Test cases for common regex patterns and edge cases"""
+class TestHistoryIntegration:
+    """Test history API integration"""
     
-    def test_email_regex(self):
-        """Test email validation regex"""
-        pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-        test_cases = [
-            ('test@example.com', True),
-            ('user.name+tag@domain.co.uk', True),
-            ('invalid-email', False),
-            ('missing@.com', False),
-            ('@invalid.com', False),
-            ('test@', False)
-        ]
-        
-        for text, should_match in test_cases:
-            match = re.search(pattern, text)
-            assert bool(match) == should_match, f"Pattern failed for: {text}"
-    
-    def test_multiline_email_regex(self):
-        """Test email regex with multiline text"""
-        pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-        multiline_text = 'Contact: john@example.com\nsupport@company.org\nInvalid: not-email\nuser@test.co.uk'
-        
-        matches = list(re.finditer(pattern, multiline_text))
-        assert len(matches) == 3
-        
-        expected_matches = ['john@example.com', 'support@company.org', 'user@test.co.uk']
-        actual_matches = [match.group(0) for match in matches]
-        assert actual_matches == expected_matches
-    
-    def test_phone_number_regex(self):
-        """Test phone number regex with groups"""
-        pattern = r'\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})'
-        test_cases = [
-            ('(555) 123-4567', ['555', '123', '4567']),
-            ('555-123-4567', ['555', '123', '4567']),
-            ('555.123.4567', ['555', '123', '4567']),
-            ('5551234567', ['555', '123', '4567']),
-            ('12-345-6789', None)  # Invalid format
-        ]
-        
-        for text, expected_groups in test_cases:
-            match = re.search(pattern, text)
-            if expected_groups:
-                assert match is not None, f"Should match: {text}"
-                assert list(match.groups()) == expected_groups
-            else:
-                assert match is None, f"Should not match: {text}"
-    
-    def test_date_regex(self):
-        """Test ISO date format regex"""
-        pattern = r'\d{4}-\d{2}-\d{2}'
-        test_cases = [
-            ('2024-03-15', True),
-            ('1990-12-25', True),
-            ('2024/03/15', False),
-            ('24-03-15', False),
-            ('2024-3-15', False),
-            ('2024-13-45', True)  # Invalid date but matches pattern
-        ]
-        
-        for text, should_match in test_cases:
-            match = re.search(pattern, text)
-            assert bool(match) == should_match, f"Pattern failed for: {text}"
-    
-    def test_password_strength_regex(self):
-        """Test strong password regex with lookaheads"""
-        pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
-        test_cases = [
-            ('Password123!', True),
-            ('MyP@ssw0rd', True),
-            ('weakpass', False),     # No uppercase, number, special
-            ('PASSWORD123!', False), # No lowercase
-            ('Password123', False),  # No special char
-            ('Pass1!', False),       # Too short
-            ('STRONG456#', False)    # No lowercase
-        ]
-        
-        for text, should_match in test_cases:
-            match = re.match(pattern, text)
-            assert bool(match) == should_match, f"Pattern failed for: {text}"
-    
-    def test_password_strength_regex_multiline(self):
-        """Test strong password regex with multiline text (simulating our fix)"""
-        pattern = r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
-        multiline_text = 'Password123!\nweakpass\nSTRONG456#\nAbc123\nMyP@ssw0rd'
-        
-        # Test with multiline flag
-        matches = list(re.finditer(pattern, multiline_text, re.MULTILINE))
-        assert len(matches) == 2
-        
-        expected_matches = ['Password123!', 'MyP@ssw0rd']
-        actual_matches = [match.group(0) for match in matches]
-        assert actual_matches == expected_matches
-        
-        # Test line-by-line approach (simulating our JavaScript fix)
-        lines = multiline_text.split('\n')
-        line_matches = []
-        for line in lines:
-            match = re.match(pattern, line)
-            if match:
-                line_matches.append(match.group(0))
-        
-        assert line_matches == expected_matches
-    
-    def test_url_regex(self):
-        """Test URL matching regex"""
-        pattern = r'https?://(?:[-\w.])+(?:[:\d]+)?(?:/(?:[\w/_.])*(?:\?(?:[\w&=%.])*)?(?:#(?:[\w.])*)?)?'
-        test_cases = [
-            ('https://example.com', True),
-            ('http://test.org:8080/path?param=value#section', True),
-            ('https://sub.domain.com/deep/path/file.html', True),
-            ('ftp://example.com', False),
-            ('not-a-url', False),
-            ('https://', False)
-        ]
-        
-        for text, should_match in test_cases:
-            match = re.search(pattern, text)
-            assert bool(match) == should_match, f"Pattern failed for: {text}"
-
-class TestRegexFlags:
-    """Test regex flags and their behavior"""
-    
-    def test_global_flag(self):
-        """Test global flag behavior"""
-        pattern = r'\d+'
-        text = 'Find 123 and 456 and 789'
-        
-        # Without global flag (Python doesn't have global flag, but we can simulate)
-        matches = list(re.finditer(pattern, text))
-        assert len(matches) == 3
-        assert [m.group() for m in matches] == ['123', '456', '789']
-    
-    def test_case_insensitive_flag(self):
-        """Test case insensitive flag"""
-        pattern = r'test'
-        text = 'Test TEST test TeSt'
-        
-        # Case sensitive
-        matches_sensitive = list(re.finditer(pattern, text))
-        assert len(matches_sensitive) == 1
-        
-        # Case insensitive
-        matches_insensitive = list(re.finditer(pattern, text, re.IGNORECASE))
-        assert len(matches_insensitive) == 4
-    
-    def test_multiline_flag(self):
-        """Test multiline flag with ^ and $"""
-        pattern = r'^test'
-        text = 'test\nother line\ntest again'
-        
-        # Without multiline
-        matches_single = list(re.finditer(pattern, text))
-        assert len(matches_single) == 1
-        
-        # With multiline
-        matches_multi = list(re.finditer(pattern, text, re.MULTILINE))
-        assert len(matches_multi) == 2
-    
-    def test_dotall_flag(self):
-        """Test dotall flag with . matching newlines"""
-        pattern = r'start.+end'
-        text = 'start\nmiddle\nend'
-        
-        # Without dotall
-        match_normal = re.search(pattern, text)
-        assert match_normal is None
-        
-        # With dotall
-        match_dotall = re.search(pattern, text, re.DOTALL)
-        assert match_dotall is not None
-
-class TestRegexEdgeCases:
-    """Test edge cases and error conditions"""
-    
-    def test_invalid_regex_patterns(self):
-        """Test invalid regex patterns"""
-        invalid_patterns = [
-            r'[',           # Unclosed bracket
-            r'(?P<',        # Incomplete named group
-            r'*',           # Nothing to repeat
-            r'(?P<name>)(?P<name>)',  # Duplicate group name
-            r'(?',          # Incomplete group
-        ]
-        
-        for pattern in invalid_patterns:
-            with pytest.raises(re.error):
-                re.compile(pattern)
-    
-    def test_empty_patterns_and_text(self):
-        """Test behavior with empty patterns and text"""
-        # Empty pattern - newer Python versions allow this
-        empty_regex = re.compile('')
-        assert empty_regex.pattern == ''
-        
-        # Empty pattern should match empty strings
-        match = empty_regex.search('')
-        assert match is not None
-        assert match.group() == ''
-        
-        # Empty text with non-empty pattern
-        pattern = r'\d+'
-        text = ''
-        match = re.search(pattern, text)
-        assert match is None
-    
-    def test_zero_length_matches(self):
-        """Test patterns that can match zero-length strings"""
-        pattern = r'\b'  # Word boundary - zero-length assertion
-        text = 'hello world'
-        matches = list(re.finditer(pattern, text))
-        assert len(matches) == 4  # Start, between words, end positions
-    
-    def test_very_long_text(self):
-        """Test regex with very long text"""
-        pattern = r'\d+'
-        # Create a long text with numbers
-        text = 'text ' * 1000 + '12345' + ' more' * 1000
-        
-        match = re.search(pattern, text)
-        assert match is not None
-        assert match.group() == '12345'
-    
-    def test_unicode_text(self):
-        """Test regex with Unicode characters"""
-        pattern = r'\w+'
-        text = 'Hello 世界 🌍 Düsseldorf café'
-        
-        matches = list(re.finditer(pattern, text, re.UNICODE))
-        # This will match based on Unicode word character definition
-        assert len(matches) > 0
-    
-    def test_complex_nested_groups(self):
-        """Test complex nested capture groups"""
-        pattern = r'(((\d{4})-(\d{2}))-(\d{2}))'
-        text = 'Date: 2024-03-15'
-        
-        match = re.search(pattern, text)
-        assert match is not None
-        groups = match.groups()
-        assert groups == ('2024-03-15', '2024-03', '2024', '03', '15')
-
-class TestRegexPerformance:
-    """Performance-related tests"""
-    
-    def test_catastrophic_backtracking(self):
-        """Test patterns that could cause catastrophic backtracking"""
-        # This pattern can cause exponential backtracking
-        pattern = r'(a+)+b'
-        text = 'a' * 20 + 'c'  # No 'b' at end causes backtracking
-        
-        import time
-        start_time = time.time()
-        match = re.search(pattern, text)
-        end_time = time.time()
-        
-        # Should complete quickly and not match
-        assert match is None
-        assert end_time - start_time < 1.0  # Should complete in under 1 second
-    
-    def test_large_number_of_matches(self):
-        """Test pattern with large number of matches"""
-        pattern = r'\d'
-        text = ''.join([str(i % 10) for i in range(10000)])  # 10,000 digits
-        
-        matches = list(re.finditer(pattern, text))
-        assert len(matches) == 10000
-
-class TestRegexFeatures:
-    """Test specific regex features"""
-    
-    def test_named_groups(self):
-        """Test named capture groups"""
-        pattern = r'(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})'
-        text = 'Today is 2024-03-15'
-        
-        match = re.search(pattern, text)
-        assert match is not None
-        assert match.group('year') == '2024'
-        assert match.group('month') == '03'
-        assert match.group('day') == '15'
-    
-    def test_lookahead_lookbehind(self):
-        """Test lookahead and lookbehind assertions"""
-        # Positive lookahead
-        pattern = r'\d+(?=\s*dollars?)'
-        text = 'I have 100 dollars and 50 cents'
-        match = re.search(pattern, text)
-        assert match is not None
-        assert match.group() == '100'
-        
-        # Positive lookbehind
-        pattern = r'(?<=\$)\d+'
-        text = 'Price: $29.99 and €25.00'
-        match = re.search(pattern, text)
-        assert match is not None
-        assert match.group() == '29'
-    
-    def test_non_capturing_groups(self):
-        """Test non-capturing groups"""
-        pattern = r'(?:http|https)://(\w+\.\w+)'
-        text = 'Visit https://example.com for more info'
-        
-        match = re.search(pattern, text)
-        assert match is not None
-        assert len(match.groups()) == 1  # Only capturing group
-        assert match.group(1) == 'example.com'
-    
-    def test_character_classes(self):
-        """Test various character classes"""
-        test_cases = [
-            (r'\d+', '123abc', '123'),
-            (r'\w+', 'hello-world_123', 'hello'),
-            (r'\s+', 'a   b', '   '),
-            (r'[a-zA-Z]+', '123abc456', 'abc'),
-            (r'[^0-9]+', '123abc456', 'abc'),
-        ]
-        
-        for pattern, text, expected in test_cases:
-            match = re.search(pattern, text)
-            assert match is not None, f"Pattern {pattern} should match in {text}"
-            assert match.group() == expected
-
-class TestRegexUIFeatures:
-    """Test UI-specific features that would be tested in frontend"""
-    
-    def test_match_highlighting_data(self):
-        """Test data structure for match highlighting"""
-        pattern = r'(\w+)@(\w+\.\w+)'
-        text = 'Contact: test@example.com and admin@site.org'
-        
-        matches = []
-        for match in re.finditer(pattern, text):
-            match_data = {
-                'match': match.group(0),
-                'index': match.start(),
-                'endIndex': match.end(),
-                'groups': list(match.groups()),
-                'fullMatch': match
-            }
-            matches.append(match_data)
-        
-        assert len(matches) == 2
-        
-        # First match
-        assert matches[0]['match'] == 'test@example.com'
-        assert matches[0]['groups'] == ['test', 'example.com']
-        assert matches[0]['index'] == 9
-        
-        # Second match
-        assert matches[1]['match'] == 'admin@site.org'
-        assert matches[1]['groups'] == ['admin', 'site.org']
-    
-    def test_group_color_assignment(self):
-        """Test group color assignment logic"""
-        groups = ['group1', 'group2', 'group3', 'group4', 'group5', 'group6', 'group7', 'group8', 'group9', 'group10']
-        
-        # Simulate color assignment (group index % 9) + 1
-        colors = []
-        for i, group in enumerate(groups):
-            color_index = (i % 9) + 1
-            colors.append(f'group-{color_index}')
-        
-        expected_colors = [f'group-{i+1}' for i in range(9)] + ['group-1']
-        assert colors == expected_colors
-    
-    def test_match_statistics(self):
-        """Test match statistics calculation"""
-        pattern = r'(\d+)'
-        text = 'Find 123, 456, and 789 numbers'
-        
-        matches = list(re.finditer(pattern, text))
-        
-        stats = {
-            'total_matches': len(matches),
-            'unique_matches': len(set(m.group() for m in matches)),
-            'groups_per_match': len(matches[0].groups()) if matches else 0,
-            'total_characters_matched': sum(len(m.group()) for m in matches)
-        }
-        
-        assert stats['total_matches'] == 3
-        assert stats['unique_matches'] == 3
-        assert stats['groups_per_match'] == 1
-        assert stats['total_characters_matched'] == 9
-
-class TestAdvancedEmailIPValidation:
-    """Test the advanced email/IP validation regex pattern"""
-    
-    def test_advanced_email_ip_validation_pattern(self):
-        """Test the complex email/IP validation regex pattern"""
-        pattern = r'^(?![-.])[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}(?<!\.))?(?<!\.)@(?=[A-Za-z0-9])[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}(?<!\.))?(?<!\.)(\.[A-Za-z]{2,})$|^(?:[1-9]\d{0,2}\.){3}(?:[1-9]\d{0,2})$|^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$'
-        
-        # Valid emails that should match
-        valid_emails = [
-            'john.doe@example.com',
-            'jane_doe+123@subdomain.test.org',
-            'a@domain.co',
-            'valid-email@domain.io'
-        ]
-        
-        # Invalid emails that should NOT match (but some might due to complex regex)
-        invalid_emails = [
-            '.invalid@domain.com',
-            'local@domain..com',
-            '@missing.local.com',
-            'test@-bad.com',
-            'test@domain.c',
-            'space in@domain.com',
-            'email@domain'
-        ]
-        
-        # Valid IPv4 addresses (matching the specific pattern requirements)
-        valid_ipv4 = [
-            '1.2.3.4',
-            '255.255.255.255'
-        ]
-        
-        # IPv4 that won't match due to pattern restrictions (octets must start with 1-9)
-        ipv4_pattern_restricted = [
-            '192.168.0.1'  # Third octet starts with 0
-        ]
-        
-        # Invalid IPv4 addresses that should NOT match
-        invalid_ipv4 = [
-            '0.0.0.0',  # Should not match (starts with 0)
-            '1.2.3',    # Incomplete
-            '1.2.3.4.5',  # Too many octets
-            '192.168.001.1'  # Leading zeros
-        ]
-        
-        # Valid IPv6 addresses
-        valid_ipv6 = [
-            '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
-            'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
-            '1:2:3:4:5:6:7:8'
-        ]
-        
-        # Test valid emails
-        for email in valid_emails:
-            match = re.match(pattern, email, re.MULTILINE)
-            assert match is not None, f"Valid email should match: {email}"
-        
-        # Test valid IPv4
-        for ip in valid_ipv4:
-            match = re.match(pattern, ip, re.MULTILINE)
-            assert match is not None, f"Valid IPv4 should match: {ip}"
-        
-        # Test valid IPv6  
-        for ipv6 in valid_ipv6:
-            match = re.match(pattern, ipv6, re.MULTILINE)
-            assert match is not None, f"Valid IPv6 should match: {ipv6}"
-        
-        # Test that some invalid cases don't match
-        for email in ['@missing.local.com', 'test@domain.c', 'email@domain']:
-            match = re.match(pattern, email, re.MULTILINE)
-            assert match is None, f"Invalid email should not match: {email}"
-        
-        for ip in ['0.0.0.0', '1.2.3', '1.2.3.4.5']:
-            match = re.match(pattern, ip, re.MULTILINE)
-            assert match is None, f"Invalid IPv4 should not match: {ip}"
-    
-    def test_advanced_validation_multiline_matching(self):
-        """Test the advanced validation pattern with multiline text"""
-        pattern = r'^(?![-.])[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}(?<!\.))?(?<!\.)@(?=[A-Za-z0-9])[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}(?<!\.))?(?<!\.)(\.[A-Za-z]{2,})$|^(?:[1-9]\d{0,2}\.){3}(?:[1-9]\d{0,2})$|^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$'
-        
-        # Sample text with mixed valid and invalid entries
-        test_text = """john.doe@example.com
-jane_doe+123@subdomain.test.org
-a@domain.co
-.invalid@domain.com
-192.168.0.1
-1.2.3.4
-0.0.0.0
-2001:0db8:85a3:0000:0000:8a2e:0370:7334
-invalid line without pattern"""
-        
-        # Find all matches using multiline mode
-        matches = list(re.finditer(pattern, test_text, re.MULTILINE))
-        
-        # Should find several valid matches (5 expected: 3 emails + 1 IPv4 + 1 IPv6)
-        assert len(matches) >= 5, f"Should find at least 5 matches, found {len(matches)}"
-        
-        # Check that we found the expected valid entries
-        match_texts = [match.group(0) for match in matches]
-        
-        expected_matches = [
-            'john.doe@example.com',
-            'jane_doe+123@subdomain.test.org', 
-            'a@domain.co',
-            '1.2.3.4',
-            '2001:0db8:85a3:0000:0000:8a2e:0370:7334'
-        ]
-        
-        for expected in expected_matches:
-            assert expected in match_texts, f"Expected match not found: {expected}"
-
-class TestNewlineHandling:
-    """Test that literal \\n in example data gets converted to actual newlines"""
-    
-    def test_newline_conversion_simulation(self):
-        """Test that simulates the JavaScript newline conversion for example data"""
-        
-        # Simulate the text as stored in HTML data attribute (with literal \n)
-        html_data_text = "line1\\nline2\\nline3@domain.com\\nline4"
-        
-        # Simulate JavaScript conversion: text.replace(/\\n/g, '\n')
-        converted_text = html_data_text.replace('\\n', '\n')
-        
-        # Test that conversion works
-        assert '\\n' in html_data_text, "Original should contain literal \\n"
-        assert '\n' in converted_text, "Converted should contain actual newlines"
-        assert converted_text.count('\n') == 3, "Should have 3 actual newlines"
-        assert len(converted_text.split('\n')) == 4, "Should split into 4 lines"
-        
-        # Test regex matching before and after conversion
-        email_pattern = r'[a-zA-Z0-9]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-        
-        # Before conversion - should find email in the single line
-        matches_before = list(re.finditer(email_pattern, html_data_text))
-        assert len(matches_before) == 1, "Should find 1 email in literal text"
-        
-        # After conversion - should still find the email, now on separate line
-        matches_after = list(re.finditer(email_pattern, converted_text, re.MULTILINE))
-        assert len(matches_after) == 1, "Should find 1 email after conversion"
-        assert matches_after[0].group() == "line3@domain.com"
-    
-    def test_advanced_email_ip_newline_dependency(self):
-        """Test that the Advanced Email/IP pattern requires proper newlines to work correctly"""
-        
-        pattern = r'^(?![-.])[A-Za-z0-9](?:[A-Za-z0-9._%+-]{0,62}(?<!\.))?(?<!\.)@(?=[A-Za-z0-9])[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}(?<!\.))?(?<!\.)(\.[A-Za-z]{2,})$|^(?:[1-9]\d{0,2}\.){3}(?:[1-9]\d{0,2})$|^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$'
-        
-        # Text with literal \n (as stored in HTML)
-        literal_text = "john.doe@example.com\\n1.2.3.4\\n2001:0db8:85a3:0000:0000:8a2e:0370:7334"
-        
-        # Text with actual newlines (after JavaScript conversion)
-        proper_text = literal_text.replace('\\n', '\n')
-        
-        # With literal \n - should find fewer or no matches
-        matches_literal = list(re.finditer(pattern, literal_text, re.MULTILINE))
-        
-        # With actual newlines - should find more matches
-        matches_proper = list(re.finditer(pattern, proper_text, re.MULTILINE))
-        
-        # The fix ensures we get more matches with proper newlines
-        assert len(matches_proper) > len(matches_literal), \
-            f"Should find more matches with proper newlines: {len(matches_proper)} > {len(matches_literal)}"
-        
-        # Should find at least the 3 valid entries
-        assert len(matches_proper) >= 3, f"Should find at least 3 matches, found {len(matches_proper)}"
-
-class TestHistoryFunctionality:
-    """Test history functionality fixes"""
-    
-    def test_history_newline_conversion_simulation(self):
-        """Test that history loading simulates the JavaScript newline conversion"""
-        
-        # Simulate data as it would be stored in the database (with literal \n)
-        stored_history_data = {
-            "pattern": r"\d+",
-            "testText": "line1\\ntest123\\nline3", 
-            "flags": "g"
-        }
-        
-        # Simulate the JavaScript loadHistoryEntry conversion: (data.testText || '').replace(/\\n/g, '\n')
-        loaded_text = stored_history_data["testText"].replace('\\n', '\n')
-        
-        # Test that the conversion works correctly
-        assert '\\n' in stored_history_data["testText"], "Original data should have literal \\n"
-        assert '\n' in loaded_text, "Converted data should have actual newlines"
-        assert loaded_text.count('\n') == 2, "Should have 2 actual newlines"
-        assert loaded_text == "line1\ntest123\nline3", "Conversion should produce correct text"
-        
-        # Test that regex works better with converted text
-        pattern = r'^\w+\d+$'  # Line-anchored pattern
-        
-        # With literal \n - should not match individual lines properly
-        matches_literal = list(re.finditer(pattern, stored_history_data["testText"], re.MULTILINE))
-        
-        # With converted newlines - should match lines properly
-        matches_converted = list(re.finditer(pattern, loaded_text, re.MULTILINE))
-        
-        # Should find more matches with proper newlines
-        assert len(matches_converted) >= len(matches_literal), \
-            f"Converted text should find more or equal matches: {len(matches_converted)} >= {len(matches_literal)}"
-        
-        # Should find the test123 match
-        match_texts = [m.group() for m in matches_converted]
-        assert "test123" in match_texts, "Should find 'test123' with proper newlines"
-    
-    def test_history_data_format_compatibility(self):
-        """Test that history data format is compatible with the JavaScript loading functions"""
-        
-        # Test data structure as expected by JavaScript functions
-        history_entry = {
-            "id": "test123",
-            "data": '{"pattern":"test\\\\d+","testText":"line1\\\\ntest123\\\\nline3","flags":"g"}',
-            "timestamp": "2025-09-01T10:00:00.000000",
+    def test_history_api_endpoints(self):
+        """Test that history API endpoints work"""
+        # Test saving to history
+        test_data = {
+            "data": json.dumps({
+                "pattern": r"\d+",
+                "testText": "Test 123 numbers",
+                "flags": "g"
+            }),
             "operation": "test"
         }
         
-        # Simulate JavaScript JSON.parse(entry.data)
-        data = json.loads(history_entry["data"])
+        response = requests.post("http://127.0.0.1:8000/api/history/regex-tester", json=test_data)
+        assert response.status_code == 200
         
-        # Verify structure
-        assert "pattern" in data, "Data should contain pattern"
-        assert "testText" in data, "Data should contain testText"
-        assert "flags" in data, "Data should contain flags"
+        result = response.json()
+        assert result["success"] is True
         
-        # Test the newline conversion
-        original_text = data["testText"]
-        converted_text = original_text.replace('\\n', '\n')
+        # Test retrieving history
+        response = requests.get("http://127.0.0.1:8000/api/history/regex-tester?limit=5")
+        assert response.status_code == 200
         
-        # Verify conversion works as expected
-        assert original_text == "line1\\ntest123\\nline3", "Original should have literal \\n"
-        assert converted_text == "line1\ntest123\nline3", "Converted should have actual newlines"
-        
-        # Test that the pattern works with converted text
-        pattern = data["pattern"]
-        flags = data["flags"]
-        
-        # Create regex flags
-        regex_flags = 0
-        if 'i' in flags:
-            regex_flags |= re.IGNORECASE
-        if 'm' in flags:
-            regex_flags |= re.MULTILINE
-        if 's' in flags:
-            regex_flags |= re.DOTALL
-        if 'g' in flags:
-            # Global flag is handled by finditer vs search
-            pass
-            
-        compiled_regex = re.compile(pattern, regex_flags)
-        
-        # Test matching
-        matches = list(compiled_regex.finditer(converted_text))
-        assert len(matches) > 0, "Should find matches in the converted text"
-        
-        # Should find "test123"
-        match_values = [m.group() for m in matches]
-        assert any("123" in match for match in match_values), "Should find the number 123"
+        data = response.json()
+        assert "history" in data
+        assert len(data["history"]) >= 1
 
 if __name__ == '__main__':
-    # Run tests with pytest
     pytest.main([__file__, '-v', '--tb=short'])

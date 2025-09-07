@@ -8,9 +8,10 @@ import sys
 import os
 
 # Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from main import generate_diff, generate_character_diff_html
+from src.main import generate_diff, generate_character_diff_html
 
 class TestDiffGenerationFunctions(unittest.TestCase):
     """Test suite for diff generation logic"""
@@ -227,6 +228,97 @@ class TestEdgeCases(unittest.TestCase):
             char_diff_2 = replace_lines[0]['char_diff_2']
             self.assertIn("🌟", char_diff_1)
             self.assertIn("⭐", char_diff_2)
+
+
+class TestDiffAlgorithmEdgeCases(unittest.TestCase):
+    """Test edge cases for diff algorithm robustness"""
+    
+    def test_very_large_files(self):
+        """Test diff with large files (performance)"""
+        large_text1 = '\n'.join([f"Line {i} with content" for i in range(1000)])
+        large_text2 = '\n'.join([f"Line {i} with modified content" if i % 100 == 0 else f"Line {i} with content" for i in range(1000)])
+        
+        result = generate_diff(large_text1, large_text2)
+        
+        # Should handle large files without crashing
+        self.assertGreater(len(result['lines']), 0)
+        self.assertGreater(result['stats']['modifications'], 0)
+        self.assertEqual(result['stats']['equal'], 990)  # 10 modifications out of 1000
+    
+    def test_completely_different_files(self):
+        """Test diff when files are completely different"""
+        text1 = "File A content\nWith multiple lines\nAll different"
+        text2 = "File B data\nCompletely changed\nNothing matches"
+        
+        result = generate_diff(text1, text2)
+        
+        # Should show all as modifications since line counts match
+        self.assertEqual(result['stats']['equal'], 0)
+        self.assertEqual(result['stats']['modifications'], 3)
+    
+    def test_whitespace_differences(self):
+        """Test diff with only whitespace changes"""
+        text1 = "Line with spaces"
+        text2 = "Line  with   spaces"  # Extra spaces
+        
+        result = generate_diff(text1, text2)
+        
+        # Should detect character-level differences
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertEqual(len(modify_lines), 1)
+        self.assertIn('char_diff_1', modify_lines[0])
+        self.assertIn('char_diff_2', modify_lines[0])
+    
+    def test_newline_variations(self):
+        """Test diff with different newline styles"""
+        text1 = "Line 1\nLine 2\nLine 3"  # Unix newlines
+        text2 = "Line 1\r\nLine 2\r\nLine 3"  # Windows newlines
+        
+        result = generate_diff(text1, text2)
+        
+        # Should handle different newline styles gracefully
+        self.assertIsNotNone(result)
+        self.assertIn('stats', result)
+    
+    def test_binary_like_content(self):
+        """Test diff with binary-like content"""
+        text1 = "Binary\x00\x01\x02data"
+        text2 = "Binary\x00\x03\x04data"
+        
+        result = generate_diff(text1, text2)
+        
+        # Should handle binary content without crashing
+        self.assertIsNotNone(result)
+        self.assertIn('lines', result)
+
+
+class TestDiffAPIIntegration(unittest.TestCase):
+    """Test the actual API endpoint that serves diff functionality"""
+    
+    def test_text_diff_api_endpoint(self):
+        """Test that the /api/text-diff/compare endpoint works"""
+        import requests
+        
+        try:
+            payload = {
+                'text1': 'Original text\nWith multiple lines',
+                'text2': 'Modified text\nWith multiple lines\nAnd extra content'
+            }
+            
+            response = requests.post('http://127.0.0.1:8000/api/text-diff/compare', json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                self.assertTrue(data['success'])
+                self.assertIn('diff', data)
+                self.assertIn('stats', data)
+                self.assertGreater(len(data['diff']), 0)
+            else:
+                # Server might not be running, skip this test
+                self.skipTest("Server not available for API testing")
+                
+        except requests.ConnectionError:
+            self.skipTest("Server not available for API testing")
 
 
 if __name__ == '__main__':

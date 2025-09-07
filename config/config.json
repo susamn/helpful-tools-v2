@@ -1,19 +1,12 @@
 {
   "history_limits": {
     "json-formatter": 50,
-    "sql-formatter": 30,
-    "yaml-validator": 25,
     "json-yaml-xml-converter": 40,
-    "csv-json-converter": 35,
-    "jwt-decoder": 20,
-    "url-encoder": 25,
-    "base64-encoder": 30,
-    "hash-generator": 15,
     "text-diff": 25,
-    "html-entity-converter": 20,
-    "xml-xslt-processor": 20,
-    "markdown-preview": 30,
-    "backslash-escape": 15
+    "regex-tester": 30,
+    "cron-parser": 20,
+    "scientific-calculator": 25,
+    "jwt-decoder": 20
   },
   "global_history_limit": 100,
   "ui_config": {
