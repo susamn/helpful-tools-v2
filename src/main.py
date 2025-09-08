@@ -475,8 +475,11 @@ def clear_global_history():
 def compare_texts():
     """Compare two texts and return diff with character-level changes"""
     try:
-        data = request.json
-        if not data or 'text1' not in data or 'text2' not in data:
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({'success': False, 'error': 'Invalid JSON format'}), 400
+
+        if 'text1' not in data or 'text2' not in data:
             return jsonify({'success': False, 'error': 'Missing text1 or text2'}), 400
             
         text1 = data['text1']

@@ -6,12 +6,13 @@ Unit tests for Text Diff generation functions
 import unittest
 import sys
 import os
+import json
 
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from src.main import generate_diff, generate_character_diff_html
+from src.main import generate_diff, generate_character_diff_html, app
 
 class TestDiffGenerationFunctions(unittest.TestCase):
     """Test suite for diff generation logic"""
@@ -290,6 +291,183 @@ class TestDiffAlgorithmEdgeCases(unittest.TestCase):
         # Should handle binary content without crashing
         self.assertIsNotNone(result)
         self.assertIn('lines', result)
+
+
+class TestChaosTheoryScenarios(unittest.TestCase):
+    """Test scenarios inspired by chaos theory, where small changes can have large effects."""
+
+    def test_single_character_change_at_beginning(self):
+        """A single character change at the start of a long string."""
+        text1 = "a" + "b" * 100
+        text2 = "c" + "b" * 100
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('<span class="char-delete">a</span>', modify_lines[0]['char_diff_1'])
+        self.assertIn('<span class="char-insert">c</span>', modify_lines[0]['char_diff_2'])
+
+    def test_single_character_change_at_end(self):
+        """A single character change at the end of a long string."""
+        text1 = "b" * 100 + "a"
+        text2 = "b" * 100 + "c"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('<span class="char-delete">a</span>', modify_lines[0]['char_diff_1'])
+        self.assertIn('<span class="char-insert">c</span>', modify_lines[0]['char_diff_2'])
+
+    def test_transposition_of_characters(self):
+        """Two characters swapped, which should be seen as two replacements."""
+        text1 = "ab"
+        text2 = "ba"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('<span class="char-delete">a</span><span class="char-delete">b</span>', modify_lines[0]['char_diff_1'])
+        self.assertIn('<span class="char-insert">b</span><span class="char-insert">a</span>', modify_lines[0]['char_diff_2'])
+
+    def test_small_change_in_repeated_pattern(self):
+        """A small change in a line that is repeated many times."""
+        text1 = "abc\n" * 5
+        text2 = ("abc\n" * 2) + "abd\n" + ("abc\n" * 2)
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['equal'], 4)
+        self.assertEqual(result['stats']['deletions'], 1)
+        self.assertEqual(result['stats']['additions'], 1)
+
+
+class TestGameTheoryScenarios(unittest.TestCase):
+    """Test scenarios inspired by game theory, using adversarial inputs."""
+
+    def test_adversarial_input_alternating_chars(self):
+        """Strings with alternating characters, to test performance and correctness."""
+        text1 = "abababab"
+        text2 = "babababa"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+    def test_input_with_many_similar_lines(self):
+        """Input where many lines are similar but not identical."""
+        text1 = "line a\nline b\nline c"
+        text2 = "line x\nline y\nline z"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 3)
+        self.assertEqual(result['stats']['equal'], 0)
+
+    def test_lines_that_are_substrings_of_each_other(self):
+        """Lines that are substrings of each other."""
+        text1 = "short"
+        text2 = "a short story"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('<span class="char-delete">s</span>', modify_lines[0]['char_diff_1'])
+        self.assertIn('<span class="char-insert">a</span>', modify_lines[0]['char_diff_2'])
+
+    def test_input_with_misleading_common_substrings(self):
+        """Input with common substrings that might mislead a simple diff algorithm."""
+        text1 = "common_prefix_unique_suffix1"
+        text2 = "common_prefix_unique_suffix2"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('common_prefix_unique_suffix1', modify_lines[0]['content_1'])
+        self.assertIn('common_prefix_unique_suffix2', modify_lines[0]['content_2'])
+        self.assertIn('<span class="char-delete">1</span>', modify_lines[0]['char_diff_1'])
+        self.assertIn('<span class="char-insert">2</span>', modify_lines[0]['char_diff_2'])
+
+
+class TestAdvancedEdgeCases(unittest.TestCase):
+    """Test advanced edge cases to make the tool more bulletproof."""
+
+    def test_mixed_charsets(self):
+        """Test with a mix of different character sets."""
+        text1 = "Hello, world! Cyrillic: мир. CJK: 世界. Emoji: 😊"
+        text2 = "Hello, world! Cyrillic: мір. CJK: 世界. Emoji: 😂"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('<span class="char-delete">и</span>', modify_lines[0]['char_diff_1'])
+        self.assertIn('<span class="char-insert">і</span>', modify_lines[0]['char_diff_2'])
+        self.assertIn('<span class="char-delete">😊</span>', modify_lines[0]['char_diff_1'])
+        self.assertIn('<span class="char-insert">😂</span>', modify_lines[0]['char_diff_2'])
+
+    def test_combining_characters(self):
+        """Test with Unicode combining characters."""
+        text1 = "école"  # e + combining acute accent
+        text2 = "école"  # precomposed character
+        result = generate_diff(text1, text2)
+        # Depending on normalization, these might be seen as different
+        self.assertNotEqual(text1, text2)
+        # The diff should still be able to process them
+        self.assertIn('stats', result)
+
+    def test_rtl_text(self):
+        """Test with right-to-left text."""
+        text1 = "שלום עולם"
+        text2 = "שלום עולם!"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+    def test_mixed_whitespace(self):
+        """Test with mixed spaces and tabs."""
+        text1 = "hello\tworld"
+        text2 = "hello world"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('\t', modify_lines[0]['char_diff_1'])
+        self.assertIn(' ', modify_lines[0]['char_diff_2'])
+
+    def test_zero_width_spaces(self):
+        """Test with zero-width spaces."""
+        text1 = "hello​world"  # Contains a zero-width space
+        text2 = "helloworld"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+    def test_extremely_long_lines(self):
+        """Test performance with extremely long lines."""
+        text1 = "a" * 10000
+        text2 = "a" * 5000 + "b" + "a" * 4999
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+    def test_large_number_of_lines(self):
+        """Test performance with a large number of lines."""
+        text1 = "line\n" * 2000
+        text2 = ("line\n" * 1000) + "new line\n" + ("line\n" * 999)
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1000)
+        self.assertEqual(result['stats']['equal'], 1000)
+
+    def test_api_malformed_json(self):
+        """Test API robustness with malformed JSON."""
+        with app.test_client() as client:
+            response = client.post('/api/text-diff/compare', data="not a valid json", content_type='application/json')
+            self.assertEqual(response.status_code, 400)
+            json_data = response.get_json()
+            self.assertIn('error', json_data)
+            self.assertEqual(json_data['error'], 'Invalid JSON format')
+
+    def test_api_missing_keys(self):
+        """Test API robustness with missing keys."""
+        with app.test_client() as client:
+            response = client.post('/api/text-diff/compare', json={'text1': 'some text'}, content_type='application/json')
+            self.assertEqual(response.status_code, 400)
+            json_data = response.get_json()
+            self.assertIn('error', json_data)
+            self.assertEqual(json_data['error'], 'Missing text1 or text2')
+
+    def test_api_large_payload(self):
+        """Test API robustness with a large payload."""
+        with app.test_client() as client:
+            text1 = "a" * 50000
+            text2 = "b" * 50000
+            response = client.post('/api/text-diff/compare', json={'text1': text1, 'text2': text2}, content_type='application/json')
+            self.assertEqual(response.status_code, 200)
+            json_data = response.get_json()
+            self.assertTrue(json_data['success'])
 
 
 class TestDiffAPIIntegration(unittest.TestCase):
