@@ -257,7 +257,7 @@ class TextDiffFrontendTest(unittest.TestCase):
         self.wait.until(EC.visibility_of_element_located((By.ID, "historyPopup")))
         
         # Check that history item exists
-        history_items = self.driver.find_elements(By.CLASS_NAME, "history-item")
+        history_items = self.driver.find_elements(By.CLASS_NAME, "hist-item")
         self.assertTrue(len(history_items) > 0)
         
         # Click on first history item to load it
