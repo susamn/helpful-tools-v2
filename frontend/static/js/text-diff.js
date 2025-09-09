@@ -36,14 +36,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 compareBtn: document.getElementById('compareBtn'),
                 clearBtn: document.getElementById('clearBtn'),
                 swapBtn: document.getElementById('swapBtn'),
-                copyLeftBtn: document.getElementById('copyLeftBtn'),
-                copyRightBtn: document.getElementById('copyRightBtn'),
                 collapseBtn: document.getElementById('collapseBtn'),
                 prevDiffBtn: document.getElementById('prevDiffBtn'),
                 nextDiffBtn: document.getElementById('nextDiffBtn'),
                 diffCounter: document.getElementById('diffCounter'),
                 inputSection1: document.getElementById('inputSection1'),
                 inputSection2: document.getElementById('inputSection2'),
+                
+                // Summary Stats
+                summaryStats: document.getElementById('summaryStats'),
+                summaryEqual: document.getElementById('summaryEqual'),
+                summaryAdded: document.getElementById('summaryAdded'),
+                summaryDeleted: document.getElementById('summaryDeleted'),
+                summaryModified: document.getElementById('summaryModified'),
+                
+                // File upload elements
+                file1Input: document.getElementById('file1Input'),
+                file2Input: document.getElementById('file2Input'),
+                leftFilePath: document.getElementById('leftFilePath'),
+                rightFilePath: document.getElementById('rightFilePath'),
                 
                 // Font controls
                 fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
@@ -63,8 +74,6 @@ document.addEventListener('DOMContentLoaded', function() {
             this.elements.compareBtn.addEventListener('click', () => this.compareTexts());
             this.elements.clearBtn.addEventListener('click', () => this.clearAll());
             this.elements.swapBtn.addEventListener('click', () => this.swapTexts());
-            this.elements.copyLeftBtn.addEventListener('click', () => this.copyToClipboard(this.elements.text1.value));
-            this.elements.copyRightBtn.addEventListener('click', () => this.copyToClipboard(this.elements.text2.value));
             
             // New functionality
             this.elements.collapseBtn.addEventListener('click', () => this.toggleInputCollapse());
@@ -74,6 +83,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Font size controls
             this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
             this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
+            
+            // File upload listeners
+            this.elements.file1Input.addEventListener('change', (e) => this.handleFileUpload(e, 'text1'));
+            this.elements.file2Input.addEventListener('change', (e) => this.handleFileUpload(e, 'text2'));
             
             // Text input listeners
             this.elements.text1.addEventListener('input', () => this.updateLineCount());
@@ -245,11 +258,34 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         updateDiffStats(stats) {
+            // Update existing stats display
             this.elements.equalCount.textContent = stats.equal || 0;
             this.elements.addedCount.textContent = stats.additions || 0;
             this.elements.deletedCount.textContent = stats.deletions || 0;
             this.elements.modifiedCount.textContent = stats.modifications || 0;
             this.elements.diffStats.style.display = 'flex';
+            
+            // Update summary banner
+            this.updateSummaryBanner(stats);
+        }
+        
+        updateSummaryBanner(stats) {
+            const equal = stats.equal || 0;
+            const added = stats.additions || 0;
+            const deleted = stats.deletions || 0;
+            const modified = stats.modifications || 0;
+            const total = equal + added + deleted + modified;
+            
+            // Update summary stats
+            this.elements.summaryEqual.textContent = equal;
+            this.elements.summaryAdded.textContent = added;
+            this.elements.summaryDeleted.textContent = deleted;
+            this.elements.summaryModified.textContent = modified;
+            
+            // Show the stats when there are results
+            if (total > 0) {
+                this.elements.summaryStats.style.display = 'flex';
+            }
         }
 
         updateLineCount() {
@@ -269,6 +305,12 @@ document.addEventListener('DOMContentLoaded', function() {
             this.elements.leftDiff.innerHTML = '<div class="loading">Enter text above and click Compare to see differences</div>';
             this.elements.rightDiff.innerHTML = '<div class="loading">Enter text above and click Compare to see differences</div>';
             this.elements.diffStats.style.display = 'none';
+            this.elements.summaryStats.style.display = 'none';
+            
+            // Hide file path labels
+            this.elements.leftFilePath.style.display = 'none';
+            this.elements.rightFilePath.style.display = 'none';
+            
             this.updateLineCount();
             this.updateStatus('Ready to compare texts');
         }
@@ -277,6 +319,24 @@ document.addEventListener('DOMContentLoaded', function() {
             const temp = this.elements.text1.value;
             this.elements.text1.value = this.elements.text2.value;
             this.elements.text2.value = temp;
+            
+            // Also swap file path labels if they exist
+            const leftPathLabel = this.elements.leftFilePath;
+            const rightPathLabel = this.elements.rightFilePath;
+            
+            if (leftPathLabel && rightPathLabel) {
+                const leftPath = leftPathLabel.textContent;
+                const rightPath = rightPathLabel.textContent;
+                leftPathLabel.textContent = rightPath;
+                rightPathLabel.textContent = leftPath;
+                
+                // Swap display states
+                const leftDisplay = leftPathLabel.style.display;
+                const rightDisplay = rightPathLabel.style.display;
+                leftPathLabel.style.display = rightDisplay;
+                rightPathLabel.style.display = leftDisplay;
+            }
+            
             this.updateLineCount();
             this.updateStatus('Texts swapped');
         }
@@ -494,6 +554,106 @@ document.addEventListener('DOMContentLoaded', function() {
         saveFontSize() {
             localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
         }
+
+        /**
+         * Handle file upload and read content into text area
+         */
+        handleFileUpload(event, targetTextArea) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Check file size (limit to 10MB)
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                this.updateStatus('File too large. Please select a file under 10MB.');
+                event.target.value = ''; // Clear the input
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    this.elements[targetTextArea].value = content;
+                    this.updateLineCount();
+                    this.updateStatus(`File "${file.name}" loaded successfully (${this.formatFileSize(file.size)})`);
+                    
+                    // Show file path label
+                    const isLeftPanel = targetTextArea === 'text1';
+                    const filePathElement = isLeftPanel ? this.elements.leftFilePath : this.elements.rightFilePath;
+                    
+                    // Use file.name as the path (browsers don't expose full path for security)
+                    const truncatedPath = this.truncateFilePath(file.name);
+                    filePathElement.textContent = truncatedPath;
+                    filePathElement.style.display = 'inline';
+                    
+                    // Clear the file input to allow uploading the same file again
+                    event.target.value = '';
+                } catch (error) {
+                    console.error('Error reading file:', error);
+                    this.updateStatus('Error reading file. Please try again.');
+                    event.target.value = '';
+                }
+            };
+            
+            reader.onerror = () => {
+                this.updateStatus('Error reading file. Please try again.');
+                event.target.value = '';
+            };
+            
+            // Read as text with UTF-8 encoding
+            reader.readAsText(file, 'UTF-8');
+        }
+        
+        /**
+         * Format file size for display
+         */
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        /**
+         * Truncate file path if longer than 20 characters
+         */
+        truncateFilePath(filePath) {
+            if (filePath.length <= 20) {
+                return filePath;
+            }
+            
+            // Find the last slash to get the filename
+            const lastSlashIndex = filePath.lastIndexOf('/');
+            if (lastSlashIndex === -1) {
+                // No path separator, just filename
+                return '...' + filePath.slice(-17);
+            }
+            
+            const fileName = filePath.slice(lastSlashIndex + 1);
+            const pathPart = filePath.slice(0, lastSlashIndex + 1);
+            
+            // If filename itself is too long, just truncate it
+            if (fileName.length > 17) {
+                return '...' + fileName.slice(-17);
+            }
+            
+            // Calculate how much path we can show
+            const availableForPath = 20 - fileName.length - 3; // 3 for "..."
+            
+            if (availableForPath <= 0) {
+                return '...' + fileName;
+            }
+            
+            // Get the end of the path
+            const truncatedPath = '...' + pathPart.slice(-(availableForPath));
+            return truncatedPath + fileName;
+        }
+
+
     }
 
     // Initialize the text diff tool
