@@ -13,8 +13,7 @@ class RegexTester {
         
         this.initElements();
         this.attachEvents();
-        this.loadHistory();
-        this.updateHistoryToggle();
+        this.initializeHistoryManager();
         this.applyFontSize();
     }
 
@@ -35,8 +34,7 @@ class RegexTester {
             statusText: document.getElementById('statusText'),
             historyPopup: document.getElementById('historyPopup'),
             historyList: document.getElementById('historyList'),
-            globalHistoryPopup: document.getElementById('globalHistoryPopup'),
-            globalHistoryList: document.getElementById('globalHistoryList')
+            globalHistoryPopup: document.getElementById('globalHistoryPopup')
         };
     }
 
@@ -61,17 +59,39 @@ class RegexTester {
             btn.onclick = (e) => this.loadExample(e.target);
         });
 
-        // History
-        document.getElementById('historyBtn').onclick = () => this.toggleHistory();
-        document.getElementById('historyToggleBtn').onclick = () => this.toggleHistoryEnabled();
-        document.getElementById('globalHistoryBtn').onclick = () => this.toggleGlobalHistory();
+        // History is handled by HistoryManager class
 
         // Font controls
         document.getElementById('fontIncreaseBtn').onclick = () => this.changeFontSize(1);
         document.getElementById('fontDecreaseBtn').onclick = () => this.changeFontSize(-1);
 
-        // Outside clicks
-        document.onclick = (e) => this.handleOutsideClick(e);
+        // Outside clicks handled by HistoryManager
+    }
+
+    /**
+     * Initialize history manager
+     */
+    initializeHistoryManager() {
+        // Create history manager with callback to load data into inputs
+        this.historyManager = new HistoryManager(this.toolName, (data) => {
+            try {
+                const parsedData = JSON.parse(data);
+                this.els.regexInput.value = parsedData.pattern || '';
+                this.els.testText.value = parsedData.testText || '';
+                
+                // Set flags
+                this.els.flagGlobal.checked = parsedData.flags?.includes('g') || false;
+                this.els.flagIgnoreCase.checked = parsedData.flags?.includes('i') || false;
+                this.els.flagMultiline.checked = parsedData.flags?.includes('m') || false;
+                this.els.flagDotAll.checked = parsedData.flags?.includes('s') || false;
+                this.els.flagUnicode.checked = parsedData.flags?.includes('u') || false;
+                
+                // Test the regex
+                this.testRegex();
+            } catch (error) {
+                console.warn('Failed to load history entry:', error);
+            }
+        });
     }
 
     debounceTest() {
@@ -107,7 +127,13 @@ class RegexTester {
             this.currentMatches = matches;
             this.displayMatches(matches, text);
             this.updateStatus(`Found ${matches.length} match${matches.length !== 1 ? 'es' : ''}`);
-            this.saveToHistory(pattern, text, flags);
+            
+            // Save to history using HistoryManager
+            this.historyManager?.addHistoryEntry(JSON.stringify({
+                pattern: pattern,
+                testText: text,
+                flags: flags
+            }), 'test');
             
         } catch (error) {
             this.showError(error.message);
@@ -296,146 +322,6 @@ class RegexTester {
         this.els.statusText.textContent = message;
     }
 
-    // History functionality
-    async saveToHistory(pattern, text, flags) {
-        if (!this.historyEnabled) return;
-        
-        try {
-            await fetch(`/api/history/${this.toolName}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    data: JSON.stringify({ pattern, testText: text, flags }),
-                    operation: 'test'
-                })
-            });
-        } catch (error) {
-            console.error('History save failed:', error);
-        }
-    }
-
-    async loadHistory() {
-        try {
-            const response = await fetch(`/api/history/${this.toolName}?limit=20`);
-            const result = await response.json();
-            this.displayHistory(result.history || []);
-        } catch (error) {
-            this.els.historyList.innerHTML = '<div class="history-item">Failed to load history</div>';
-        }
-    }
-
-    displayHistory(history) {
-        if (history.length === 0) {
-            this.els.historyList.innerHTML = '<div class="history-item">No history available</div>';
-            return;
-        }
-
-        this.els.historyList.innerHTML = history.map(entry => {
-            const time = new Date(entry.timestamp).toLocaleString();
-            return `
-                <div class="history-item" onclick="regexTester.loadHistoryEntry('${entry.id}')">
-                    <div class="history-item-header">
-                        <span class="history-id">ID: ${entry.id}</span>
-                        <button class="history-delete-btn" onclick="regexTester.deleteHistoryItem('${entry.id}'); event.stopPropagation();">×</button>
-                    </div>
-                    <div class="history-time">${time}</div>
-                    <div class="history-preview">${entry.preview || 'No preview'}</div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    async loadHistoryEntry(entryId) {
-        try {
-            const response = await fetch(`/api/history/${this.toolName}/${entryId}`);
-            const entry = await response.json();
-            
-            if (entry?.data) {
-                const data = JSON.parse(entry.data);
-                this.els.regexInput.value = data.pattern || '';
-                this.els.testText.value = (data.testText || '').replace(/\\n/g, '\n');
-                
-                const flags = data.flags || '';
-                this.els.flagGlobal.checked = flags.includes('g');
-                this.els.flagIgnoreCase.checked = flags.includes('i');
-                this.els.flagMultiline.checked = flags.includes('m');
-                this.els.flagDotAll.checked = flags.includes('s');
-                this.els.flagUnicode.checked = flags.includes('u');
-                
-                this.els.historyPopup.classList.remove('show');
-                this.testRegex();
-            }
-        } catch (error) {
-            this.updateStatus('Failed to load history entry');
-        }
-    }
-
-    async deleteHistoryItem(entryId) {
-        try {
-            const response = await fetch(`/api/history/${this.toolName}/${entryId}`, { method: 'DELETE' });
-            if (response.ok) {
-                this.loadHistory();
-                this.updateStatus('History item deleted');
-            }
-        } catch (error) {
-            this.updateStatus('Failed to delete history item');
-        }
-    }
-
-    toggleHistory() {
-        this.els.historyPopup.classList.toggle('show');
-        if (this.els.historyPopup.classList.contains('show')) {
-            this.loadHistory();
-        }
-    }
-
-    toggleHistoryEnabled() {
-        this.historyEnabled = !this.historyEnabled;
-        localStorage.setItem(`${this.toolName}-historyEnabled`, this.historyEnabled);
-        this.updateHistoryToggle();
-    }
-
-    updateHistoryToggle() {
-        const btn = document.getElementById('historyToggleBtn');
-        btn.textContent = this.historyEnabled ? '📝 History On' : '📝 History Off';
-        btn.classList.toggle('disabled', !this.historyEnabled);
-    }
-
-    async loadGlobalHistory() {
-        try {
-            const response = await fetch('/api/global-history?limit=50');
-            const result = await response.json();
-            this.displayGlobalHistory(result.history || []);
-        } catch (error) {
-            this.els.globalHistoryList.innerHTML = '<div class="global-history-item">Failed to load</div>';
-        }
-    }
-
-    displayGlobalHistory(history) {
-        this.els.globalHistoryList.innerHTML = history.length ? 
-            history.map(entry => `
-                <div class="global-history-item" onclick="regexTester.loadGlobalEntry('${entry.id}', '${entry.tool_name}')">
-                    <span class="global-history-tool-label" style="background: ${getToolColor(entry.tool_name)}">${entry.tool_name}</span>
-                    <div>${new Date(entry.timestamp).toLocaleString()}</div>
-                    <div>${entry.operation}</div>
-                </div>
-            `).join('') :
-            '<div class="global-history-item">No global history</div>';
-    }
-
-    async loadGlobalEntry(entryId, toolName) {
-        if (toolName === this.toolName) {
-            await this.loadHistoryEntry(entryId);
-            this.els.globalHistoryPopup.classList.remove('show');
-        }
-    }
-
-    toggleGlobalHistory() {
-        this.els.globalHistoryPopup.classList.toggle('show');
-        if (this.els.globalHistoryPopup.classList.contains('show')) {
-            this.loadGlobalHistory();
-        }
-    }
 
 
     changeFontSize(delta) {
@@ -449,18 +335,4 @@ class RegexTester {
         elements.forEach(el => el.style.fontSize = `${this.fontSize}px`);
     }
 
-    handleOutsideClick(event) {
-        const popups = [
-            { popup: this.els.historyPopup, btn: document.getElementById('historyBtn') },
-            { popup: this.els.globalHistoryPopup, btn: document.getElementById('globalHistoryBtn') }
-        ];
-
-        popups.forEach(({ popup, btn }) => {
-            if (popup?.classList.contains('show') && 
-                !popup.contains(event.target) && 
-                !btn.contains(event.target)) {
-                popup.classList.remove('show');
-            }
-        });
-    }
 }

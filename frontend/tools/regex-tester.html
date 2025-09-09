@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Regex Tester - Helpful Tools v2</title>
     <link rel="stylesheet" href="/static/css/common-enhancements.css">
+    <link rel="stylesheet" href="/static/css/history.css">
     <link rel="stylesheet" href="/static/css/regex-tester.css">
 </head>
 <body>
@@ -16,21 +17,8 @@
                 <button id="fontDecreaseBtn" title="Decrease font size">−</button>
                 <button id="fontIncreaseBtn" title="Increase font size">+</button>
             </div>
-            <button class="history-toggle-btn" id="historyToggleBtn">📝 History On</button>
-            <div style="position: relative; display: inline-block;">
-                <button class="global-history-btn" id="globalHistoryBtn">📚 Global History</button>
-                <div class="global-history-popup" id="globalHistoryPopup">
-                    <div class="global-history-header">
-                        <span>Global History</span>
-                        <button onclick="document.getElementById('globalHistoryPopup').classList.remove('show')" style="background: none; border: none; font-size: 14px; cursor: pointer;">✕</button>
-                    </div>
-                    <div class="global-history-content" id="globalHistoryContent">
-                        <div id="globalHistoryList">
-                            <div class="global-history-item">Loading global history...</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <button class="hist-toggle-btn" id="historyToggleBtn">📝 History On</button>
+            <button class="hist-global-btn" id="globalHistoryBtn">📚 Global History</button>
             <a href="/">← Back to Tools</a>
         </div>
     </div>
@@ -43,21 +31,21 @@
         <div class="separator"></div>
         <button id="copyMatchesBtn">Copy Matches</button>
         <div class="separator"></div>
-        <div class="history-container">
-            <button class="history-btn" id="historyBtn">📋 History</button>
-            <div class="history-popup" id="historyPopup">
-                <div class="history-tabs">
-                    <button class="history-tab active" data-tab="history">History</button>
-                    <button class="history-tab" data-tab="copy">Copy</button>
+        <div class="hist-container">
+            <button class="hist-btn" id="historyBtn">📋 History</button>
+            <div class="hist-popup" id="historyPopup">
+                <div class="hist-tabs">
+                    <button class="hist-tab active" data-tab="history">History</button>
+                    <button class="hist-tab" data-tab="copy">Copy</button>
                 </div>
-                <div class="history-content" id="historyContent">
-                    <div class="tab-content active" id="historyTab">
+                <div class="hist-content" id="historyContent">
+                    <div class="hist-tab-content active" id="historyTab">
                         <div id="historyList">
-                            <div class="history-item">No regex test history available</div>
+                            <div class="hist-item">No regex tests saved yet</div>
                         </div>
                     </div>
-                    <div class="tab-content" id="copyTab" style="display: none;">
-                        <div class="history-item">Copy features coming soon</div>
+                    <div class="hist-tab-content" id="copyTab" style="display: none;">
+                        <div class="hist-item">Copy features coming soon</div>
                     </div>
                 </div>
             </div>
@@ -144,7 +132,21 @@
         <div id="regexInfo">Pattern: None | Test length: 0</div>
     </div>
 
+    <!-- Global History Popup -->
+    <div class="hist-global-popup" id="globalHistoryPopup">
+        <div class="hist-global-header">
+            <span>Global History - All Tools</span>
+            <button class="hist-close-btn" onclick="window.historyManager?.toggleGlobalHistory()">×</button>
+        </div>
+        <div class="hist-global-content">
+            <div id="globalHistoryList">
+                <div class="hist-global-item">Loading...</div>
+            </div>
+        </div>
+    </div>
+
     <script src="/static/js/common-functions.js"></script>
+    <script src="/static/js/history.js"></script>
     <script src="/static/js/regex-tester.js"></script>
 </body>
 </html>
