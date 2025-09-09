@@ -470,6 +470,374 @@ class TestAdvancedEdgeCases(unittest.TestCase):
             self.assertTrue(json_data['success'])
 
 
+class TestChaosTheoryScenarios(unittest.TestCase):
+    """Test scenarios inspired by chaos theory - small changes having large effects"""
+    
+    def test_butterfly_effect_single_character(self):
+        """Single character change in middle of large text"""
+        base_text = "A" * 1000 + "B" + "C" * 1000
+        modified_text = "A" * 1000 + "X" + "C" * 1000
+        result = generate_diff(base_text, modified_text)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_cascade_newline_insertion(self):
+        """Single newline insertion causing line number cascade"""
+        text1 = "Line1\nLine2\nLine3\nLine4\nLine5"
+        text2 = "Line1\n\nLine2\nLine3\nLine4\nLine5"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['additions'], 1)
+        self.assertEqual(result['stats']['equal'], 5)
+        
+    def test_invisible_character_chaos(self):
+        """Zero-width characters causing invisible differences"""
+        text1 = "Hello\u200bWorld"  # Zero-width space
+        text2 = "HelloWorld"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_encoding_normalization_chaos(self):
+        """Unicode normalization differences"""
+        text1 = "café"  # é as single character
+        text2 = "cafe\u0301"  # e + combining acute accent
+        result = generate_diff(text1, text2)
+        # These look identical but are different byte sequences
+        self.assertNotEqual(text1, text2)
+        
+    def test_exponential_similarity_explosion(self):
+        """Strings with exponentially growing similarity patterns"""
+        text1 = "AB" * 100
+        text2 = "BA" * 100
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_fractal_repetition_pattern(self):
+        """Self-similar patterns at different scales"""
+        pattern1 = "ABC" * 10 + "DEF" * 10 + "ABC" * 10
+        pattern2 = "ABC" * 10 + "XYZ" * 10 + "ABC" * 10
+        result = generate_diff(pattern1, pattern2)
+        # These are single-line strings, so they will be treated as one modification
+        # rather than having equal parts, since the entire lines are different
+        self.assertTrue(result['stats']['modifications'] >= 1)
+        
+    def test_palindrome_symmetry_break(self):
+        """Breaking palindrome symmetry with single change"""
+        text1 = "ABCCBA"
+        text2 = "ABCXBA"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_fibonacci_sequence_disruption(self):
+        """Disrupting mathematical sequences"""
+        fib1 = "1 1 2 3 5 8 13 21 34 55"
+        fib2 = "1 1 2 3 5 8 13 22 34 55"  # Changed 21 to 22
+        result = generate_diff(fib1, fib2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_quantum_superposition_strings(self):
+        """Strings that exist in multiple states until observed"""
+        text1 = "Schrödinger's cat is alive"
+        text2 = "Schrödinger's cat is dead"
+        result = generate_diff(text1, text2)
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        self.assertIn('alive', modify_lines[0]['content_1'])
+        self.assertIn('dead', modify_lines[0]['content_2'])
+
+
+class TestAdversarialInputScenarios(unittest.TestCase):
+    """Adversarial inputs designed to break the diff algorithm"""
+    
+    def test_pathological_lcs_worst_case(self):
+        """Worst case for Longest Common Subsequence algorithms"""
+        text1 = "A" * 50 + "B" * 50
+        text2 = "B" * 50 + "A" * 50
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_regex_bomb_pattern(self):
+        """Patterns that could cause regex catastrophic backtracking"""
+        text1 = "a" * 20 + "X"
+        text2 = "a" * 20 + "Y"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_memory_exhaustion_attempt(self):
+        """Large repetitive patterns to test memory usage"""
+        text1 = ("ABCD" * 1000) + "X"
+        text2 = ("ABCD" * 1000) + "Y"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_algorithmic_complexity_bomb(self):
+        """Input designed to trigger worst-case O(n²) behavior"""
+        text1 = "".join([chr(65 + i % 26) for i in range(1000)])
+        text2 = "".join([chr(65 + (i + 1) % 26) for i in range(1000)])
+        result = generate_diff(text1, text2)
+        self.assertIsNotNone(result)
+        
+    def test_hash_collision_simulation(self):
+        """Strings designed to have similar hash values"""
+        text1 = "FB" + "A" * 98
+        text2 = "Ea" + "A" * 98  # These might hash similarly
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_stack_overflow_recursion(self):
+        """Deeply nested similar structures"""
+        text1 = "(" * 500 + "CONTENT" + ")" * 500
+        text2 = "(" * 500 + "CHANGED" + ")" * 500
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_cache_thrashing_pattern(self):
+        """Pattern designed to thrash LRU caches"""
+        text1 = "".join([f"BLOCK{i%10}" for i in range(1000)])
+        text2 = "".join([f"BLOCK{(i+1)%10}" for i in range(1000)])
+        result = generate_diff(text1, text2)
+        self.assertIsNotNone(result)
+        
+    def test_delimiter_injection_attack(self):
+        """Attempting to inject control characters"""
+        text1 = "Normal\nText\nHere"
+        text2 = "Normal\r\n\x00\x01Text\nHere"
+        result = generate_diff(text1, text2)
+        self.assertTrue(result['stats']['modifications'] > 0)
+
+
+class TestExtremeEdgeCases(unittest.TestCase):
+    """Extreme edge cases to test robustness"""
+    
+    def test_null_byte_injection(self):
+        """Null bytes in text content"""
+        text1 = "Hello\x00World"
+        text2 = "Hello\x00Universe"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_all_control_characters(self):
+        """Text with every control character"""
+        text1 = "".join([chr(i) for i in range(32)])
+        text2 = "".join([chr(i+1) for i in range(32)])
+        result = generate_diff(text1, text2)
+        self.assertIsNotNone(result)
+        
+    def test_maximum_unicode_codepoint(self):
+        """Maximum valid Unicode characters"""
+        text1 = "\U0010FFFF" * 10  # Maximum Unicode codepoint
+        text2 = "\U0010FFFE" * 10  # One less
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_surrogate_pair_edge_cases(self):
+        """Unicode surrogate pairs at boundaries"""
+        text1 = "Test\U0001F600End"  # Emoji with surrogate pairs
+        text2 = "Test\U0001F601End"  # Different emoji
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_mixed_line_endings_chaos(self):
+        """Every type of line ending mixed together"""
+        text1 = "Line1\nLine2\rLine3\r\nLine4"
+        text2 = "Line1\r\nLine2\nLine3\rLine4"
+        result = generate_diff(text1, text2)
+        self.assertIsNotNone(result)
+        
+    def test_bidi_text_confusion(self):
+        """Bidirectional text with direction changes"""
+        text1 = "Hello \u202Eworld\u202D!"  # RLO and LRO
+        text2 = "Hello \u202Dworld\u202E!"  # Swapped
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_normalization_attack(self):
+        """Unicode normalization confusion"""
+        text1 = "é"  # NFC normalized
+        text2 = "e\u0301"  # NFD normalized
+        result = generate_diff(text1, text2)
+        # These look identical but are different
+        self.assertNotEqual(text1, text2)
+        
+    def test_homoglyph_attack(self):
+        """Visually identical but different characters"""
+        text1 = "Hello"  # Regular ASCII
+        text2 = "Hеllo"  # Cyrillic 'е' instead of 'e'
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+
+class TestPsychologicalTestCases(unittest.TestCase):
+    """Tests based on psychological principles of perception"""
+    
+    def test_change_blindness(self):
+        """Changes that humans typically miss"""
+        text1 = "The quick brown fox jumps over the lazy dog."
+        text2 = "The quick brown fox jumps over the lazy dag."  # dog -> dag
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_gestalt_grouping_violation(self):
+        """Breaking expected patterns"""
+        text1 = "1 2 3 4 5 6 7 8 9 10"
+        text2 = "1 2 3 4 X 6 7 8 9 10"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_semantic_vs_syntactic_change(self):
+        """Meaningful vs meaningless changes"""
+        text1 = "The cat sat on the mat."
+        text2 = "The cat sat on the bat."  # mat -> bat (meaningful)
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_cognitive_load_overload(self):
+        """Too many changes to process mentally"""
+        text1 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        text2 = "abcdefghijklmnopqrstuvwxyz"  # Case change
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+
+class TestMathematicalExtremes(unittest.TestCase):
+    """Tests based on mathematical extremes and special cases"""
+    
+    def test_golden_ratio_disruption(self):
+        """Mathematical constants with slight modifications"""
+        text1 = "1.618033988749895"  # Golden ratio
+        text2 = "1.618033988749896"  # Last digit changed
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_pi_precision_test(self):
+        """High precision mathematical constants"""
+        pi_100 = "3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679"
+        pi_99 = "3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117067"
+        result = generate_diff(pi_100, pi_99)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_infinity_representation(self):
+        """Different representations of infinity"""
+        text1 = "∞"
+        text2 = "infinity"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_exponential_growth_pattern(self):
+        """Exponentially growing sequences"""
+        exp1 = " ".join([str(2**i) for i in range(20)])
+        exp2 = " ".join([str(2**i) for i in range(19)] + ["1048577"])  # Changed last
+        result = generate_diff(exp1, exp2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+
+class TestConcurrencySimulation(unittest.TestCase):
+    """Simulate concurrent modification scenarios"""
+    
+    def test_race_condition_simulation(self):
+        """Simulate race condition in text modification"""
+        base = "Original text content"
+        modification_a = "Modified text content"
+        modification_b = "Original text changed"
+        
+        # Test both possible merge outcomes
+        result_a = generate_diff(base, modification_a)
+        result_b = generate_diff(base, modification_b)
+        
+        self.assertEqual(result_a['stats']['modifications'], 1)
+        self.assertEqual(result_b['stats']['modifications'], 1)
+        
+    def test_atomic_operation_failure(self):
+        """Simulate partial write scenarios"""
+        text1 = "Complete operation"
+        text2 = "Complete oper"  # Truncated
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+
+class TestSecurityVulnerabilityProbes(unittest.TestCase):
+    """Test potential security vulnerabilities"""
+    
+    def test_script_injection_attempt(self):
+        """HTML/JavaScript injection in diff content"""
+        text1 = "Normal text"
+        text2 = "Normal <script>alert('xss')</script> text"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        # Ensure the script tags are properly escaped in output
+        modify_lines = [line for line in result['lines'] if line['type'] == 'modify']
+        # Check that HTML characters are properly escaped
+        self.assertIn('&lt;', modify_lines[0]['char_diff_2'])  # < should be escaped
+        self.assertIn('&gt;', modify_lines[0]['char_diff_2'])  # > should be escaped
+        # Make sure the raw script tag is NOT present
+        self.assertNotIn('<script>', modify_lines[0]['char_diff_2'])
+        
+    def test_sql_injection_simulation(self):
+        """SQL injection patterns in text"""
+        text1 = "user = 'john'"
+        text2 = "user = 'john'; DROP TABLE users; --'"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_buffer_overflow_pattern(self):
+        """Extremely long strings to test buffer handling"""
+        text1 = "A" * 10000
+        text2 = "A" * 10001
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+
+class TestAPIStressTests(unittest.TestCase):
+    """Stress tests for the API endpoints"""
+    
+    def test_api_json_bomb(self):
+        """Test API with deeply nested JSON-like structures"""
+        json_bomb = '{"a":' * 1000 + '{}' + '}' * 1000
+        normal_text = "Normal text"
+        
+        # Test through the function directly (API testing would need server)
+        result = generate_diff(json_bomb, normal_text)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_api_unicode_stress(self):
+        """Unicode stress test for API"""
+        unicode_text1 = "🔥" * 1000
+        unicode_text2 = "❄️" * 1000
+        result = generate_diff(unicode_text1, unicode_text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_api_mixed_encoding_chaos(self):
+        """Mixed character encodings"""
+        text1 = "ASCII text"
+        text2 = "ÀSCÏÏ tëxt"  # Accented characters
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+
+
+class TestPerformanceDegradation(unittest.TestCase):
+    """Test scenarios designed to degrade performance"""
+    
+    def test_quadratic_performance_trap(self):
+        """Input designed to trigger O(n²) behavior"""
+        # Create strings with many similar subsequences
+        text1 = "ABC" * 300 + "X"
+        text2 = "ABC" * 300 + "Y"
+        result = generate_diff(text1, text2)
+        self.assertEqual(result['stats']['modifications'], 1)
+        
+    def test_cache_invalidation_storm(self):
+        """Pattern that invalidates caches frequently"""
+        text1 = "".join([f"CACHE_KEY_{i%5}" for i in range(1000)])
+        text2 = "".join([f"CACHE_KEY_{(i+1)%5}" for i in range(1000)])
+        result = generate_diff(text1, text2)
+        self.assertIsNotNone(result)
+        
+    def test_memory_fragmentation_pattern(self):
+        """Pattern designed to fragment memory"""
+        chunks = ["CHUNK" + "A" * i for i in range(100)]
+        text1 = "\n".join(chunks)
+        text2 = "\n".join(chunks[::2])  # Every other chunk
+        result = generate_diff(text1, text2)
+        self.assertTrue(result['stats']['deletions'] > 0)
+
+
 class TestDiffAPIIntegration(unittest.TestCase):
     """Test the actual API endpoint that serves diff functionality"""
     

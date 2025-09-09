@@ -3,6 +3,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template_string, request, jsonify, send_file, abort
+import html
 
 # Import history manager
 from api.history import history_manager, validate_tool_name, sanitize_data
@@ -498,23 +499,27 @@ def compare_texts():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def generate_character_diff_html(text1: str, text2: str) -> (str, str):
-    """Generate character-level diff as an HTML string."""
+    """Generate character-level diff as an HTML string with proper escaping."""
     res1 = []
     res2 = []
     i = 0
     j = 0
     while i < len(text1) or j < len(text2):
         if i < len(text1) and j < len(text2) and text1[i] == text2[j]:
-            res1.append(text1[i])
-            res2.append(text2[j])
+            # Escape matching characters to prevent XSS
+            escaped_char = html.escape(text1[i])
+            res1.append(escaped_char)
+            res2.append(escaped_char)
             i += 1
             j += 1
         else:
             if i < len(text1):
-                res1.append(f'<span class="char-delete">{text1[i]}</span>')
+                escaped_char1 = html.escape(text1[i])
+                res1.append(f'<span class="char-delete">{escaped_char1}</span>')
                 i += 1
             if j < len(text2):
-                res2.append(f'<span class="char-insert">{text2[j]}</span>')
+                escaped_char2 = html.escape(text2[j])
+                res2.append(f'<span class="char-insert">{escaped_char2}</span>')
                 j += 1
     return "".join(res1), "".join(res2)
 
