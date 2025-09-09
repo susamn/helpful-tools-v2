@@ -514,6 +514,7 @@
         <button id="clearBtn">Clear</button>
         <button id="swapBtn">Swap</button>
         <div class="separator"></div>
+        <button class="collapse-btn" id="collapseBtn">▲ Collapse Inputs</button>
         <div class="hist-container">
             <button class="hist-btn" id="historyBtn">📋 History</button>
             <div class="hist-popup" id="historyPopup">
@@ -533,7 +534,7 @@
                 </div>
             </div>
         </div>
-        <button class="collapse-btn" id="collapseBtn">▲ Collapse Inputs</button>
+
         <div class="stats-nav-container">
             <div class="summary-stats" id="summaryStats" style="display: none;">
                 <span class="summary-stat summary-equal">
@@ -563,7 +564,7 @@
             <div class="panel-header">
                 <span>Text 1 (Original)</span>
                 <div class="header-controls">
-                    <input type="file" id="file1Input" accept=".txt,.md,.json,.xml,.yaml,.yml,.js,.py,.html,.css,.log" style="display: none;">
+                    <input type="file" id="file1Input" style="display: none;">
                     <span class="file-path-label left" id="leftFilePath" style="display: none;"></span>
                     <button class="file-upload-btn" onclick="document.getElementById('file1Input').click()">📁 Upload File</button>
                     <span id="leftStats">0 lines</span>
@@ -582,7 +583,7 @@
             <div class="panel-header">
                 <span>Text 2 (Comparison)</span>
                 <div class="header-controls">
-                    <input type="file" id="file2Input" accept=".txt,.md,.json,.xml,.yaml,.yml,.js,.py,.html,.css,.log" style="display: none;">
+                    <input type="file" id="file2Input" style="display: none;">
                     <span class="file-path-label right" id="rightFilePath" style="display: none;"></span>
                     <button class="file-upload-btn" onclick="document.getElementById('file2Input').click()">📁 Upload File</button>
                     <span id="rightStats">0 lines</span>

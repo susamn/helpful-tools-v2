@@ -574,6 +574,14 @@ document.addEventListener('DOMContentLoaded', function() {
             reader.onload = (e) => {
                 try {
                     const content = e.target.result;
+                    
+                    // Check if content appears to be binary (contains null bytes or too many non-printable characters)
+                    if (content.includes('\0') || this.isBinaryContent(content)) {
+                        this.updateStatus(`Cannot read "${file.name}" - appears to be a binary file. Please select a text file.`);
+                        event.target.value = '';
+                        return;
+                    }
+                    
                     this.elements[targetTextArea].value = content;
                     this.updateLineCount();
                     this.updateStatus(`File "${file.name}" loaded successfully (${this.formatFileSize(file.size)})`);
@@ -591,13 +599,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     event.target.value = '';
                 } catch (error) {
                     console.error('Error reading file:', error);
-                    this.updateStatus('Error reading file. Please try again.');
+                    this.updateStatus(`Could not read "${file.name}" - file may be corrupted or in an unsupported format.`);
                     event.target.value = '';
                 }
             };
             
             reader.onerror = () => {
-                this.updateStatus('Error reading file. Please try again.');
+                this.updateStatus(`Failed to read "${file.name}" - file may be corrupted or inaccessible.`);
                 event.target.value = '';
             };
             
@@ -605,6 +613,29 @@ document.addEventListener('DOMContentLoaded', function() {
             reader.readAsText(file, 'UTF-8');
         }
         
+        /**
+         * Check if content appears to be binary by analyzing character patterns
+         */
+        isBinaryContent(content) {
+            if (!content || content.length === 0) return false;
+            
+            // Check first 8KB for binary patterns
+            const sampleSize = Math.min(content.length, 8192);
+            const sample = content.substring(0, sampleSize);
+            
+            let nonPrintableCount = 0;
+            for (let i = 0; i < sample.length; i++) {
+                const charCode = sample.charCodeAt(i);
+                // Count non-printable characters (excluding common whitespace)
+                if (charCode < 32 && charCode !== 9 && charCode !== 10 && charCode !== 13) {
+                    nonPrintableCount++;
+                }
+            }
+            
+            // If more than 5% of characters are non-printable, likely binary
+            return (nonPrintableCount / sample.length) > 0.05;
+        }
+
         /**
          * Format file size for display
          */

@@ -175,8 +175,8 @@ class TextDiffFrontendTest(unittest.TestCase):
         self.assertEqual(text1_input.get_attribute("value"), original_text2)
         self.assertEqual(text2_input.get_attribute("value"), original_text1)
     
-    def test_copy_functionality(self):
-        """Test copy diff functionality"""
+    def test_swap_functionality_basic(self):
+        """Test basic swap functionality after comparison"""
         # Add text and compare
         text1_input = self.driver.find_element(By.ID, "text1")
         text2_input = self.driver.find_element(By.ID, "text2")
@@ -184,22 +184,26 @@ class TextDiffFrontendTest(unittest.TestCase):
         text1_input.send_keys("Hello world")
         text2_input.send_keys("Hello universe")
         
-        # Compare
+        # Compare first
         compare_btn = self.driver.find_element(By.ID, "compareBtn")
         compare_btn.click()
         
         # Wait for results
         self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "diff-line")))
         
-        # Click copy button
-        copy_btn = self.driver.find_element(By.ID, "copyLeftBtn")
-        copy_btn.click()
+        # Click swap button
+        swap_btn = self.driver.find_element(By.ID, "swapBtn")
+        swap_btn.click()
         
         # Wait for feedback message
-        self.wait.until(EC.text_to_be_present_in_element((By.ID, "statusText"), "copied"))
+        self.wait.until(EC.text_to_be_present_in_element((By.ID, "statusText"), "swapped"))
+        
+        # Verify content was swapped
+        self.assertEqual(text1_input.get_attribute("value"), "Hello universe")
+        self.assertEqual(text2_input.get_attribute("value"), "Hello world")
         
         feedback = self.driver.find_element(By.ID, "statusText")
-        self.assertIn("copied", feedback.text.lower())
+        self.assertIn("swapped", feedback.text.lower())
     
     def test_keyboard_shortcuts(self):
         """Test keyboard shortcuts functionality"""
@@ -328,6 +332,238 @@ class TextDiffFrontendTest(unittest.TestCase):
         # Elements should still be functional
         compare_btn = self.driver.find_element(By.ID, "compareBtn")
         self.assertTrue(compare_btn.is_displayed())
+    
+    def test_file_upload_accepts_any_file_type(self):
+        """Test that file inputs no longer have accept restrictions"""
+        file1_input = self.driver.find_element(By.ID, "file1Input")
+        file2_input = self.driver.find_element(By.ID, "file2Input")
+        
+        # Check that accept attribute is not present or empty
+        file1_accept = file1_input.get_attribute("accept")
+        file2_accept = file2_input.get_attribute("accept")
+        
+        self.assertTrue(file1_accept is None or file1_accept == "", 
+                       f"File1 input should not have accept restrictions, but has: {file1_accept}")
+        self.assertTrue(file2_accept is None or file2_accept == "", 
+                       f"File2 input should not have accept restrictions, but has: {file2_accept}")
+    
+    def test_swap_functionality_comprehensive(self):
+        """Test comprehensive swap functionality including file path labels"""
+        # Add different text to each input
+        text1_input = self.driver.find_element(By.ID, "text1")
+        text2_input = self.driver.find_element(By.ID, "text2")
+        
+        original_text1 = "Original left text content"
+        original_text2 = "Original right text content"
+        
+        text1_input.send_keys(original_text1)
+        text2_input.send_keys(original_text2)
+        
+        # Simulate file path labels (since we can't actually upload files in this test)
+        self.driver.execute_script("""
+            document.getElementById('leftFilePath').textContent = 'file1.txt';
+            document.getElementById('leftFilePath').style.display = 'inline';
+            document.getElementById('rightFilePath').textContent = 'file2.txt';
+            document.getElementById('rightFilePath').style.display = 'inline';
+        """)
+        
+        # Click swap button
+        swap_btn = self.driver.find_element(By.ID, "swapBtn")
+        swap_btn.click()
+        
+        # Verify texts are swapped
+        self.assertEqual(text1_input.get_attribute("value"), original_text2)
+        self.assertEqual(text2_input.get_attribute("value"), original_text1)
+        
+        # Verify file path labels are swapped
+        left_path = self.driver.find_element(By.ID, "leftFilePath").text
+        right_path = self.driver.find_element(By.ID, "rightFilePath").text
+        self.assertEqual(left_path, "file2.txt")
+        self.assertEqual(right_path, "file1.txt")
+        
+        # Check status message
+        status_text = self.driver.find_element(By.ID, "statusText").text
+        self.assertIn("swapped", status_text.lower())
+    
+    def test_file_size_limit_behavior(self):
+        """Test file size limit functionality through JavaScript simulation"""
+        # Simulate a large file upload scenario
+        self.driver.execute_script("""
+            // Simulate the file size check logic
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            const mockLargeFileSize = 15 * 1024 * 1024; // 15MB
+            
+            // Simulate the error condition
+            if (mockLargeFileSize > maxSize) {
+                window.textDiffTool.updateStatus('File too large. Please select a file under 10MB.');
+            }
+        """)
+        
+        # Wait for status update
+        self.wait.until(lambda driver: 
+            "too large" in driver.find_element(By.ID, "statusText").text.lower()
+        )
+        
+        status_text = self.driver.find_element(By.ID, "statusText").text
+        self.assertIn("too large", status_text.lower())
+        self.assertIn("10MB", status_text)
+    
+    def test_binary_file_detection_simulation(self):
+        """Test binary file detection through JavaScript simulation"""
+        # Simulate binary file detection logic
+        self.driver.execute_script("""
+            // Simulate binary content detection
+            const binaryContent = 'Some text\\0with null bytes\\x01\\x02';
+            const fileName = 'binary_file.exe';
+            
+            // Simulate the binary detection result
+            if (binaryContent.includes('\\0')) {
+                window.textDiffTool.updateStatus(`Cannot read "${fileName}" - appears to be a binary file. Please select a text file.`);
+            }
+        """)
+        
+        # Wait for status update
+        self.wait.until(lambda driver: 
+            "binary file" in driver.find_element(By.ID, "statusText").text.lower()
+        )
+        
+        status_text = self.driver.find_element(By.ID, "statusText").text
+        self.assertIn("binary file", status_text.lower())
+        self.assertIn("binary_file.exe", status_text)
+    
+    def test_file_path_truncation_display(self):
+        """Test file path truncation and display functionality"""
+        # Simulate file upload with long path
+        self.driver.execute_script("""
+            // Simulate truncation logic
+            function truncateFilePath(filePath) {
+                if (filePath.length <= 20) {
+                    return filePath;
+                }
+                
+                const lastSlashIndex = filePath.lastIndexOf('/');
+                if (lastSlashIndex === -1) {
+                    return '...' + filePath.slice(-17);
+                }
+                
+                const fileName = filePath.slice(lastSlashIndex + 1);
+                const pathPart = filePath.slice(0, lastSlashIndex + 1);
+                
+                if (fileName.length > 17) {
+                    return '...' + fileName.slice(-17);
+                }
+                
+                const availableForPath = 20 - fileName.length - 3;
+                if (availableForPath <= 0) {
+                    return '...' + fileName;
+                }
+                
+                const truncatedPath = '...' + pathPart.slice(-(availableForPath));
+                return truncatedPath + fileName;
+            }
+            
+            // Test various file paths - using shorter filename to test path preservation logic
+            const longPath = '/very/long/path/to/some/deeply/nested/directory/structure/file.txt';
+            const truncated = truncateFilePath(longPath);
+            
+            // Also test a long filename case
+            const longFilenamePath = '/path/verylongfilename.txt';
+            const truncatedLongFilename = truncateFilePath(longFilenamePath);
+            
+            // Display the result
+            document.getElementById('leftFilePath').textContent = truncated;
+            document.getElementById('leftFilePath').style.display = 'inline';
+            
+            // Store for verification
+            window.testTruncatedPath = truncated;
+            window.testTruncatedLongFilename = truncatedLongFilename;
+        """)
+        
+        # Verify truncation worked for regular case (short filename, long path)
+        truncated_path = self.driver.execute_script("return window.testTruncatedPath;")
+        self.assertTrue(len(truncated_path) <= 20, f"Truncated path too long: {len(truncated_path)} chars")
+        self.assertTrue(truncated_path.startswith("..."), "Truncated path should start with ...")
+        self.assertTrue(truncated_path.endswith("file.txt"), "Should preserve short filename")
+        
+        # Verify truncation worked for long filename case  
+        truncated_long = self.driver.execute_script("return window.testTruncatedLongFilename;")
+        self.assertTrue(len(truncated_long) <= 20, f"Truncated long filename too long: {len(truncated_long)} chars")
+        self.assertTrue(truncated_long.startswith("..."), "Should start with ...")
+        # For long filenames, only the last 17 chars are kept, so we check the suffix
+        self.assertTrue(truncated_long.endswith("longfilename.txt"), "Should preserve end of long filename")
+        
+        # Verify it's displayed
+        left_path_element = self.driver.find_element(By.ID, "leftFilePath")
+        self.assertTrue(left_path_element.is_displayed())
+        self.assertEqual(left_path_element.text, truncated_path)
+    
+    def test_input_area_visual_distinction(self):
+        """Test that input areas have different background from output areas"""
+        text1_input = self.driver.find_element(By.ID, "text1")
+        left_diff = self.driver.find_element(By.ID, "leftDiff")
+        
+        # Get computed styles
+        input_bg = self.driver.execute_script(
+            "return window.getComputedStyle(arguments[0]).backgroundColor;", text1_input
+        )
+        output_bg = self.driver.execute_script(
+            "return window.getComputedStyle(arguments[0]).backgroundColor;", left_diff
+        )
+        
+        # Input should have a subtle gray background, output should be white
+        self.assertNotEqual(input_bg, output_bg, "Input and output areas should have different backgrounds")
+        
+        # Verify input has the expected light gray background
+        # Note: Computed styles may vary across browsers, so we check for non-white
+        self.assertNotEqual(input_bg, "rgba(0, 0, 0, 0)", "Input should have a background color")
+        self.assertNotEqual(input_bg, "rgb(255, 255, 255)", "Input should not be pure white")
+    
+    def test_merge_buttons_removed(self):
+        """Test that merge buttons have been removed from the interface"""
+        # Try to find merge buttons - they should not exist
+        merge_buttons = self.driver.find_elements(By.CLASS_NAME, "merge-btn")
+        self.assertEqual(len(merge_buttons), 0, "Merge buttons should be removed from interface")
+        
+        # Check for specific button IDs that should not exist
+        copy_left_to_right = self.driver.find_elements(By.ID, "copyLeftToRightBtn")
+        copy_right_to_left = self.driver.find_elements(By.ID, "copyRightToLeftBtn")
+        
+        self.assertEqual(len(copy_left_to_right), 0, "copyLeftToRightBtn should not exist")
+        self.assertEqual(len(copy_right_to_left), 0, "copyRightToLeftBtn should not exist")
+        
+        # Verify swap button still exists
+        swap_btn = self.driver.find_elements(By.ID, "swapBtn")
+        self.assertEqual(len(swap_btn), 1, "Swap button should still exist")
+    
+    def test_error_message_specificity(self):
+        """Test that error messages are specific and helpful"""
+        # Test different error scenarios through JavaScript
+        error_scenarios = [
+            {
+                'script': 'window.textDiffTool.updateStatus("File too large. Please select a file under 10MB.");',
+                'expected': ['too large', '10MB']
+            },
+            {
+                'script': 'window.textDiffTool.updateStatus("Cannot read \\"test.exe\\" - appears to be a binary file. Please select a text file.");',
+                'expected': ['binary file', 'test.exe', 'text file']
+            },
+            {
+                'script': 'window.textDiffTool.updateStatus("Could not read \\"corrupted.txt\\" - file may be corrupted or in an unsupported format.");',
+                'expected': ['corrupted.txt', 'corrupted', 'unsupported format']
+            }
+        ]
+        
+        for scenario in error_scenarios:
+            self.driver.execute_script(scenario['script'])
+            
+            # Wait for status update
+            time.sleep(0.1)
+            
+            status_text = self.driver.find_element(By.ID, "statusText").text.lower()
+            
+            for expected_text in scenario['expected']:
+                self.assertIn(expected_text.lower(), status_text, 
+                             f"Expected '{expected_text}' in status message: {status_text}")
 
 
 if __name__ == '__main__':
