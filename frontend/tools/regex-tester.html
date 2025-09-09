@@ -84,6 +84,7 @@
         </div>
 
         <div id="regexError" class="regex-error"></div>
+        
 
         <div class="quick-examples">
             <span style="color: #555;">Quick examples:</span>
@@ -110,7 +111,10 @@
         <div class="right-panel">
             <div class="panel-header">
                 Highlighted Matches
-                <button class="example-btn" id="toggleMatchesBtn">Show Details</button>
+                <div class="panel-header-controls">
+                    <button class="example-btn" id="showExplanationBtn">📖 Explain</button>
+                    <button class="example-btn" id="toggleMatchesBtn">Show Details</button>
+                </div>
             </div>
             <div class="panel-content">
                 <div class="highlighted-text" id="highlightedText">
@@ -129,7 +133,10 @@
 
     <div class="status-bar">
         <div id="statusText">Ready - Enter a regex pattern and test string</div>
-        <div id="regexInfo">Pattern: None | Test length: 0</div>
+        <div class="status-metrics">
+            <div id="regexInfo">Pattern: None | Test length: 0</div>
+            <div id="performanceInfo" style="display: none;">⚡ 0.00ms | 0 steps</div>
+        </div>
     </div>
 
     <!-- Global History Popup -->
@@ -142,6 +149,39 @@
             <div id="globalHistoryList">
                 <div class="hist-global-item">Loading...</div>
             </div>
+        </div>
+    </div>
+
+    <!-- Popup Overlay -->
+    <div class="regex-popup-overlay" id="popupOverlay"></div>
+
+    <!-- Pattern Explanation Popup -->
+    <div class="regex-popup" id="explanationPopup">
+        <div class="regex-popup-header">
+            <span>📖 Pattern Explanation</span>
+            <button class="regex-popup-close" id="explanationCloseBtn">×</button>
+        </div>
+        <div class="regex-popup-info">
+            <div class="popup-pattern" id="explanationPattern"></div>
+            <div class="popup-timing" id="explanationTiming"></div>
+        </div>
+        <div class="regex-popup-content" id="explanationContent">
+            <div class="explanation-loading">Analyzing pattern...</div>
+        </div>
+    </div>
+
+    <!-- Match Details Popup -->
+    <div class="regex-popup" id="detailsPopup">
+        <div class="regex-popup-header">
+            <span>🔍 Match Details</span>
+            <button class="regex-popup-close" id="detailsCloseBtn">×</button>
+        </div>
+        <div class="regex-popup-info">
+            <div class="popup-pattern" id="detailsPattern"></div>
+            <div class="popup-timing" id="detailsTiming"></div>
+        </div>
+        <div class="regex-popup-content" id="detailsContent">
+            <div class="no-details">No matches to display</div>
         </div>
     </div>
 

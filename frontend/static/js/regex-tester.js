@@ -32,6 +32,16 @@ class RegexTester {
             matchesList: document.getElementById('matchesList'),
             regexError: document.getElementById('regexError'),
             statusText: document.getElementById('statusText'),
+            performanceInfo: document.getElementById('performanceInfo'),
+            explanationPopup: document.getElementById('explanationPopup'),
+            explanationContent: document.getElementById('explanationContent'),
+            explanationPattern: document.getElementById('explanationPattern'),
+            explanationTiming: document.getElementById('explanationTiming'),
+            detailsPopup: document.getElementById('detailsPopup'),
+            detailsContent: document.getElementById('detailsContent'),
+            detailsPattern: document.getElementById('detailsPattern'),
+            detailsTiming: document.getElementById('detailsTiming'),
+            popupOverlay: document.getElementById('popupOverlay'),
             historyPopup: document.getElementById('historyPopup'),
             historyList: document.getElementById('historyList'),
             globalHistoryPopup: document.getElementById('globalHistoryPopup')
@@ -45,6 +55,23 @@ class RegexTester {
         document.getElementById('sampleBtn').onclick = () => this.loadSample();
         document.getElementById('copyMatchesBtn').onclick = () => this.copyMatches();
         document.getElementById('toggleMatchesBtn').onclick = () => this.toggleDetails();
+        document.getElementById('showExplanationBtn').onclick = () => this.showExplanationPopup();
+        document.getElementById('explanationCloseBtn').onclick = () => this.hideExplanationPopup();
+        document.getElementById('detailsCloseBtn').onclick = () => this.hideDetailsPopup();
+        
+        // Close popups when clicking outside (on overlay)
+        this.els.popupOverlay.addEventListener('click', (e) => {
+            this.hideExplanationPopup();
+            this.hideDetailsPopup();
+        });
+        
+        // Close popups with Escape key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.hideExplanationPopup();
+                this.hideDetailsPopup();
+            }
+        });
 
         // Auto-test on input
         this.els.regexInput.oninput = () => this.debounceTest();
@@ -103,7 +130,7 @@ class RegexTester {
         }, 300);
     }
 
-    testRegex() {
+    async testRegex() {
         const pattern = this.els.regexInput.value.trim();
         const text = this.els.testText.value;
         
@@ -121,12 +148,33 @@ class RegexTester {
 
         try {
             const flags = this.getFlags();
-            const regex = new RegExp(pattern, flags);
-            const matches = this.findMatches(regex, text);
             
-            this.currentMatches = matches;
-            this.displayMatches(matches, text);
-            this.updateStatus(`Found ${matches.length} match${matches.length !== 1 ? 'es' : ''}`);
+            // Test with backend for performance metrics
+            const response = await fetch('/api/regex/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({pattern, text, flags})
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    this.currentMatches = result.matches;
+                    this.displayMatches(result.matches, text);
+                    this.displayPerformanceMetrics(result.performance);
+                    this.updateStatus(`Found ${result.matches.length} match${result.matches.length !== 1 ? 'es' : ''}`);
+                } else {
+                    this.showError(result.error);
+                }
+            } else {
+                // Fallback to client-side testing
+                const regex = new RegExp(pattern, flags);
+                const matches = this.findMatches(regex, text);
+                
+                this.currentMatches = matches;
+                this.displayMatches(matches, text);
+                this.updateStatus(`Found ${matches.length} match${matches.length !== 1 ? 'es' : ''} (client-side)`);
+            }
             
             // Save to history using HistoryManager
             this.historyManager?.addHistoryEntry(JSON.stringify({
@@ -189,17 +237,89 @@ class RegexTester {
     }
 
     highlightText(text, matches) {
+        if (!matches.length) {
+            this.els.highlightedText.innerHTML = this.escapeHtml(text);
+            return;
+        }
+    
         let html = '';
         let lastIndex = 0;
-
+        let legend = new Set();
+    
         matches.forEach((match, i) => {
             html += this.escapeHtml(text.slice(lastIndex, match.index));
-            html += `<span class="regex-match" title="Match ${i + 1}: ${this.escapeHtml(match.text)}">${this.escapeHtml(match.text)}</span>`;
-            lastIndex = match.index + match.text.length;
+            
+            // Enhanced highlighting with nested groups
+            const matchHtml = this.highlightMatchWithGroups(match, i);
+            html += matchHtml.html;
+            
+            // Collect group info for legend
+            if (match.groups && match.groups.length) {
+                match.groups.forEach((group, groupIndex) => {
+                    if (group !== undefined) {
+                        legend.add(groupIndex + 1);
+                    }
+                });
+            }
+            legend.add(0); // Main match
+            
+            lastIndex = match.end || (match.index + match.text.length);
         });
-
+    
         html += this.escapeHtml(text.slice(lastIndex));
+        
+        // Add group legend
+        if (legend.size > 1) {
+            html += this.generateGroupLegend(legend);
+        }
+        
         this.els.highlightedText.innerHTML = html;
+    }
+    
+    highlightMatchWithGroups(match, matchIndex) {
+        const text = match.text;
+        let html = '';
+        
+        if (!match.groups || match.groups.length === 0) {
+            // Simple match without groups
+            html = `<span class="regex-match group-0" title="Match ${matchIndex + 1}: ${this.escapeHtml(text)}">${this.escapeHtml(text)}</span>`;
+        } else {
+            // Complex highlighting for matches with groups
+            // For now, use the main match highlighting
+            // TODO: Implement proper nested group highlighting
+            html = `<span class="regex-match group-0" title="Match ${matchIndex + 1}: ${this.escapeHtml(text)} | Groups: ${match.groups.join(', ')}">${this.escapeHtml(text)}</span>`;
+        }
+        
+        return { html };
+    }
+    
+    generateGroupLegend(groups) {
+        const colors = [
+            { bg: '#ffeb3b', border: '#ff9800' },
+            { bg: '#e1f5fe', border: '#0277bd' },
+            { bg: '#f3e5f5', border: '#7b1fa2' },
+            { bg: '#e8f5e8', border: '#2e7d32' },
+            { bg: '#fff3e0', border: '#ef6c00' },
+            { bg: '#fce4ec', border: '#c2185b' },
+            { bg: '#f1f8e9', border: '#689f38' },
+            { bg: '#e8eaf6', border: '#5e35b1' },
+            { bg: '#fff8e1', border: '#fbc02d' },
+            { bg: '#fafafa', border: '#616161' }
+        ];
+        
+        let legendHtml = '<div class="group-legend"><strong>Groups:</strong> ';
+        
+        Array.from(groups).sort((a, b) => a - b).forEach(groupNum => {
+            const color = colors[groupNum % colors.length];
+            const label = groupNum === 0 ? 'Match' : `Group ${groupNum}`;
+            legendHtml += `<span class="legend-item">`;
+            legendHtml += `<span class="legend-color" style="background: ${color.bg}; border-color: ${color.border};"></span>`;
+            legendHtml += `<span class="legend-text">${label}</span>`;
+            legendHtml += `</span>`;
+        });
+        
+        legendHtml += '</div>';
+        return legendHtml;
     }
 
     showMatchDetails(matches) {
@@ -245,6 +365,9 @@ class RegexTester {
         this.els.testText.value = '';
         this.els.highlightedText.innerHTML = '<div class="regex-no-match">Enter a regex pattern and test string</div>';
         this.els.matchesList.innerHTML = '';
+        this.hideExplanationPopup();
+        this.hideDetailsPopup();
+        this.els.performanceInfo.style.display = 'none';
         this.clearError();
         this.updateStatus('Ready');
         this.els.matchCount.textContent = 'NO MATCHES';
@@ -289,16 +412,57 @@ class RegexTester {
     }
 
     toggleDetails() {
-        const panel = this.els.matchesPanel;
-        const btn = document.getElementById('toggleMatchesBtn');
-        
-        if (panel.classList.contains('show')) {
-            panel.classList.remove('show');
-            btn.textContent = 'Show Details';
-        } else {
-            panel.classList.add('show');
-            btn.textContent = 'Hide Details';
+        this.showDetailsPopup();
+    }
+    
+    showDetailsPopup() {
+        if (this.currentMatches.length === 0) {
+            alert('No matches to show details for');
+            return;
         }
+        
+        const pattern = this.els.regexInput.value.trim();
+        
+        // Update popup info
+        this.els.detailsPattern.textContent = pattern;
+        this.els.detailsTiming.innerHTML = this.els.performanceInfo.innerHTML || 'No timing info';
+        
+        // Generate match details content
+        this.displayMatchDetailsInPopup(this.currentMatches);
+        
+        this.els.popupOverlay.classList.add('show');
+        this.els.detailsPopup.classList.add('show');
+    }
+    
+    hideDetailsPopup() {
+        this.els.detailsPopup.classList.remove('show');
+        if (!this.els.explanationPopup.classList.contains('show')) {
+            this.els.popupOverlay.classList.remove('show');
+        }
+    }
+    
+    displayMatchDetailsInPopup(matches) {
+        const html = matches.map((match, i) => `
+            <div class="match-item-popup">
+                <div>
+                    <span class="match-index">#${i + 1}</span>
+                    <span class="match-text">${this.escapeHtml(match.text)}</span>
+                    <span class="match-position">at position ${match.index}</span>
+                </div>
+                ${match.groups && match.groups.length ? this.formatGroupsForPopup(match.groups) : ''}
+            </div>
+        `).join('');
+
+        this.els.detailsContent.innerHTML = html || '<div class="no-details">No matches to display</div>';
+    }
+    
+    formatGroupsForPopup(groups) {
+        const html = groups.map((group, i) => 
+            group !== undefined ? 
+            `<span class="group-match group-${i + 1}">$${i + 1}: "${this.escapeHtml(group)}"</span>` : ''
+        ).filter(Boolean).join(' ');
+        
+        return html ? `<div class="group-matches"><strong>Groups:</strong> ${html}</div>` : '';
     }
 
     showError(message) {
@@ -320,6 +484,75 @@ class RegexTester {
 
     updateStatus(message) {
         this.els.statusText.textContent = message;
+    }
+    
+    displayPerformanceMetrics(performance) {
+        if (performance) {
+            const info = `⚡ ${performance.total_time_ms}ms | ${performance.steps} steps`;
+            this.els.performanceInfo.textContent = info;
+            this.els.performanceInfo.style.display = 'block';
+        } else {
+            this.els.performanceInfo.style.display = 'none';
+        }
+    }
+    
+    async showExplanationPopup() {
+        const pattern = this.els.regexInput.value.trim();
+        
+        if (!pattern) {
+            alert('Enter a regex pattern first');
+            return;
+        }
+        
+        // Update popup info
+        this.els.explanationPattern.textContent = pattern;
+        this.els.explanationTiming.innerHTML = this.els.performanceInfo.innerHTML || 'No timing info';
+        
+        // Show popup and start loading
+        this.els.popupOverlay.classList.add('show');
+        this.els.explanationPopup.classList.add('show');
+        this.els.explanationContent.innerHTML = '<div class="explanation-loading">Analyzing pattern...</div>';
+        
+        try {
+            const response = await fetch('/api/regex/explain', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({pattern})
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    this.displayExplanation(result.explanation);
+                } else {
+                    this.els.explanationContent.innerHTML = `<div class="explanation-loading">Error: ${result.error}</div>`;
+                }
+            } else {
+                this.els.explanationContent.innerHTML = '<div class="explanation-loading">Failed to fetch explanation</div>';
+            }
+        } catch (error) {
+            this.els.explanationContent.innerHTML = `<div class="explanation-loading">Error: ${error.message}</div>`;
+        }
+    }
+    
+    hideExplanationPopup() {
+        this.els.explanationPopup.classList.remove('show');
+        if (!this.els.detailsPopup.classList.contains('show')) {
+            this.els.popupOverlay.classList.remove('show');
+        }
+    }
+    
+    displayExplanation(explanation) {
+        let html = '';
+        
+        explanation.forEach(item => {
+            html += '<div class="explanation-item">';
+            html += `<span class="explanation-component">${this.escapeHtml(item.component)}</span>`;
+            html += `<span class="explanation-description">${this.escapeHtml(item.description)}</span>`;
+            html += '</div>';
+        });
+        
+        this.els.explanationContent.innerHTML = html;
     }
 
 

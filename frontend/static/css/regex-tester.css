@@ -321,16 +321,7 @@ body {
     background: #fff176;
     box-shadow: 0 0 3px rgba(255, 152, 0, 0.5);
 }
-.regex-match.group-0 { background: #ffeb3b; border-color: #ff9800; }
-.regex-match.group-1 { background: #e1f5fe; border-color: #0277bd; }
-.regex-match.group-2 { background: #f3e5f5; border-color: #7b1fa2; }
-.regex-match.group-3 { background: #e8f5e8; border-color: #2e7d32; }
-.regex-match.group-4 { background: #fff3e0; border-color: #ef6c00; }
-.regex-match.group-5 { background: #fce4ec; border-color: #c2185b; }
-.regex-match.group-6 { background: #f1f8e9; border-color: #689f38; }
-.regex-match.group-7 { background: #e8eaf6; border-color: #5e35b1; }
-.regex-match.group-8 { background: #fff8e1; border-color: #fbc02d; }
-.regex-match.group-9 { background: #fafafa; border-color: #616161; }
+/* Removed - replaced with enhanced styles above */
 .regex-no-match {
     color: #999;
     font-style: italic;
@@ -418,6 +409,23 @@ body {
     position: sticky;
     bottom: 0;
     z-index: 98;
+}
+
+.status-metrics {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#performanceInfo {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-weight: bold;
+    color: #4a90e2;
+}
+
+.panel-header-controls {
+    display: flex;
+    gap: 6px;
 }
 
 /* History popup styles matching other tools */
@@ -572,4 +580,236 @@ body {
 .global-history-checkbox {
     margin-top: 2px;
     cursor: pointer;
+}
+
+/* Regex Popup Styles */
+.regex-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border: 1px solid #c0c0c0;
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    width: 750px;
+    max-width: 95vw;
+    max-height: 80vh;
+    z-index: 3000;
+    display: none;
+    overflow: hidden;
+}
+
+.regex-popup.show {
+    display: block;
+}
+
+.regex-popup-header {
+    background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+    border-bottom: 1px solid #c0c0c0;
+    color: #333;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.regex-popup-close {
+    background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+    border: 1px solid #a0a0a0;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.regex-popup-close:hover {
+    background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+}
+
+.regex-popup-info {
+    background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+    border-bottom: 1px solid #dee2e6;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.popup-pattern {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-style: italic;
+    color: #4a90e2;
+    font-size: 16px;
+    font-weight: bold;
+    flex: 1;
+    word-break: break-all;
+}
+
+.popup-timing {
+    color: #6c757d;
+    font-size: 12px;
+    text-align: right;
+    margin-left: 16px;
+    line-height: 1.2;
+}
+
+.regex-popup-content {
+    padding: 16px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.explanation-loading {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 20px;
+}
+
+.explanation-item {
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.explanation-component {
+    font-weight: bold;
+    color: #d73527;
+    background: #fff5f5;
+    padding: 3px 6px;
+    border-radius: 3px;
+    margin-right: 12px;
+    display: inline-block;
+}
+
+.explanation-description {
+    color: #333;
+    margin-top: 4px;
+}
+
+.no-details {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 20px;
+}
+
+/* Popup overlay */
+.regex-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 2999;
+    display: none;
+}
+
+.regex-popup-overlay.show {
+    display: block;
+}
+
+/* Enhanced capture group highlighting */
+.regex-match.group-0 { background: #ffeb3b; border: 2px solid #ff9800; }
+.regex-match.group-1 { background: #e1f5fe; border: 2px solid #0277bd; }
+.regex-match.group-2 { background: #f3e5f5; border: 2px solid #7b1fa2; }
+.regex-match.group-3 { background: #e8f5e8; border: 2px solid #2e7d32; }
+.regex-match.group-4 { background: #fff3e0; border: 2px solid #ef6c00; }
+.regex-match.group-5 { background: #fce4ec; border: 2px solid #c2185b; }
+.regex-match.group-6 { background: #f1f8e9; border: 2px solid #689f38; }
+.regex-match.group-7 { background: #e8eaf6; border: 2px solid #5e35b1; }
+.regex-match.group-8 { background: #fff8e1; border: 2px solid #fbc02d; }
+.regex-match.group-9 { background: #fafafa; border: 2px solid #616161; }
+
+/* Group legend */
+.group-legend {
+    margin-top: 8px;
+    padding: 8px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    font-size: 10px;
+}
+
+.legend-item {
+    display: inline-block;
+    margin-right: 12px;
+    margin-bottom: 4px;
+}
+
+.legend-color {
+    display: inline-block;
+    width: 16px;
+    height: 12px;
+    border: 1px solid #ccc;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.legend-text {
+    font-weight: bold;
+    color: #333;
+}
+
+/* Match details in popup */
+.match-item-popup {
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.match-item-popup .match-index {
+    color: #666;
+    font-size: 11px;
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+.match-item-popup .match-text {
+    background: #ffeb3b;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+.match-item-popup .match-position {
+    color: #999;
+    font-size: 11px;
+}
+
+.match-item-popup .group-matches {
+    margin-left: 0;
+    margin-top: 8px;
+    font-size: 11px;
+    padding: 6px;
+    background: #ffffff;
+    border-radius: 3px;
+    border: 1px solid #dee2e6;
+}
+
+.match-item-popup .group-match {
+    display: inline-block;
+    margin-right: 12px;
+    margin-bottom: 4px;
+    font-weight: bold;
 }
