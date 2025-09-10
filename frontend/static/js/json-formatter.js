@@ -33,6 +33,11 @@ class JsonFormatter {
             copyBtn: document.getElementById('copyBtn'),
             copyFormattedBtn: document.getElementById('copyFormattedBtn'),
             loadFromSourceBtn: document.getElementById('loadFromSourceBtn'),
+            
+            // File upload elements
+            fileInput: document.getElementById('fileInput'),
+            uploadFileBtn: document.getElementById('uploadFileBtn'),
+            filePathLabel: document.getElementById('filePathLabel'),
 
             // Source Popup
             sourcePopupOverlay: document.getElementById('sourcePopupOverlay'),
@@ -107,6 +112,9 @@ class JsonFormatter {
         this.elements.loadFromSourceBtn.addEventListener('click', () => this.openSourcePopup());
         this.elements.sourcePopupOverlay.addEventListener('click', () => this.closeSourcePopup());
         this.elements.sourcePopupCloseBtn.addEventListener('click', () => this.closeSourcePopup());
+        
+        // File upload
+        this.elements.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
     }
 
     /**
@@ -968,6 +976,56 @@ class JsonFormatter {
         this.lastOutputText = '';
         this.resetJsonStats();
         this.showMessage('Inputs cleared.', 'success');
+        
+        // Clear file path label
+        this.elements.filePathLabel.style.display = 'none';
+        this.elements.filePathLabel.textContent = '';
+    }
+
+    /**
+     * Handle file upload for JSON files
+     */
+    handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.name.toLowerCase().endsWith('.json')) {
+            this.showMessage('Please select a valid JSON file (.json extension)', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const content = e.target.result;
+                
+                // Validate JSON content
+                JSON.parse(content);
+                
+                // Set the content to input
+                this.elements.jsonInput.value = content;
+                
+                // Show truncated file path in panel header (like text diff tool)
+                const truncatedPath = this.truncateFilePath(file.name);
+                this.elements.filePathLabel.textContent = truncatedPath;
+                this.elements.filePathLabel.style.display = 'inline';
+                
+                // Auto-format the JSON
+                this.formatJson();
+                
+                this.showMessage(`Loaded JSON file: ${file.name}`, 'success');
+                
+            } catch (error) {
+                this.showMessage(`Invalid JSON file: ${error.message}`, 'error');
+            }
+        };
+
+        reader.onerror = () => {
+            this.showMessage('Error reading file', 'error');
+        };
+
+        reader.readAsText(file);
     }
 
     /**
@@ -1224,10 +1282,37 @@ class JsonFormatter {
         this.showMessage('Loading source data...', 'info');
 
         try {
+            // First get source information for URL display
+            const sourceResponse = await fetch(`/api/sources/${sourceId}`);
+            let sourceInfo = null;
+            if (sourceResponse.ok) {
+                sourceInfo = await sourceResponse.json();
+            }
+
+            // Then load the data
             const response = await fetch(`/api/sources/${sourceId}/data`);
             if (response.ok) {
                 const data = await response.text();
                 this.elements.jsonInput.value = data;
+                
+                // Show source URL/path in panel header
+                if (sourceInfo) {
+                    let displayPath = '';
+                    if (sourceInfo.config?.url) {
+                        displayPath = sourceInfo.config.url;
+                    } else if (sourceInfo.config?.path) {
+                        displayPath = sourceInfo.config.path;
+                    } else if (sourceInfo.config?.bucket && sourceInfo.config?.key) {
+                        displayPath = `s3://${sourceInfo.config.bucket}/${sourceInfo.config.key}`;
+                    } else {
+                        displayPath = sourceInfo.name || 'Source';
+                    }
+                    
+                    const truncatedPath = this.truncateFilePath(displayPath);
+                    this.elements.filePathLabel.textContent = truncatedPath;
+                    this.elements.filePathLabel.style.display = 'inline';
+                }
+                
                 this.showMessage('Source data loaded successfully.', 'success');
                 this.updateJsonStats();
             } else {
@@ -1238,6 +1323,41 @@ class JsonFormatter {
             this.showMessage('Error loading source data.', 'error');
             console.error('Error fetching source data:', error);
         }
+    }
+
+    /**
+     * Truncate file path for display (similar to text diff tool)
+     */
+    truncateFilePath(filePath) {
+        if (filePath.length <= 20) {
+            return filePath;
+        }
+        
+        // Find the last slash to get the filename
+        const lastSlashIndex = filePath.lastIndexOf('/');
+        if (lastSlashIndex === -1) {
+            // No path separator, just filename
+            return '...' + filePath.slice(-17);
+        }
+        
+        const fileName = filePath.slice(lastSlashIndex + 1);
+        const pathPart = filePath.slice(0, lastSlashIndex + 1);
+        
+        // If filename itself is too long, just truncate it
+        if (fileName.length > 17) {
+            return '...' + fileName.slice(-17);
+        }
+        
+        // Calculate how much path we can show
+        const availableForPath = 20 - fileName.length - 3; // 3 for "..."
+        
+        if (availableForPath <= 0) {
+            return '...' + fileName;
+        }
+        
+        // Get the end of the path
+        const truncatedPath = '...' + pathPart.slice(-(availableForPath));
+        return truncatedPath + fileName;
     }
 }
 
