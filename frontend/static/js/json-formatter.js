@@ -15,6 +15,7 @@ class JsonFormatter {
         this.initializeElements();
         this.attachEventListeners();
         this.initializeHistoryManager();
+        this.initializeSourceSelector();
         this.applyFontSize();
     }
 
@@ -38,12 +39,6 @@ class JsonFormatter {
             fileInput: document.getElementById('fileInput'),
             uploadFileBtn: document.getElementById('uploadFileBtn'),
             filePathLabel: document.getElementById('filePathLabel'),
-
-            // Source Popup
-            sourcePopupOverlay: document.getElementById('sourcePopupOverlay'),
-            sourcePopup: document.getElementById('sourcePopup'),
-            sourcePopupCloseBtn: document.getElementById('sourcePopupCloseBtn'),
-            sourceList: document.getElementById('sourceList'),
             
             // Collapsible controls
             expandAllBtn: document.getElementById('expandAllBtn'),
@@ -108,10 +103,8 @@ class JsonFormatter {
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
 
-        // Source popup
-        this.elements.loadFromSourceBtn.addEventListener('click', () => this.openSourcePopup());
-        this.elements.sourcePopupOverlay.addEventListener('click', () => this.closeSourcePopup());
-        this.elements.sourcePopupCloseBtn.addEventListener('click', () => this.closeSourcePopup());
+        // Source selector
+        this.elements.loadFromSourceBtn.addEventListener('click', () => this.openSourceSelector());
         
         // File upload
         this.elements.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
@@ -1323,6 +1316,81 @@ class JsonFormatter {
             this.showMessage('Error loading source data.', 'error');
             console.error('Error fetching source data:', error);
         }
+    }
+
+    /**
+     * Initialize the SourceSelector component
+     */
+    initializeSourceSelector() {
+        this.sourceSelector = new SourceSelector({
+            containerId: 'jsonFormatterSourceSelector',
+            onFetch: (data, source) => this.loadSourceData(data, source),
+            onEdit: (source) => this.onSourceEdit(source),
+            showEditButton: true,
+            showFetchButton: true
+        });
+    }
+
+    /**
+     * Open the source selector
+     */
+    openSourceSelector() {
+        this.sourceSelector.show();
+    }
+
+    /**
+     * Handle source data loading
+     */
+    loadSourceData(data, source) {
+        try {
+            // Set the data in the input area
+            this.elements.jsonInput.value = data;
+            
+            // Show the source URL/path in the file path label
+            const resolvedPath = this.resolveSourcePath(source);
+            this.elements.filePathLabel.textContent = this.truncateFilePath(resolvedPath);
+            this.elements.filePathLabel.style.display = 'inline';
+            
+            // Auto-format the JSON if it's valid
+            this.formatJson();
+            
+            // Update stats
+            this.updateJsonStats();
+            
+            // Save to history
+            this.saveToHistory(data, `load-from-source-${source.type}`);
+            
+            this.showMessage(`Loaded data from source: ${source.name}`, 'success');
+            
+        } catch (error) {
+            console.error('Error loading source data:', error);
+            this.showMessage(`Error loading source data: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Handle source editing
+     */
+    onSourceEdit(source) {
+        // This callback is triggered when a source is edited
+        // You can add additional logic here if needed
+        console.log('Source edited:', source);
+    }
+
+    /**
+     * Resolve source path with dynamic variables
+     */
+    resolveSourcePath(source) {
+        let path = source.pathTemplate || source.config?.path || source.config?.url || '';
+        
+        if (source.dynamicVariables) {
+            Object.entries(source.dynamicVariables).forEach(([key, value]) => {
+                const placeholder = `$${key}`;
+                path = path.replace(new RegExp('\\' + placeholder, 'g'), value || placeholder);
+            });
+        }
+
+        return path;
     }
 
     /**

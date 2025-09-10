@@ -1707,22 +1707,32 @@ def get_source_data(source_id):
         source_type = source.get('type')
         config = source.get('config', {})
 
-        data = None
-        if source_type == 'local_file':
-            file_path = config.get('path')
-            if file_path:
-                file_path = os.path.expanduser(file_path)
-            if file_path and os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = f.read()
-                if not data:
-                    return jsonify({'success': False, 'error': 'Source file is empty'}), 400
+        # Use the new source system for all source types
+        try:
+            source_config = convert_to_source_config(source)
+            source_instance = SourceFactory.create_source(source_config)
+            
+            # Read data using the source implementation
+            data = source_instance.read_data(mode='text')
+            
+            if not data:
+                return jsonify({'success': False, 'error': 'Source returned empty data'}), 400
+                
+        except Exception as source_error:
+            # Fallback to legacy local file handling for backward compatibility
+            if source_type == 'local_file':
+                file_path = config.get('path')
+                if file_path:
+                    file_path = os.path.expanduser(file_path)
+                if file_path and os.path.exists(file_path):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = f.read()
+                    if not data:
+                        return jsonify({'success': False, 'error': 'Source file is empty'}), 400
+                else:
+                    return jsonify({'success': False, 'error': 'File not found'}), 404
             else:
-                return jsonify({'success': False, 'error': 'File not found'}), 404
-        elif source_type in ['s3', 'sftp', 'http', 'samba']:
-            return jsonify({'success': False, 'error': f'{source_type} source type not implemented yet'}), 501
-        else:
-            return jsonify({'success': False, 'error': 'Unknown source type'}), 400
+                return jsonify({'success': False, 'error': f'Error reading {source_type} source: {str(source_error)}'}), 500
 
         return data, 200, {'Content-Type': 'text/plain'}
 
