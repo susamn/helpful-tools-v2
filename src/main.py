@@ -1,5 +1,7 @@
 import os
 import json
+import uuid
+import configparser
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template_string, request, jsonify, send_file, abort
@@ -84,6 +86,14 @@ TOOLS = [
         "tags": ["jwt", "decoder", "token", "security", "json", "auth"],
         "has_history": True,
         "icon": "🔑"
+    },
+    {
+        "name": "Sources Manager",
+        "description": "Manage data sources from various locations: local files, S3, SFTP, Samba, HTTP URLs with secure credential management",
+        "path": "/tools/sources",
+        "tags": ["sources", "data", "s3", "sftp", "samba", "http", "files", "credentials"],
+        "has_history": True,
+        "icon": "🗄️"
     }
 ]
 
@@ -857,6 +867,512 @@ def serve_tool(tool_name):
 
 # Static files are now handled automatically by Flask's built-in static file serving
 
+# Sources API Routes
+@app.route('/api/sources/aws-profiles', methods=['GET'])
+def get_aws_profiles():
+    """Get AWS profiles from ~/.aws/credentials"""
+    try:
+        credentials_path = Path.home() / '.aws' / 'credentials'
+        if not credentials_path.exists():
+            return jsonify({'profiles': [], 'error': 'AWS credentials file not found'})
+        
+        config = configparser.ConfigParser()
+        config.read(credentials_path)
+        
+        profiles = []
+        for section in config.sections():
+            profiles.append({
+                'name': section,
+                'has_access_key': 'aws_access_key_id' in config[section],
+                'region': config[section].get('region', 'us-east-1')
+            })
+        
+        return jsonify({'profiles': profiles})
+        
+    except Exception as e:
+        return jsonify({'profiles': [], 'error': str(e)})
+
+@app.route('/api/sources/ssh-keys', methods=['GET'])
+def get_ssh_keys():
+    """Get SSH keys from ~/.ssh directory"""
+    try:
+        ssh_path = Path.home() / '.ssh'
+        if not ssh_path.exists():
+            return jsonify({'keys': [], 'error': 'SSH directory not found'})
+        
+        keys = []
+        for key_file in ssh_path.glob('*'):
+            if key_file.is_file() and not key_file.name.endswith('.pub'):
+                # Check if it's likely a private key
+                try:
+                    with open(key_file, 'r') as f:
+                        first_line = f.readline().strip()
+                        if 'PRIVATE KEY' in first_line:
+                            keys.append({
+                                'name': key_file.name,
+                                'path': str(key_file),
+                                'type': 'rsa' if 'RSA' in first_line else 'other'
+                            })
+                except:
+                    continue
+        
+        return jsonify({'keys': keys})
+        
+    except Exception as e:
+        return jsonify({'keys': [], 'error': str(e)})
+
+@app.route('/api/sources', methods=['POST'])
+def create_source():
+    """Create a new data source"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        source_type = data.get('type')
+        if not source_type:
+            return jsonify({'success': False, 'error': 'Source type is required'}), 400
+            
+        source_name = data.get('name')
+        if not source_name:
+            return jsonify({'success': False, 'error': 'Source name is required'}), 400
+        
+        # Handle both old and new structure
+        if 'staticConfig' in data and 'pathTemplate' in data:
+            # New structure with dynamic variables
+            static_config = data.get('staticConfig', {})
+            path_template = data.get('pathTemplate', '')
+            dynamic_variables = data.get('dynamicVariables', {})
+            
+            # Resolve the path template with dynamic variables
+            resolved_path = resolve_dynamic_path(path_template, dynamic_variables)
+            
+            # Merge static config with resolved path based on source type
+            config = static_config.copy()
+            if source_type == 'local_file':
+                config['path'] = resolved_path
+            elif source_type == 's3':
+                # Parse s3://bucket/key format
+                if resolved_path.startswith('s3://'):
+                    parts = resolved_path[5:].split('/', 1)
+                    config['bucket'] = parts[0] if parts else ''
+                    config['key'] = parts[1] if len(parts) > 1 else ''
+                else:
+                    config['key'] = resolved_path
+            elif source_type == 'sftp':
+                config['path'] = resolved_path
+            elif source_type == 'samba':
+                config['path'] = resolved_path  
+            elif source_type == 'http':
+                config['url'] = resolved_path
+        else:
+            # Old structure - backward compatibility
+            config = data.get('config', {})
+            path_template = config.get('path', config.get('url', config.get('key', '')))
+            dynamic_variables = {}
+        
+        # Generate unique ID
+        source_id = str(uuid.uuid4())[:8]
+        
+        source = {
+            'id': source_id,
+            'type': source_type,
+            'name': source_name,
+            'config': config,
+            'pathTemplate': path_template,
+            'dynamicVariables': dynamic_variables,
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat(),
+            'last_accessed': None,
+            'last_tested': None,
+            'status': 'created'
+        }
+        
+        # Store source
+        sources = get_stored_sources()
+        sources[source_id] = source
+        store_sources(sources)
+        
+        return jsonify({
+            'success': True,
+            'id': source_id,
+            'source': source
+        }), 201
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources', methods=['GET'])
+def get_sources():
+    """Get all data sources"""
+    try:
+        sources = get_stored_sources()
+        return jsonify(list(sources.values()))
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources/<source_id>', methods=['GET'])
+def get_source(source_id):
+    """Get a specific data source"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+        
+        return jsonify(sources[source_id])
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources/<source_id>', methods=['DELETE'])
+def delete_source(source_id):
+    """Delete a data source"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+        
+        del sources[source_id]
+        store_sources(sources)
+        
+        return jsonify({'success': True, 'message': 'Source deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources/<source_id>', methods=['PUT'])
+def update_source(source_id):
+    """Update an existing data source"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        if not data.get('name') or not data.get('type'):
+            return jsonify({'success': False, 'error': 'Missing required fields: name and type'}), 400
+        
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+        
+        source_type = data['type']
+        
+        # Handle both old and new structure
+        if 'staticConfig' in data and 'pathTemplate' in data:
+            # New structure with dynamic variables
+            static_config = data.get('staticConfig', {})
+            path_template = data.get('pathTemplate', '')
+            dynamic_variables = data.get('dynamicVariables', {})
+            
+            # Resolve the path template with dynamic variables
+            resolved_path = resolve_dynamic_path(path_template, dynamic_variables)
+            
+            # Merge static config with resolved path based on source type
+            config = static_config.copy()
+            if source_type == 'local_file':
+                config['path'] = resolved_path
+            elif source_type == 's3':
+                # Parse s3://bucket/key format
+                if resolved_path.startswith('s3://'):
+                    parts = resolved_path[5:].split('/', 1)
+                    config['bucket'] = parts[0] if parts else ''
+                    config['key'] = parts[1] if len(parts) > 1 else ''
+                else:
+                    config['key'] = resolved_path
+            elif source_type == 'sftp':
+                config['path'] = resolved_path
+            elif source_type == 'samba':
+                config['path'] = resolved_path  
+            elif source_type == 'http':
+                config['url'] = resolved_path
+        else:
+            # Old structure - backward compatibility
+            config = data.get('config', {})
+            path_template = config.get('path', config.get('url', config.get('key', '')))
+            dynamic_variables = {}
+        
+        # Update the source
+        updated_source = {
+            'id': source_id,
+            'name': data['name'],
+            'type': source_type,
+            'config': config,
+            'pathTemplate': path_template,
+            'dynamicVariables': dynamic_variables,
+            'status': 'created',  # Reset status when updated
+            'created_at': sources[source_id]['created_at'],  # Keep original creation time
+            'updated_at': datetime.now().isoformat(),
+            'last_tested': None  # Reset test status
+        }
+        
+        sources[source_id] = updated_source
+        store_sources(sources)
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Source updated successfully',
+            'source': updated_source
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources/<source_id>/test', methods=['POST'])
+def test_source_endpoint(source_id):
+    """Test connection to a data source"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+        
+        source = sources[source_id]
+        source_type = source['type']
+        config = source['config']
+        
+        # Test based on source type
+        test_result = test_source_connection(source_type, config)
+        
+        # Update source status
+        sources[source_id]['status'] = 'connected' if test_result['success'] else 'error'
+        sources[source_id]['last_tested'] = datetime.now().isoformat()
+        store_sources(sources)
+        
+        return jsonify(test_result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def test_source_connection(source_type, config):
+    """Test connection based on source type"""
+    try:
+        if source_type == 'local_file':
+            return test_local_file(config)
+        elif source_type == 's3':
+            return test_s3_connection(config)
+        elif source_type == 'sftp':
+            return test_sftp_connection(config)
+        elif source_type == 'samba':
+            return test_samba_connection(config)
+        elif source_type == 'http':
+            return test_http_connection(config)
+        else:
+            return {'success': False, 'error': f'Unknown source type: {source_type}'}
+    except Exception as e:
+        return {'success': False, 'error': f'Test failed: {str(e)}'}
+
+def test_local_file(config):
+    """Test local file access"""
+    import os
+    file_path = config.get('path')
+    if not file_path:
+        return {'success': False, 'error': 'No file path specified'}
+    
+    if not os.path.exists(file_path):
+        return {'success': False, 'status': 'error', 'error': f'File not found: {file_path}'}
+    
+    if not os.access(file_path, os.R_OK):
+        return {'success': False, 'error': f'File not readable: {file_path}'}
+    
+    file_size = os.path.getsize(file_path)
+    return {
+        'success': True, 
+        'status': 'connected',
+        'message': f'File accessible, size: {file_size} bytes'
+    }
+
+def test_s3_connection(config):
+    """Test S3 connection"""
+    try:
+        import boto3
+        from botocore.exceptions import ClientError, NoCredentialsError
+        
+        bucket = config.get('bucket')
+        key = config.get('key')
+        profile = config.get('profile', 'default')
+        region = config.get('region')
+        
+        if not bucket or not key:
+            return {'success': False, 'error': 'Bucket and key are required'}
+        
+        # Create session with profile
+        session = boto3.Session(profile_name=profile)
+        s3 = session.client('s3', region_name=region) if region else session.client('s3')
+        
+        # Test by checking if object exists
+        s3.head_object(Bucket=bucket, Key=key)
+        
+        return {
+            'success': True,
+            'message': f'S3 object accessible: s3://{bucket}/{key}'
+        }
+    except ImportError:
+        return {'success': False, 'error': 'boto3 library not available'}
+    except NoCredentialsError:
+        return {'success': False, 'error': f'No AWS credentials found for profile: {profile}'}
+    except ClientError as e:
+        error_code = e.response['Error']['Code']
+        if error_code == '404':
+            return {'success': False, 'error': f'S3 object not found: s3://{bucket}/{key}'}
+        else:
+            return {'success': False, 'error': f'S3 error: {e.response["Error"]["Message"]}'}
+
+def test_sftp_connection(config):
+    """Test SFTP connection"""
+    try:
+        import paramiko
+        
+        host = config.get('host')
+        port = int(config.get('port', 22))
+        username = config.get('username')
+        key_file = config.get('key_file')
+        path = config.get('path')
+        
+        if not all([host, username, key_file, path]):
+            return {'success': False, 'error': 'Host, username, key file, and path are required'}
+        
+        # Create SSH client
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # Connect using key file
+        ssh.connect(host, port=port, username=username, key_filename=key_file, timeout=10)
+        
+        # Test SFTP
+        sftp = ssh.open_sftp()
+        try:
+            stat = sftp.stat(path)
+            file_size = stat.st_size
+            message = f'SFTP file accessible, size: {file_size} bytes'
+        except FileNotFoundError:
+            return {'success': False, 'error': f'SFTP file not found: {path}'}
+        finally:
+            sftp.close()
+            ssh.close()
+        
+        return {'success': True, 'message': message}
+    except ImportError:
+        return {'success': False, 'error': 'paramiko library not available'}
+    except Exception as e:
+        return {'success': False, 'error': f'SFTP connection failed: {str(e)}'}
+
+def test_samba_connection(config):
+    """Test Samba/SMB connection"""
+    try:
+        from smb.SMBConnection import SMBConnection
+        
+        host = config.get('host')
+        share = config.get('share')
+        username = config.get('username')
+        password = config.get('password')
+        path = config.get('path', '')
+        
+        if not all([host, share, username, password]):
+            return {'success': False, 'error': 'Host, share, username, and password are required'}
+        
+        # Create SMB connection
+        conn = SMBConnection(username, password, 'client', host, use_ntlm_v2=True)
+        
+        # Connect
+        if not conn.connect(host, 139, timeout=10):
+            return {'success': False, 'error': 'Failed to connect to SMB server'}
+        
+        try:
+            # Test by listing the path
+            files = conn.listPath(share, path or '/')
+            message = f'SMB share accessible, found {len(files)} items'
+        except Exception as e:
+            return {'success': False, 'error': f'SMB path access failed: {str(e)}'}
+        finally:
+            conn.close()
+        
+        return {'success': True, 'message': message}
+    except ImportError:
+        return {'success': False, 'error': 'pysmb library not available'}
+    except Exception as e:
+        return {'success': False, 'error': f'SMB connection failed: {str(e)}'}
+
+def test_http_connection(config):
+    """Test HTTP connection"""
+    import urllib.request
+    import urllib.error
+    import json
+    
+    url = config.get('url')
+    method = config.get('method', 'GET')
+    headers_str = config.get('headers', '{}')
+    
+    if not url:
+        return {'success': False, 'error': 'URL is required'}
+    
+    try:
+        # Parse headers
+        headers = json.loads(headers_str) if headers_str else {}
+        
+        # Create request
+        req = urllib.request.Request(url, method=method)
+        for key, value in headers.items():
+            req.add_header(key, value)
+        
+        # Make request with timeout
+        with urllib.request.urlopen(req, timeout=10) as response:
+            status_code = response.getcode()
+            content_length = response.headers.get('Content-Length', 'unknown')
+            
+        return {
+            'success': True,
+            'message': f'HTTP {method} successful, status: {status_code}, size: {content_length} bytes'
+        }
+    except urllib.error.HTTPError as e:
+        return {'success': False, 'error': f'HTTP error {e.code}: {e.reason}'}
+    except urllib.error.URLError as e:
+        return {'success': False, 'error': f'URL error: {e.reason}'}
+    except json.JSONDecodeError:
+        return {'success': False, 'error': 'Invalid JSON in headers'}
+    except Exception as e:
+        return {'success': False, 'error': f'HTTP test failed: {str(e)}'}
+
+def resolve_dynamic_path(path_template, dynamic_variables):
+    """Resolve dynamic variables in a path template"""
+    import re
+    resolved_path = path_template
+    
+    # Find all variables in format $variableName
+    variables = re.findall(r'\$(\w+)', path_template)
+    
+    for var in variables:
+        value = dynamic_variables.get(var, '')
+        resolved_path = resolved_path.replace(f'${var}', value)
+    
+    return resolved_path
+
+def extract_dynamic_variables(path_template):
+    """Extract dynamic variable names from a path template"""
+    import re
+    return re.findall(r'\$(\w+)', path_template)
+
+@app.route('/api/sources/resolve-variables', methods=['POST'])
+def resolve_variables():
+    """Extract dynamic variables from a path template"""
+    try:
+        try:
+            data = request.get_json(force=True)
+        except Exception:
+            return jsonify({'success': False, 'error': 'Invalid JSON format'}), 400
+            
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+        path_template = data.get('pathTemplate')
+        if path_template is None:
+            return jsonify({'success': False, 'error': 'pathTemplate field is required'}), 400
+            
+        if not path_template.strip():
+            return jsonify({'success': False, 'error': 'pathTemplate cannot be empty'}), 400
+        
+        variables = extract_dynamic_variables(path_template)
+        
+        return jsonify({
+            'success': True,
+            'variables': variables
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/health')
 def health():
     return jsonify({
@@ -1048,6 +1564,30 @@ def test_regex_with_performance(pattern: str, text: str, flags: str) -> Dict[str
             'success': False,
             'error': f'Error testing regex: {str(e)}'
         }
+
+def get_stored_sources():
+    """Get sources from storage file"""
+    try:
+        sources_file = Path.home() / '.helpful-tools' / 'sources.json'
+        if not sources_file.exists():
+            return {}
+        
+        with open(sources_file, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def store_sources(sources):
+    """Store sources to storage file"""
+    try:
+        storage_dir = Path.home() / '.helpful-tools'
+        storage_dir.mkdir(exist_ok=True)
+        
+        sources_file = storage_dir / 'sources.json'
+        with open(sources_file, 'w') as f:
+            json.dump(sources, f, indent=2)
+    except Exception as e:
+        print(f"Error storing sources: {e}")
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8000, debug=True)

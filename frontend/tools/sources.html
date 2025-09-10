@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sources Manager - Helpful Tools v2</title>
+    <link rel="stylesheet" href="/static/css/common-enhancements.css">
+    <link rel="stylesheet" href="/static/css/sources.css">
+</head>
+<body>
+    <div class="header">
+        <h1>🗂️ Sources Manager</h1>
+        <div class="header-actions">
+            <div class="font-controls">
+                <label>Font:</label>
+                <button id="fontDecreaseBtn" title="Decrease font size">−</button>
+                <button id="fontIncreaseBtn" title="Increase font size">+</button>
+            </div>
+            <a href="/">← Back to Tools</a>
+        </div>
+    </div>
+    
+    <div class="toolbar">
+        <button class="primary" id="addSourceBtn">➕ Add Source</button>
+        <div class="separator"></div>
+        <button id="refreshBtn">🔄 Refresh</button>
+        <button id="testAllBtn">🔍 Test All</button>
+    </div>
+
+    <div class="main-container">
+        <div class="sources-list">
+            <div class="panel-header">
+                <span>Data Sources</span>
+                <span id="sourcesCount">0 sources</span>
+            </div>
+            <div class="panel-content">
+                <div id="sourcesList">
+                    <div class="no-sources">
+                        <div class="no-sources-icon">🗂️</div>
+                        <div class="no-sources-title">No Data Sources</div>
+                        <div class="no-sources-text">Click "Add Source" to create your first data source</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <div id="statusText">Ready - Manage your data sources</div>
+        <div id="connectionInfo">No sources configured</div>
+    </div>
+
+
+    <!-- Add/Edit Source Popup -->
+    <div class="source-popup-overlay" id="sourcePopupOverlay"></div>
+    <div class="source-popup" id="sourcePopup">
+        <div class="source-popup-header">
+            <span id="sourcePopupTitle">Add New Source</span>
+            <button class="source-popup-close" id="sourcePopupClose">×</button>
+        </div>
+        
+        <div class="source-popup-content">
+            <form id="sourceForm">
+                <!-- Basic Info -->
+                <div class="form-section">
+                    <h3>Basic Information</h3>
+                    
+                    <div class="form-group">
+                        <label for="sourceName">Source Name</label>
+                        <input type="text" id="sourceName" placeholder="Enter a descriptive name for this source" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sourceType">Source Type</label>
+                        <select id="sourceType" required>
+                            <option value="">Select source type...</option>
+                            <option value="local_file">📁 Local File</option>
+                            <option value="s3">☁️ Amazon S3</option>
+                            <option value="sftp">🔐 SFTP</option>
+                            <option value="samba">🌐 Samba/SMB</option>
+                            <option value="http">🌍 HTTP URL</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Static Configuration Section -->
+                <div class="form-section" id="staticConfigSection" style="display: none;">
+                    <h3>Static Configuration</h3>
+                    <div id="staticConfigFields"></div>
+                </div>
+
+                <!-- Path Template Section -->
+                <div class="form-section" id="pathSection" style="display: none;">
+                    <h3>Path Template</h3>
+                    <div class="form-group">
+                        <label for="pathTemplate">Path Template</label>
+                        <input type="text" id="pathTemplate" placeholder="Enter path with dynamic variables like /folder/$file or s3://$bucket/folder/$key" required>
+                        <div class="config-help">Use $variableName for dynamic parts (e.g., /folder/$file, s3://$bucket/$key)</div>
+                    </div>
+                    <div class="form-group">
+                        <button type="button" id="resolveBtn" class="resolve-btn">🔍 Resolve Variables</button>
+                    </div>
+                </div>
+
+                <!-- Dynamic Variables Section -->
+                <div class="form-section" id="dynamicSection" style="display: none;">
+                    <h3>Dynamic Variables</h3>
+                    <div id="dynamicFields"></div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="button" id="testConnectionBtn" class="test-btn" disabled>🔍 Test Connection</button>
+                    <div class="form-actions-right">
+                        <button type="button" id="cancelBtn" class="cancel-btn">Cancel</button>
+                        <button type="submit" class="save-btn">💾 Save Source</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/common-functions.js"></script>
+</script>
+    <script src="/static/js/sources.js"></script>
+</body>
+</html>
