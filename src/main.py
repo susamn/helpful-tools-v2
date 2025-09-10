@@ -15,6 +15,9 @@ import re
 import time
 from typing import Dict, Any, List, Tuple
 
+# Import sources package
+from sources import SourceFactory, SourceConfig, create_source
+
 # Configure Flask to use the correct static folder with absolute path
 static_dir = Path(__file__).parent.parent / "frontend" / "static"
 app = Flask(__name__, 
@@ -28,6 +31,61 @@ os.makedirs(app_root / "frontend" / "static" / "css", exist_ok=True)
 os.makedirs(app_root / "frontend" / "static" / "js", exist_ok=True)
 os.makedirs(app_root / "logs", exist_ok=True)
 os.makedirs(app_root / "frontend" / "tools", exist_ok=True)
+
+# Helper function to convert legacy source data to new SourceConfig format
+def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
+    """Convert legacy source data format to new SourceConfig format."""
+    # Handle both old and new structure
+    if 'staticConfig' in source_data and 'pathTemplate' in source_data:
+        # New structure with dynamic variables
+        static_config = source_data.get('staticConfig', {})
+        path_template = source_data.get('pathTemplate', '')
+        dynamic_variables = source_data.get('dynamicVariables', {})
+    else:
+        # Old structure - backward compatibility
+        # Try to infer static config and path from config
+        config = source_data.get('config', {})
+        source_type = source_data.get('type', source_data.get('source_type', ''))
+        
+        # Extract path/URL based on source type
+        if source_type == 'local_file':
+            path_template = config.get('path', '')
+        elif source_type == 's3':
+            bucket = config.get('bucket', '')
+            key = config.get('key', '')
+            path_template = f"s3://{bucket}/{key}" if bucket and key else config.get('url', '')
+        elif source_type == 'sftp':
+            host = config.get('host', '')
+            path = config.get('path', '')
+            path_template = f"sftp://{host}{path}" if host else path
+        elif source_type == 'samba':
+            host = config.get('host', '')
+            share = config.get('share', '')
+            path = config.get('path', '')
+            path_template = f"smb://{host}/{share}{path}" if host and share else path
+        elif source_type == 'http':
+            path_template = config.get('url', config.get('path', ''))
+        else:
+            path_template = config.get('path', config.get('url', ''))
+        
+        # Static config excludes the path/url
+        static_config = {k: v for k, v in config.items() 
+                        if k not in ['path', 'url', 'bucket', 'key']}
+        dynamic_variables = {}
+
+    return SourceConfig(
+        source_id=source_data.get('source_id', source_data.get('id', str(uuid.uuid4()))),
+        name=source_data.get('name', 'Untitled Source'),
+        source_type=source_data.get('type', source_data.get('source_type', '')),
+        static_config=static_config,
+        path_template=path_template,
+        dynamic_variables=dynamic_variables,
+        created_at=datetime.fromisoformat(source_data['created_at']) if source_data.get('created_at') else datetime.now(),
+        updated_at=datetime.fromisoformat(source_data['updated_at']) if source_data.get('updated_at') else datetime.now(),
+        last_accessed=datetime.fromisoformat(source_data['last_accessed']) if source_data.get('last_accessed') else None,
+        last_tested=datetime.fromisoformat(source_data['last_tested']) if source_data.get('last_tested') else None,
+        status=source_data.get('status', 'created')
+    )
 
 # Store for tools configuration
 TOOLS = [
@@ -1009,7 +1067,7 @@ def get_sources():
     """Get all data sources"""
     try:
         sources = get_stored_sources()
-        return jsonify(list(sources.values()))
+        return jsonify({'success': True, 'sources': list(sources.values())})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1037,6 +1095,33 @@ def delete_source(source_id):
         store_sources(sources)
         
         return jsonify({'success': True, 'message': 'Source deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources/<source_id>/duplicate', methods=['POST'])
+def duplicate_source(source_id):
+    """Duplicate an existing data source"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        original_source = sources[source_id]
+        
+        new_source = original_source.copy()
+        new_source['id'] = str(uuid.uuid4())[:8]
+        new_source['name'] = f"{original_source.get('name', 'Source')} (copy)"
+        new_source['created_at'] = datetime.now().isoformat()
+        new_source['updated_at'] = datetime.now().isoformat()
+        new_source['last_accessed'] = None
+        new_source['last_tested'] = None
+        new_source['status'] = 'created'
+
+        sources[new_source['id']] = new_source
+        store_sources(sources)
+
+        return jsonify({'success': True, 'source': new_source}), 201
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1129,8 +1214,8 @@ def test_source_endpoint(source_id):
         source_type = source['type']
         config = source['config']
         
-        # Test based on source type
-        test_result = test_source_connection(source_type, config)
+        # Test based on source type using the new source package
+        test_result = test_source_connection(source_type, config, source)
         
         # Update source status
         sources[source_id]['status'] = 'connected' if test_result['success'] else 'error'
@@ -1141,21 +1226,38 @@ def test_source_endpoint(source_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-def test_source_connection(source_type, config):
-    """Test connection based on source type"""
+def test_source_connection(source_type, config, source_data=None):
+    """Test connection using the new source package"""
     try:
-        if source_type == 'local_file':
-            return test_local_file(config)
-        elif source_type == 's3':
-            return test_s3_connection(config)
-        elif source_type == 'sftp':
-            return test_sftp_connection(config)
-        elif source_type == 'samba':
-            return test_samba_connection(config)
-        elif source_type == 'http':
-            return test_http_connection(config)
+        # Convert source data to SourceConfig format
+        if source_data:
+            source_config = convert_to_source_config(source_data)
         else:
-            return {'success': False, 'error': f'Unknown source type: {source_type}'}
+            # Create a minimal SourceConfig from the old format
+            source_config = SourceConfig(
+                source_id=str(uuid.uuid4()),
+                name='Test Source',
+                source_type=source_type,
+                static_config=config,
+                path_template=config.get('path', config.get('url', '')),
+                dynamic_variables={},
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+        
+        # Create source instance and test connection
+        source = SourceFactory.create_source(source_config)
+        test_result = source.test_connection()
+        
+        # Convert TestResult to dictionary format expected by the API
+        return {
+            'success': test_result.success,
+            'status': test_result.status,
+            'message': test_result.message,
+            'response_time': test_result.response_time,
+            'error': test_result.error,
+            'metadata': test_result.metadata.__dict__ if test_result.metadata else None
+        }
     except Exception as e:
         return {'success': False, 'error': f'Test failed: {str(e)}'}
 
@@ -1592,6 +1694,40 @@ def store_sources(sources):
             json.dump(sources, f, indent=2)
     except Exception as e:
         print(f"Error storing sources: {e}")
+
+@app.route('/api/sources/<source_id>/data', methods=['GET'])
+def get_source_data(source_id):
+    """Get data from a specific source"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        source = sources[source_id]
+        source_type = source.get('type')
+        config = source.get('config', {})
+
+        data = None
+        if source_type == 'local_file':
+            file_path = config.get('path')
+            if file_path:
+                file_path = os.path.expanduser(file_path)
+            if file_path and os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = f.read()
+                if not data:
+                    return jsonify({'success': False, 'error': 'Source file is empty'}), 400
+            else:
+                return jsonify({'success': False, 'error': 'File not found'}), 404
+        elif source_type in ['s3', 'sftp', 'http', 'samba']:
+            return jsonify({'success': False, 'error': f'{source_type} source type not implemented yet'}), 501
+        else:
+            return jsonify({'success': False, 'error': 'Unknown source type'}), 400
+
+        return data, 200, {'Content-Type': 'text/plain'}
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8000, debug=True)

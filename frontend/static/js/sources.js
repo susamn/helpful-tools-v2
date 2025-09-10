@@ -118,7 +118,7 @@ class SourcesManager {
             http: '🌍'
         };
 
-        const configSummary = this.getConfigSummary(source);
+        const configSummary = this.getHighlightedPathTemplate(source);
         
         return `
             <div class="source-item" data-source-id="${source.id}">
@@ -137,6 +137,7 @@ class SourcesManager {
                     <div class="source-actions">
                         <button class="source-btn test" onclick="sourcesManager.testSource('${source.id}')">Test</button>
                         <button class="source-btn edit" onclick="sourcesManager.editSource('${source.id}')">Edit</button>
+                        <button class="source-btn duplicate" onclick="sourcesManager.duplicateSource('${source.id}')">Duplicate</button>
                         <button class="source-btn delete" onclick="sourcesManager.deleteSource('${source.id}')">Delete</button>
                     </div>
                 </div>
@@ -144,22 +145,26 @@ class SourcesManager {
         `;
     }
 
-    getConfigSummary(source) {
-        const config = source.config;
-        switch (source.type) {
-            case 'local_file':
-                return config.path || 'No path specified';
-            case 's3':
-                return `s3://${config.bucket || 'bucket'}/${config.key || 'key'} (${config.profile || 'default'})`;
-            case 'sftp':
-                return `${config.username || 'user'}@${config.host || 'host'}:${config.path || '/'}`;
-            case 'samba':
-                return `//${config.host || 'host'}/${config.share || 'share'}/${config.path || ''}`;
-            case 'http':
-                return config.url || 'No URL specified';
-            default:
-                return 'Configuration not available';
+        getHighlightedPathTemplate(source) {
+        const pathTemplate = source.pathTemplate;
+        const dynamicVariables = source.dynamicVariables;
+
+        if (!pathTemplate) {
+            return 'No path template';
         }
+
+        if (!dynamicVariables || Object.keys(dynamicVariables).length === 0) {
+            return this.escapeHtml(pathTemplate);
+        }
+
+        let highlightedPath = this.escapeHtml(pathTemplate);
+        for (const [key, value] of Object.entries(dynamicVariables)) {
+            const variable = `${key}`;
+            const highlightedValue = `<span class="dynamic-variable">${this.escapeHtml(value)}</span>`;
+            highlightedPath = highlightedPath.split(variable).join(highlightedValue);
+        }
+
+        return highlightedPath;
     }
 
     showAddSourcePopup() {
@@ -720,6 +725,26 @@ class SourcesManager {
             }
         } catch (error) {
             this.showError('Error deleting source: ' + error.message);
+        }
+    }
+
+    async duplicateSource(sourceId) {
+        try {
+            this.updateStatus('Duplicating source...');
+            
+            const response = await fetch(`/api/sources/${sourceId}/duplicate`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                this.updateStatus('Source duplicated successfully');
+                this.loadSources();
+            } else {
+                this.showError('Failed to duplicate source: ' + result.error);
+            }
+        } catch (error) {
+            this.showError('Error duplicating source: ' + error.message);
         }
     }
 

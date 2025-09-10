@@ -32,6 +32,13 @@ class JsonFormatter {
             clearBtn: document.getElementById('clearBtn'),
             copyBtn: document.getElementById('copyBtn'),
             copyFormattedBtn: document.getElementById('copyFormattedBtn'),
+            loadFromSourceBtn: document.getElementById('loadFromSourceBtn'),
+
+            // Source Popup
+            sourcePopupOverlay: document.getElementById('sourcePopupOverlay'),
+            sourcePopup: document.getElementById('sourcePopup'),
+            sourcePopupCloseBtn: document.getElementById('sourcePopupCloseBtn'),
+            sourceList: document.getElementById('sourceList'),
             
             // Collapsible controls
             expandAllBtn: document.getElementById('expandAllBtn'),
@@ -95,6 +102,11 @@ class JsonFormatter {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+
+        // Source popup
+        this.elements.loadFromSourceBtn.addEventListener('click', () => this.openSourcePopup());
+        this.elements.sourcePopupOverlay.addEventListener('click', () => this.closeSourcePopup());
+        this.elements.sourcePopupCloseBtn.addEventListener('click', () => this.closeSourcePopup());
     }
 
     /**
@@ -1167,6 +1179,64 @@ class JsonFormatter {
                     }
                     break;
             }
+        }
+    }
+
+    async openSourcePopup() {
+        this.elements.sourcePopupOverlay.style.display = 'block';
+        this.elements.sourcePopup.style.display = 'block';
+        this.elements.sourceList.innerHTML = '<div>Loading sources...</div>';
+
+        try {
+            const response = await fetch('/api/sources');
+            const result = await response.json();
+            const sources = result.sources;
+
+            if (sources && sources.length > 0) {
+                this.elements.sourceList.innerHTML = '';
+                sources.forEach(source => {
+                    const sourceItem = document.createElement('div');
+                    sourceItem.className = 'source-item';
+                    sourceItem.dataset.id = source.id;
+                    sourceItem.innerHTML = `
+                        <span class="source-name">${source.name}</span>
+                        <span class="source-type">${source.type}</span>
+                    `;
+                    sourceItem.addEventListener('click', () => this.loadSourceData(source.id));
+                    this.elements.sourceList.appendChild(sourceItem);
+                });
+            } else {
+                this.elements.sourceList.innerHTML = '<div>No sources found.</div>';
+            }
+        } catch (error) {
+            this.elements.sourceList.innerHTML = '<div>Error loading sources.</div>';
+            console.error('Error fetching sources:', error);
+        }
+    }
+
+    closeSourcePopup() {
+        this.elements.sourcePopupOverlay.style.display = 'none';
+        this.elements.sourcePopup.style.display = 'none';
+    }
+
+    async loadSourceData(sourceId) {
+        this.closeSourcePopup();
+        this.showMessage('Loading source data...', 'info');
+
+        try {
+            const response = await fetch(`/api/sources/${sourceId}/data`);
+            if (response.ok) {
+                const data = await response.text();
+                this.elements.jsonInput.value = data;
+                this.showMessage('Source data loaded successfully.', 'success');
+                this.updateJsonStats();
+            } else {
+                const error = await response.json();
+                this.showMessage(`Error loading source data: ${error.error}`, 'error');
+            }
+        } catch (error) {
+            this.showMessage('Error loading source data.', 'error');
+            console.error('Error fetching source data:', error);
         }
     }
 }
