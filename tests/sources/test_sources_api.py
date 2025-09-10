@@ -345,11 +345,27 @@ class TestSourceTesting:
         self.app = app
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
+        
+        # Clean up any existing sources
+        try:
+            response = self.client.get('/api/sources')
+            if response.status_code == 200:
+                sources = json.loads(response.data)
+                if isinstance(sources, list):
+                    for source in sources:
+                        if 'id' in source:
+                            self.client.delete(f'/api/sources/{source["id"]}')
+        except:
+            pass  # Ignore cleanup errors
     
     @patch('os.path.exists')
-    def test_test_local_file_source_success(self, mock_exists):
+    @patch('os.access')
+    @patch('os.path.getsize')
+    def test_test_local_file_source_success(self, mock_getsize, mock_access, mock_exists):
         """Test successful local file source testing."""
         mock_exists.return_value = True
+        mock_access.return_value = True
+        mock_getsize.return_value = 1234
         
         # Create a local file source
         create_data = {
@@ -417,6 +433,18 @@ class TestBackwardCompatibility:
         self.app = app
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
+        
+        # Clean up any existing sources
+        try:
+            response = self.client.get('/api/sources')
+            if response.status_code == 200:
+                sources = json.loads(response.data)
+                if isinstance(sources, list):
+                    for source in sources:
+                        if 'id' in source:
+                            self.client.delete(f'/api/sources/{source["id"]}')
+        except:
+            pass  # Ignore cleanup errors
     
     def test_create_legacy_source_format(self):
         """Test creating source with legacy format."""
@@ -483,6 +511,18 @@ class TestIntegrationScenarios:
         self.app = app
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
+        
+        # Clean up any existing sources
+        try:
+            response = self.client.get('/api/sources')
+            if response.status_code == 200:
+                sources = json.loads(response.data)
+                if isinstance(sources, list):
+                    for source in sources:
+                        if 'id' in source:
+                            self.client.delete(f'/api/sources/{source["id"]}')
+        except:
+            pass  # Ignore cleanup errors
     
     def test_complete_workflow(self):
         """Test complete workflow: create, update, test, delete."""

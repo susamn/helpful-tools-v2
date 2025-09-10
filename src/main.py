@@ -970,6 +970,7 @@ def create_source():
             config = data.get('config', {})
             path_template = config.get('path', config.get('url', config.get('key', '')))
             dynamic_variables = {}
+            static_config = {}
         
         # Generate unique ID
         source_id = str(uuid.uuid4())[:8]
@@ -979,6 +980,7 @@ def create_source():
             'type': source_type,
             'name': source_name,
             'config': config,
+            'staticConfig': static_config,
             'pathTemplate': path_template,
             'dynamicVariables': dynamic_variables,
             'created_at': datetime.now().isoformat(),
@@ -1087,6 +1089,7 @@ def update_source(source_id):
             config = data.get('config', {})
             path_template = config.get('path', config.get('url', config.get('key', '')))
             dynamic_variables = {}
+            static_config = {}
         
         # Update the source
         updated_source = {
@@ -1094,6 +1097,7 @@ def update_source(source_id):
             'name': data['name'],
             'type': source_type,
             'config': config,
+            'staticConfig': static_config,
             'pathTemplate': path_template,
             'dynamicVariables': dynamic_variables,
             'status': 'created',  # Reset status when updated
