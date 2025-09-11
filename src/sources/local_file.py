@@ -298,3 +298,13 @@ class LocalFileSource(BaseDataSource):
     def is_listable(self) -> bool:
         """Check if the local file source supports listing (directories)."""
         return True
+    
+    def is_directory(self) -> bool:
+        """Check if the source points to a directory."""
+        path = Path(self._resolved_path)
+        return path.exists() and path.is_dir()
+    
+    def is_file(self) -> bool:
+        """Check if the source points to a single file."""
+        path = Path(self._resolved_path)
+        return path.exists() and path.is_file()

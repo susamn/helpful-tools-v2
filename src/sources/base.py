@@ -219,6 +219,14 @@ class DataSourceInterface(ABC):
     def is_listable(self) -> bool:
         """Check if source supports listing contents."""
         return False
+    
+    def is_directory(self) -> bool:
+        """Check if source points to a directory/collection."""
+        return False
+    
+    def is_file(self) -> bool:
+        """Check if source points to a single file."""
+        return True
 
     def get_connection_info(self) -> Dict[str, Any]:
         """Get connection information for debugging."""

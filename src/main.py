@@ -1708,6 +1708,221 @@ def store_sources(sources):
     except Exception as e:
         print(f"Error storing sources: {e}")
 
+@app.route('/api/sources/<source_id>/browse', methods=['GET'])
+def browse_source_directory(source_id):
+    """Browse directory structure for local file sources"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        source = sources[source_id]
+        source_type = source.get('type')
+        config = source.get('config', {})
+        
+        # Only support local file sources for now
+        if source_type != 'local_file':
+            return jsonify({'success': False, 'error': 'Directory browsing only supported for local file sources'}), 400
+        
+        base_path = config.get('path')
+        if not base_path:
+            return jsonify({'success': False, 'error': 'No path specified in source'}), 400
+        
+        # Expand user path
+        base_path = os.path.expanduser(base_path)
+        
+        if not os.path.exists(base_path):
+            return jsonify({'success': False, 'error': f'Path does not exist: {base_path}'}), 404
+        
+        if not os.path.isdir(base_path):
+            return jsonify({'success': False, 'error': 'Source path is not a directory'}), 400
+        
+        # Get requested path from query parameter (for lazy loading)
+        requested_path = request.args.get('path', '')
+        current_path = os.path.join(base_path, requested_path) if requested_path else base_path
+        current_path = os.path.normpath(current_path)
+        
+        # Security check - ensure we don't go outside base path
+        if not current_path.startswith(base_path):
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        # Get directory contents
+        tree_data = get_directory_tree(current_path, base_path, max_depth=2)
+        
+        return jsonify({
+            'success': True,
+            'base_path': base_path,
+            'current_path': current_path,
+            'tree': tree_data
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def get_directory_tree(path, base_path, current_depth=0, max_depth=2):
+    """Get directory tree structure with limited depth"""
+    try:
+        if current_depth >= max_depth:
+            return None
+            
+        items = []
+        
+        # Get relative path from base for consistent referencing
+        rel_path = os.path.relpath(path, base_path) if path != base_path else ''
+        
+        for item_name in sorted(os.listdir(path)):
+            item_path = os.path.join(path, item_name)
+            item_rel_path = os.path.join(rel_path, item_name) if rel_path else item_name
+            
+            # Skip hidden files and directories
+            if item_name.startswith('.'):
+                continue
+            
+            try:
+                stat_info = os.stat(item_path)
+                is_dir = os.path.isdir(item_path)
+                
+                item_data = {
+                    'name': item_name,
+                    'path': item_rel_path.replace('\\', '/'),  # Normalize path separators
+                    'is_directory': is_dir,
+                    'size': stat_info.st_size if not is_dir else None,
+                    'modified': stat_info.st_mtime
+                }
+                
+                if is_dir:
+                    # Check if directory has contents and if we can go deeper
+                    try:
+                        has_contents = len([f for f in os.listdir(item_path) if not f.startswith('.')]) > 0
+                        item_data['has_children'] = has_contents
+                        
+                        if current_depth + 1 < max_depth and has_contents:
+                            # Recursively get children
+                            children = get_directory_tree(item_path, base_path, current_depth + 1, max_depth)
+                            if children:
+                                item_data['children'] = children
+                        else:
+                            # Mark as non-explorable if at max depth
+                            item_data['explorable'] = current_depth + 1 < max_depth
+                            
+                    except PermissionError:
+                        item_data['has_children'] = False
+                        item_data['error'] = 'Permission denied'
+                
+                items.append(item_data)
+                
+            except (OSError, PermissionError) as e:
+                # Skip items we can't access
+                continue
+        
+        return items
+        
+    except (OSError, PermissionError):
+        return []
+
+@app.route('/api/sources/<source_id>/file', methods=['GET'])
+def get_source_file_data(source_id):
+    """Get data from a specific file within a source directory"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        source = sources[source_id]
+        source_type = source.get('type')
+        config = source.get('config', {})
+        
+        # Only support local file sources for now
+        if source_type != 'local_file':
+            return jsonify({'success': False, 'error': 'File browsing only supported for local file sources'}), 400
+        
+        base_path = config.get('path')
+        if not base_path:
+            return jsonify({'success': False, 'error': 'No path specified in source'}), 400
+        
+        # Get the specific file path from query parameter
+        file_path = request.args.get('path')
+        if not file_path:
+            return jsonify({'success': False, 'error': 'File path parameter required'}), 400
+        
+        # Expand user path and construct full path
+        base_path = os.path.expanduser(base_path)
+        full_path = os.path.normpath(os.path.join(base_path, file_path))
+        
+        # Security check - ensure we don't go outside base path
+        if not full_path.startswith(base_path):
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+        
+        if not os.path.exists(full_path):
+            return jsonify({'success': False, 'error': 'File not found'}), 404
+        
+        if os.path.isdir(full_path):
+            return jsonify({'success': False, 'error': 'Path is a directory, not a file'}), 400
+        
+        # Read and return file content
+        try:
+            with open(full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            return content, 200, {'Content-Type': 'text/plain'}
+            
+        except UnicodeDecodeError:
+            # Try with different encoding
+            try:
+                with open(full_path, 'r', encoding='latin-1') as f:
+                    content = f.read()
+                return content, 200, {'Content-Type': 'text/plain'}
+            except Exception:
+                return jsonify({'success': False, 'error': 'File is not a text file or has unsupported encoding'}), 400
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources/<source_id>/fetch', methods=['GET'])
+def fetch_source_data(source_id):
+    """Fetch data from a source - auto-detects files vs directories"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        source = sources[source_id]
+        
+        # Convert to SourceConfig and create source instance
+        source_config = convert_to_source_config(source)
+        source_instance = SourceFactory.create_source(source_config)
+        
+        # Check if source is a directory
+        if source_instance.is_directory():
+            # Return directory tree structure for browsing
+            try:
+                # Use existing browse logic
+                base_path = source_config.get_resolved_path()
+                tree_data = get_directory_tree(base_path, base_path, max_depth=2)
+                
+                return jsonify({
+                    'success': True,
+                    'type': 'directory',
+                    'base_path': base_path,
+                    'tree': tree_data
+                })
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'Error reading directory: {str(e)}'}), 500
+        
+        elif source_instance.is_file():
+            # Return file content directly
+            try:
+                data = source_instance.read_data(mode='text')
+                return data, 200, {'Content-Type': 'text/plain'}
+            except Exception as e:
+                return jsonify({'success': False, 'error': f'Error reading file: {str(e)}'}), 500
+        
+        else:
+            return jsonify({'success': False, 'error': 'Source is neither a file nor directory'}), 400
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/sources/<source_id>/data', methods=['GET'])
 def get_source_data(source_id):
     """Get data from a specific source"""

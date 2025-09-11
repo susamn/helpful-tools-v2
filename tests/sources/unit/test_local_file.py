@@ -494,3 +494,170 @@ class TestLocalFileSource:
             metadata = source.get_metadata()
             
             assert metadata.content_type == expected_type
+
+
+class TestLocalFileDirectoryDetection:
+    """Test LocalFileSource directory detection functionality."""
+    
+    def setup_method(self):
+        """Set up test environment."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_file = os.path.join(self.temp_dir, 'test.txt')
+        self.test_subdir = os.path.join(self.temp_dir, 'subdir')
+        self.test_content = "Hello, World!\nThis is a test file."
+        
+        # Create test file
+        with open(self.test_file, 'w') as f:
+            f.write(self.test_content)
+        
+        # Create test subdirectory
+        os.makedirs(self.test_subdir)
+        
+        # Create file in subdirectory
+        subfile = os.path.join(self.test_subdir, 'subfile.txt')
+        with open(subfile, 'w') as f:
+            f.write("Subfile content")
+    
+    def teardown_method(self):
+        """Clean up test environment."""
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+    
+    def create_config(self, path, **kwargs):
+        """Helper to create SourceConfig."""
+        return SourceConfig(
+            source_id='test-123',
+            name='Test Local Source',
+            source_type='local_file',
+            static_config=kwargs.get('static_config', {}),
+            path_template=path,
+            dynamic_variables=kwargs.get('dynamic_variables', {}),
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+    
+    def test_file_detection(self):
+        """Test detection of regular files."""
+        config = self.create_config(self.test_file)
+        source = LocalFileSource(config)
+        
+        assert source.is_file() is True
+        assert source.is_directory() is False
+        assert source.exists() is True
+    
+    def test_directory_detection(self):
+        """Test detection of directories."""
+        config = self.create_config(self.temp_dir)
+        source = LocalFileSource(config)
+        
+        assert source.is_file() is False
+        assert source.is_directory() is True
+        assert source.exists() is True
+    
+    def test_subdirectory_detection(self):
+        """Test detection of subdirectories."""
+        config = self.create_config(self.test_subdir)
+        source = LocalFileSource(config)
+        
+        assert source.is_file() is False
+        assert source.is_directory() is True
+        assert source.exists() is True
+    
+    def test_nonexistent_path_detection(self):
+        """Test detection of non-existent paths."""
+        nonexistent = os.path.join(self.temp_dir, 'nonexistent')
+        config = self.create_config(nonexistent)
+        source = LocalFileSource(config)
+        
+        assert source.is_file() is False
+        assert source.is_directory() is False
+        assert source.exists() is False
+    
+    def test_nonexistent_file_detection(self):
+        """Test detection of non-existent file."""
+        nonexistent_file = os.path.join(self.temp_dir, 'nonexistent.txt')
+        config = self.create_config(nonexistent_file)
+        source = LocalFileSource(config)
+        
+        assert source.is_file() is False
+        assert source.is_directory() is False
+        assert source.exists() is False
+    
+    def test_nonexistent_directory_detection(self):
+        """Test detection of non-existent directory."""
+        nonexistent_dir = os.path.join(self.temp_dir, 'nonexistent_dir')
+        config = self.create_config(nonexistent_dir)
+        source = LocalFileSource(config)
+        
+        assert source.is_file() is False
+        assert source.is_directory() is False
+        assert source.exists() is False
+    
+    def test_directory_capabilities(self):
+        """Test directory source capabilities."""
+        config = self.create_config(self.temp_dir)
+        source = LocalFileSource(config)
+        
+        assert source.is_listable() is True
+        assert source.is_writable() is True
+        assert source.is_readable() is True
+    
+    def test_file_capabilities(self):
+        """Test file source capabilities."""
+        config = self.create_config(self.test_file)
+        source = LocalFileSource(config)
+        
+        assert source.is_listable() is True  # LocalFileSource supports listing generally
+        assert source.is_writable() is True
+        assert source.is_readable() is True
+    
+    
+    def test_dynamic_variables_with_directory(self):
+        """Test dynamic variables resolution with directory paths."""
+        config = self.create_config(
+            path='$base_dir/subdir',
+            dynamic_variables={'base_dir': self.temp_dir}
+        )
+        source = LocalFileSource(config)
+        
+        assert source._resolved_path == self.test_subdir
+        assert source.is_directory() is True
+        assert source.is_file() is False
+    
+    def test_dynamic_variables_with_file(self):
+        """Test dynamic variables resolution with file paths."""
+        config = self.create_config(
+            path='$base_dir/test.txt',
+            dynamic_variables={'base_dir': self.temp_dir}
+        )
+        source = LocalFileSource(config)
+        
+        assert source._resolved_path == self.test_file
+        assert source.is_directory() is False
+        assert source.is_file() is True
+    
+    def test_symlink_detection(self):
+        """Test detection of symbolic links."""
+        if os.name != 'nt':  # Skip on Windows where symlinks need special permissions
+            # Create a symlink to the test file
+            symlink_path = os.path.join(self.temp_dir, 'test_symlink.txt')
+            os.symlink(self.test_file, symlink_path)
+            
+            config = self.create_config(symlink_path)
+            source = LocalFileSource(config)
+            
+            # Should detect as file (following the symlink)
+            assert source.is_file() is True
+            assert source.is_directory() is False
+            assert source.exists() is True
+            
+            # Create a symlink to the directory
+            symlink_dir = os.path.join(self.temp_dir, 'test_symlink_dir')
+            os.symlink(self.test_subdir, symlink_dir)
+            
+            config_dir = self.create_config(symlink_dir)
+            source_dir = LocalFileSource(config_dir)
+            
+            # Should detect as directory (following the symlink)
+            assert source_dir.is_file() is False
+            assert source_dir.is_directory() is True
+            assert source_dir.exists() is True

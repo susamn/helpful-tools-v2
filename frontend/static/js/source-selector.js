@@ -230,6 +230,16 @@ class SourceSelector {
                             `<button class="source-btn source-btn-fetch" data-action="fetch" data-source-id="${source.id}">Fetch</button>` : ''}
                     </div>
                 </div>
+                <div class="file-tree-container" id="file-tree-${this.options.containerId}-${source.id}" style="display:none;">
+                    <div class="file-tree-header">
+                        <span>Select a file:</span>
+                        <button class="close-tree-btn" onclick="this.parentElement.parentElement.style.display='none'">×</button>
+                    </div>
+                    <div class="file-tree" id="tree-${this.options.containerId}-${source.id}">
+                        <!-- Tree will be populated here -->
+                    </div>
+                </div>
+                </div>
             `;
         }).join('');
 
@@ -401,6 +411,7 @@ class SourceSelector {
                 const result = await response.json();
                 
                 this.showTestStatus(source.id, result.success);
+                
             } else {
                 const errorResult = await response.json();
                 throw new Error(errorResult.error || `HTTP ${response.status}`);
@@ -415,6 +426,112 @@ class SourceSelector {
                 testBtn.disabled = false;
             }
         }
+    }
+
+
+    /**
+     * Render file tree
+     */
+    renderFileTree(items, container, source, level) {
+        if (!items || items.length === 0) {
+            container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Empty directory</div>';
+            return;
+        }
+
+        const html = items.map(item => {
+            const isDirectory = item.is_directory;
+            const icon = isDirectory ? '📁' : '📄';
+            const levelClass = level > 0 ? `tree-level-${Math.min(level, 2)}` : '';
+            const itemClass = isDirectory ? 'directory' : 'file';
+            const nonExplorable = isDirectory && item.explorable === false;
+            const sizeText = !isDirectory && item.size !== null ? this.formatFileSize(item.size) : '';
+            
+            let itemHtml = `
+                <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''}" 
+                     data-path="${item.path}" 
+                     data-is-directory="${isDirectory}"
+                     data-source-id="${source.id}">
+                    <span class="tree-item-icon">${icon}</span>
+                    <span class="tree-item-name">${this.escapeHtml(item.name)}</span>
+                    ${sizeText ? `<span class="tree-item-size">${sizeText}</span>` : ''}
+                    ${nonExplorable ? '<span class="tree-item-size">(not explorable)</span>' : ''}
+                </div>
+            `;
+            
+            // Add children if present
+            if (item.children && item.children.length > 0) {
+                const childContainer = document.createElement('div');
+                this.renderFileTree(item.children, childContainer, source, level + 1);
+                itemHtml += childContainer.innerHTML;
+            }
+            
+            return itemHtml;
+        }).join('');
+        
+        container.innerHTML = html;
+        
+        // Add click handlers for files
+        container.querySelectorAll('.tree-item.file').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectFile(item.dataset.path, source, item);
+            });
+        });
+    }
+
+    /**
+     * Handle file selection
+     */
+    async selectFile(filePath, source, element) {
+        try {
+            // Remove previous selection
+            const treeContainer = document.getElementById(`tree-${this.options.containerId}-${source.id}`);
+            treeContainer.querySelectorAll('.tree-item.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            // Mark current item as selected
+            element.classList.add('selected');
+            
+            // Fetch file content
+            const response = await fetch(`/api/sources/${source.id}/file?path=${encodeURIComponent(filePath)}`);
+            
+            if (response.ok) {
+                const data = await response.text();
+                
+                // Hide the modal
+                this.hide();
+                
+                // Create modified source object with file path
+                const fileSource = {
+                    ...source,
+                    selectedFile: filePath,
+                    pathDisplay: `${source.name}/${filePath}`
+                };
+                
+                // Trigger fetch callback
+                if (this.options.onFetch) {
+                    this.options.onFetch(data, fileSource);
+                }
+            } else {
+                const error = await response.json();
+                alert(`Error loading file: ${error.error}`);
+            }
+        } catch (error) {
+            console.error('Error selecting file:', error);
+            alert('Error loading file content');
+        }
+    }
+
+    /**
+     * Format file size for display
+     */
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
     /**
@@ -446,28 +563,40 @@ class SourceSelector {
     }
 
     /**
-     * Fetch data from a source
+     * Fetch data from source - auto-detects files vs directories
      */
     async fetchSourceData(source) {
         try {
-            // Disable the fetch button
             const fetchBtn = document.querySelector(`[data-action="fetch"][data-source-id="${source.id}"]`);
             if (fetchBtn) {
                 fetchBtn.disabled = true;
-                fetchBtn.textContent = 'Fetching...';
+                fetchBtn.textContent = 'Loading...';
             }
 
-            const response = await fetch(`/api/sources/${source.id}/data`);
+            const response = await fetch(`/api/sources/${source.id}/fetch`);
             
             if (response.ok) {
-                const data = await response.text();
+                const contentType = response.headers.get('content-type');
                 
-                // Hide the modal
-                this.hide();
-                
-                // Trigger fetch callback
-                if (this.options.onFetch) {
-                    this.options.onFetch(data, source);
+                if (contentType && contentType.includes('application/json')) {
+                    // Directory response
+                    const result = await response.json();
+                    
+                    if (result.type === 'directory') {
+                        // Show directory browser
+                        this.showDirectoryBrowser(source, result);
+                    } else {
+                        throw new Error('Unknown response type');
+                    }
+                } else {
+                    // File content response
+                    const data = await response.text();
+                    this.hide();
+                    
+                    // Trigger fetch callback
+                    if (this.options.onFetch) {
+                        this.options.onFetch(data, source);
+                    }
                 }
             } else {
                 const errorResult = await response.json();
@@ -477,13 +606,32 @@ class SourceSelector {
             console.error('Error fetching source data:', error);
             alert(`Error fetching data: ${error.message}`);
         } finally {
-            // Re-enable the fetch button
+            // Re-enable fetch button
             const fetchBtn = document.querySelector(`[data-action="fetch"][data-source-id="${source.id}"]`);
             if (fetchBtn) {
                 fetchBtn.disabled = false;
                 fetchBtn.textContent = 'Fetch';
             }
         }
+    }
+
+    /**
+     * Show directory browser for directory sources
+     */
+    showDirectoryBrowser(source, directoryData) {
+        const treeContainer = document.getElementById(`file-tree-${this.options.containerId}-${source.id}`);
+        const treeContent = document.getElementById(`tree-${this.options.containerId}-${source.id}`);
+        
+        if (!treeContainer || !treeContent) {
+            console.error(`Tree container not found for ${this.options.containerId}-${source.id}`);
+            return;
+        }
+
+        // Show tree container
+        treeContainer.style.display = 'block';
+
+        // Render the tree
+        this.renderFileTree(directoryData.tree, treeContent, source, 0);
     }
 
     /**

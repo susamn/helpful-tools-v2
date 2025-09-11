@@ -377,6 +377,8 @@ class TestBaseDataSource:
         assert source.is_readable() is True
         assert source.is_writable() is False  # Default implementation
         assert source.is_listable() is False  # Default implementation
+        assert source.is_directory() is False  # Default implementation
+        assert source.is_file() is True  # Default implementation
     
     def test_get_connection_info(self):
         """Test getting connection info."""
@@ -497,3 +499,127 @@ class TestDataSourceInterface:
         contents = source.list_contents()
         assert len(contents) == 1
         assert contents[0]['name'] == 'file.txt'
+
+
+class MockDirectoryDataSource(BaseDataSource):
+    """Mock implementation that simulates a directory source."""
+    
+    def __init__(self, config, is_dir=True, exists=True):
+        super().__init__(config)
+        self._is_dir = is_dir
+        self._exists = exists
+    
+    def test_connection(self):
+        result = TestResult(success=True, status='connected', message='Mock connection')
+        return self._cache_test_result(result)
+    
+    def get_metadata(self):
+        return SourceMetadata(size=None if self._is_dir else 100)
+    
+    def exists(self):
+        return self._exists
+    
+    def read_data(self, **kwargs):
+        if self._is_dir:
+            raise ValueError("Cannot read data from directory")
+        return b"mock file data"
+    
+    def read_stream(self, **kwargs):
+        if self._is_dir:
+            raise ValueError("Cannot read stream from directory")
+        yield b"mock file data"
+    
+    def write_data(self, data, **kwargs):
+        return True
+    
+    def list_contents(self, path=None):
+        if not self._is_dir:
+            raise ValueError("Cannot list contents of file")
+        return [
+            {'name': 'file1.txt', 'type': 'file'},
+            {'name': 'subdir', 'type': 'directory'}
+        ]
+    
+    def is_directory(self):
+        return self._exists and self._is_dir
+    
+    def is_file(self):
+        return self._exists and not self._is_dir
+    
+    def is_listable(self):
+        return self._is_dir
+
+
+class TestDirectoryDetection:
+    """Test directory detection functionality."""
+    
+    def test_default_directory_detection(self):
+        """Test default directory detection behavior."""
+        config = SourceConfig(
+            source_id='test-123',
+            name='Test Source',
+            source_type='mock',
+            static_config={},
+            path_template='/data/test.txt',
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        
+        source = MockDataSource(config)
+        assert source.is_directory() is False
+        assert source.is_file() is True
+    
+    def test_directory_source_detection(self):
+        """Test directory source detection."""
+        config = SourceConfig(
+            source_id='test-123',
+            name='Test Directory',
+            source_type='mock',
+            static_config={},
+            path_template='/data/folder',
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        
+        source = MockDirectoryDataSource(config, is_dir=True)
+        assert source.is_directory() is True
+        assert source.is_file() is False
+        assert source.is_listable() is True
+    
+    def test_file_source_detection(self):
+        """Test file source detection."""
+        config = SourceConfig(
+            source_id='test-123',
+            name='Test File',
+            source_type='mock',
+            static_config={},
+            path_template='/data/file.txt',
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        
+        source = MockDirectoryDataSource(config, is_dir=False)
+        assert source.is_directory() is False
+        assert source.is_file() is True
+        assert source.is_listable() is False
+    
+    def test_nonexistent_source_detection(self):
+        """Test detection for non-existent sources."""
+        config = SourceConfig(
+            source_id='test-123',
+            name='Test Nonexistent',
+            source_type='mock',
+            static_config={},
+            path_template='/data/nonexistent',
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        
+        source = MockDirectoryDataSource(config, is_dir=True, exists=False)
+        assert source.is_directory() is False
+        assert source.is_file() is False
+        assert source.exists() is False

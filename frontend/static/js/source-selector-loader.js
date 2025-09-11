@@ -12,9 +12,9 @@
  */
 async function loadSourceSelector(containerId = 'sourceSelector') {
     try {
-        // Check if already loaded
+        // Check if this specific containerId is already loaded
         if (document.getElementById(containerId) || document.getElementById(`${containerId}-overlay`)) {
-            console.log('Source selector already loaded');
+            console.log(`Source selector already loaded for container ID: ${containerId}`);
             return;
         }
 
