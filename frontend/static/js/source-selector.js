@@ -20,17 +20,45 @@ class SourceSelector {
         this.isVisible = false;
         this.sources = [];
         this.selectedSources = [];
+        this.templateHTML = null;
+        this.initialized = false;
         
-        this.initializeComponent();
+        // Initialize asynchronously
+        this.initializeComponent().then(() => {
+            this.initialized = true;
+        }).catch(error => {
+            console.error('Failed to initialize SourceSelector:', error);
+        });
     }
 
     /**
      * Initialize the source selector component
      */
-    initializeComponent() {
+    async initializeComponent() {
+        await this.loadTemplate();
         this.createModalStructure();
         this.attachEventListeners();
         this.loadSources();
+    }
+
+    /**
+     * Load the HTML template
+     */
+    async loadTemplate() {
+        if (!this.templateHTML) {
+            try {
+                const response = await fetch('/components/source-selector.html');
+                if (response.ok) {
+                    this.templateHTML = await response.text();
+                } else {
+                    console.warn('Could not load source selector template, falling back to inline HTML');
+                    this.templateHTML = this.getFallbackHTML();
+                }
+            } catch (error) {
+                console.warn('Could not load source selector template, falling back to inline HTML:', error);
+                this.templateHTML = this.getFallbackHTML();
+            }
+        }
     }
 
     /**
@@ -43,7 +71,33 @@ class SourceSelector {
             existing.remove();
         }
 
-        const modalHTML = `
+        // Create a temporary div to hold the template
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = this.templateHTML;
+
+        // Update IDs to match the containerId option
+        this.updateTemplateIds(tempDiv);
+
+        // Add to body
+        document.body.appendChild(tempDiv);
+    }
+
+    /**
+     * Update template IDs to match the containerId option
+     */
+    updateTemplateIds(container) {
+        // Update all IDs that contain "sourceSelector" to use the actual containerId
+        const elements = container.querySelectorAll('[id*="sourceSelector"]');
+        elements.forEach(element => {
+            element.id = element.id.replace('sourceSelector', this.options.containerId);
+        });
+    }
+
+    /**
+     * Fallback HTML template if external file cannot be loaded
+     */
+    getFallbackHTML() {
+        return `
             <div class="modal-overlay source-selector-overlay" id="${this.options.containerId}-overlay" style="display: none;"></div>
             <div class="modal source-selector-modal" id="${this.options.containerId}" style="display: none;">
                 <div class="modal-header">
@@ -80,223 +134,6 @@ class SourceSelector {
                     </div>
                 </div>
             </div>
-        `;
-
-        // Add CSS if not already present
-        if (!document.getElementById('source-selector-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'source-selector-styles';
-            styles.textContent = this.getComponentCSS();
-            document.head.appendChild(styles);
-        }
-
-        document.body.insertAdjacentHTML('beforeend', modalHTML);
-    }
-
-    /**
-     * Get component CSS
-     */
-    getComponentCSS() {
-        return `
-            .source-selector-modal {
-                width: 750px !important;
-                max-height: 80vh !important;
-            }
-            
-            .dynamic-vars-modal {
-                width: 455px !important;
-                background: #f8f9fa;
-                border: 2px solid #007bff;
-            }
-            
-            .source-selector-list {
-                max-height: 60vh;
-                overflow-y: auto;
-            }
-            
-            .source-item {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 12px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                margin-bottom: 8px;
-                background: #f9f9f9;
-                transition: background-color 0.2s;
-            }
-            
-            .source-item:hover {
-                background: #f0f0f0;
-            }
-            
-            .source-info {
-                flex: 1;
-                cursor: default;
-            }
-            
-            .source-name {
-                font-weight: bold;
-                margin-bottom: 4px;
-            }
-            
-            .source-type {
-                color: #666;
-                font-size: 0.9em;
-                margin-bottom: 2px;
-            }
-            
-            .source-path {
-                color: #888;
-                font-size: 0.8em;
-                word-break: break-all;
-            }
-            
-            .source-actions {
-                display: flex;
-                gap: 8px;
-                margin-left: 12px;
-                align-items: center;
-            }
-            
-            .source-btn {
-                padding: 6px 12px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 0.85em;
-                transition: background-color 0.2s;
-            }
-            
-            .source-btn-edit {
-                background: #007bff;
-                color: white;
-            }
-            
-            .source-btn-edit:hover {
-                background: #0056b3;
-            }
-            
-            .source-btn-test {
-                background: #ffc107;
-                color: #212529;
-            }
-            
-            .source-btn-test:hover {
-                background: #e0a800;
-            }
-            
-            .test-status {
-                font-weight: bold;
-                font-size: 1em;
-                margin-right: 8px;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-            }
-            
-            .test-status.show {
-                opacity: 1;
-            }
-            
-            .test-status.success {
-                color: #28a745;
-            }
-            
-            .test-status.failure {
-                color: #dc3545;
-            }
-            
-            .source-btn-fetch {
-                background: #28a745;
-                color: white;
-            }
-            
-            .source-btn-fetch:hover {
-                background: #1e7e34;
-            }
-            
-            .source-btn:disabled {
-                background: #ccc;
-                color: #666;
-                cursor: not-allowed;
-            }
-            
-            .dynamic-vars-modal .modal-content {
-                padding: 20px;
-                background: white;
-                border-radius: 8px;
-                margin: 10px;
-                box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-            }
-            
-            .dynamic-vars-form {
-                margin-bottom: 20px;
-                padding: 15px;
-                background: #f8f9fa;
-                border: 1px solid #dee2e6;
-                border-radius: 6px;
-            }
-            
-            .dynamic-var-row {
-                display: flex;
-                align-items: center;
-                margin-bottom: 12px;
-                gap: 10px;
-            }
-            
-            .dynamic-var-label {
-                min-width: 120px;
-                font-weight: bold;
-            }
-            
-            .dynamic-var-input {
-                flex: 1;
-                padding: 6px;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-            }
-            
-            .dynamic-var-description {
-                color: #666;
-                font-size: 0.85em;
-                margin-left: 130px;
-                margin-top: -8px;
-                margin-bottom: 8px;
-            }
-            
-            .modal-actions {
-                display: flex;
-                gap: 10px;
-                justify-content: flex-end;
-                padding-top: 15px;
-                border-top: 1px solid #eee;
-            }
-            
-            .btn {
-                padding: 8px 16px;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 0.9em;
-            }
-            
-            .btn-primary {
-                background: #007bff;
-                color: white;
-            }
-            
-            .btn-primary:hover {
-                background: #0056b3;
-            }
-            
-            .btn-secondary {
-                background: #6c757d;
-                color: white;
-            }
-            
-            .btn-secondary:hover {
-                background: #545b62;
-            }
         `;
     }
 
@@ -652,7 +489,13 @@ class SourceSelector {
     /**
      * Show the source selector
      */
-    show() {
+    async show() {
+        // Ensure component is initialized before showing
+        if (!this.initialized) {
+            await this.initializeComponent();
+            this.initialized = true;
+        }
+        
         const modal = document.getElementById(this.options.containerId);
         const overlay = document.getElementById(`${this.options.containerId}-overlay`);
         

@@ -15,7 +15,7 @@ class JsonFormatter {
         this.initializeElements();
         this.attachEventListeners();
         this.initializeHistoryManager();
-        this.initializeSourceSelector();
+        this.initializeSourceSelector(); // This is now async but we don't need to wait
         this.applyFontSize();
     }
 
@@ -1321,20 +1321,36 @@ class JsonFormatter {
     /**
      * Initialize the SourceSelector component
      */
-    initializeSourceSelector() {
-        this.sourceSelector = new SourceSelector({
-            containerId: 'jsonFormatterSourceSelector',
-            onFetch: (data, source) => this.loadSourceData(data, source),
-            onEdit: (source) => this.onSourceEdit(source),
-            showEditButton: true,
-            showFetchButton: true
-        });
+    async initializeSourceSelector() {
+        try {
+            this.sourceSelector = await createSourceSelector({
+                containerId: 'jsonFormatterSourceSelector',
+                onFetch: (data, source) => this.loadSourceData(data, source),
+                onEdit: (source) => this.onSourceEdit(source),
+                showEditButton: true,
+                showFetchButton: true
+            });
+        } catch (error) {
+            console.error('Failed to initialize source selector:', error);
+            // Fallback to old method if the new loader fails
+            this.sourceSelector = new SourceSelector({
+                containerId: 'jsonFormatterSourceSelector',
+                onFetch: (data, source) => this.loadSourceData(data, source),
+                onEdit: (source) => this.onSourceEdit(source),
+                showEditButton: true,
+                showFetchButton: true
+            });
+        }
     }
 
     /**
      * Open the source selector
      */
-    openSourceSelector() {
+    async openSourceSelector() {
+        if (!this.sourceSelector) {
+            console.warn('Source selector not initialized yet, trying to initialize...');
+            await this.initializeSourceSelector();
+        }
         this.sourceSelector.show();
     }
 

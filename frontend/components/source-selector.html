@@ -1,0 +1,321 @@
+<!-- Source Selector Modal Component -->
+<!-- This component provides a reusable modal interface for selecting and managing data sources -->
+
+<div class="modal-overlay source-selector-overlay" id="sourceSelector-overlay" style="display: none;"></div>
+<div class="modal source-selector-modal" id="sourceSelector" style="display: none;">
+    <div class="modal-header">
+        <h2>Select a Source</h2>
+        <button class="modal-close-btn source-selector-close">&times;</button>
+    </div>
+    <div class="modal-content">
+        <div class="source-selector-loading" style="display: none;">
+            <p>Loading sources...</p>
+        </div>
+        <div class="source-selector-empty" style="display: none;">
+            <p>No sources available. <a href="/sources" target="_blank">Create a source</a> to get started.</p>
+        </div>
+        <div class="source-selector-list" id="sourceSelector-list">
+            <!-- Sources will be populated here -->
+        </div>
+    </div>
+</div>
+
+<!-- Dynamic Variables Edit Modal -->
+<div class="modal-overlay dynamic-vars-overlay" id="sourceSelector-vars-overlay" style="display: none;"></div>
+<div class="modal dynamic-vars-modal" id="sourceSelector-vars-modal" style="display: none;">
+    <div class="modal-header">
+        <h2>Edit Dynamic Variables</h2>
+        <button class="modal-close-btn dynamic-vars-close">&times;</button>
+    </div>
+    <div class="modal-content">
+        <div class="dynamic-vars-form" id="sourceSelector-vars-form">
+            <!-- Dynamic variables form will be populated here -->
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-primary dynamic-vars-save">Save</button>
+            <button class="btn btn-secondary dynamic-vars-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Source Selector Component Styles */
+.source-selector-modal {
+    width: 750px !important;
+    max-height: 80vh !important;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1001;
+    max-width: 90%;
+}
+
+.source-selector-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+
+.dynamic-vars-modal {
+    width: 455px !important;
+    background: #f8f9fa;
+    border: 2px solid #007bff;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1001;
+    max-width: 90%;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+    font-size: 16px;
+    margin: 0;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #888;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close-btn:hover {
+    color: #333;
+}
+
+.modal-content {
+    padding: 15px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.source-selector-list {
+    /* Remove nested scrolling - let modal-content handle it */
+}
+
+.source-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    background: #f9f9f9;
+    transition: background-color 0.2s;
+}
+
+.source-item:hover {
+    background: #f0f0f0;
+}
+
+.source-info {
+    flex: 1;
+    cursor: default;
+}
+
+.source-name {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.source-type {
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 2px;
+}
+
+.source-path {
+    color: #888;
+    font-size: 0.8em;
+    word-break: break-all;
+}
+
+.source-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 12px;
+    align-items: center;
+}
+
+.source-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: background-color 0.2s;
+}
+
+.source-btn-edit {
+    background: #007bff;
+    color: white;
+}
+
+.source-btn-edit:hover {
+    background: #0056b3;
+}
+
+.source-btn-test {
+    background: #ffc107;
+    color: #212529;
+}
+
+.source-btn-test:hover {
+    background: #e0a800;
+}
+
+.test-status {
+    font-weight: bold;
+    font-size: 1em;
+    margin-right: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.test-status.show {
+    opacity: 1;
+}
+
+.test-status.success {
+    color: #28a745;
+}
+
+.test-status.failure {
+    color: #dc3545;
+}
+
+.source-btn-fetch {
+    background: #28a745;
+    color: white;
+}
+
+.source-btn-fetch:hover {
+    background: #1e7e34;
+}
+
+.source-btn:disabled {
+    background: #ccc;
+    color: #666;
+    cursor: not-allowed;
+}
+
+.dynamic-vars-modal .modal-content {
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    margin: 10px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.dynamic-vars-form {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+}
+
+.dynamic-var-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 10px;
+}
+
+.dynamic-var-label {
+    min-width: 120px;
+    font-weight: bold;
+}
+
+.dynamic-var-input {
+    flex: 1;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.dynamic-var-description {
+    color: #666;
+    font-size: 0.85em;
+    margin-left: 130px;
+    margin-top: -8px;
+    margin-bottom: 8px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.source-selector-loading, .source-selector-empty {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.source-selector-empty a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.source-selector-empty a:hover {
+    text-decoration: underline;
+}
+</style>

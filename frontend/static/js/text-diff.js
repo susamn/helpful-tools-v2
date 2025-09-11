@@ -661,33 +661,57 @@ document.addEventListener('DOMContentLoaded', function() {
         /**
          * Initialize source selectors for both text inputs
          */
-        initializeSourceSelectors() {
-            // Source selector for Text 1
-            this.sourceSelector1 = new SourceSelector({
-                containerId: 'textDiffSourceSelector1',
-                onFetch: (data, source) => this.loadSourceData(data, source, 'text1'),
-                onEdit: (source) => console.log('Source 1 edited:', source)
-            });
+        async initializeSourceSelectors() {
+            try {
+                // Source selector for Text 1
+                this.sourceSelector1 = await createSourceSelector({
+                    containerId: 'textDiffSourceSelector1',
+                    onFetch: (data, source) => this.loadSourceData(data, source, 'text1'),
+                    onEdit: (source) => console.log('Source 1 edited:', source)
+                });
 
-            // Source selector for Text 2
-            this.sourceSelector2 = new SourceSelector({
-                containerId: 'textDiffSourceSelector2',
-                onFetch: (data, source) => this.loadSourceData(data, source, 'text2'),
-                onEdit: (source) => console.log('Source 2 edited:', source)
-            });
+                // Source selector for Text 2
+                this.sourceSelector2 = await createSourceSelector({
+                    containerId: 'textDiffSourceSelector2',
+                    onFetch: (data, source) => this.loadSourceData(data, source, 'text2'),
+                    onEdit: (source) => console.log('Source 2 edited:', source)
+                });
+            } catch (error) {
+                console.error('Failed to initialize source selectors:', error);
+                // Fallback to old method if the new loader fails
+                this.sourceSelector1 = new SourceSelector({
+                    containerId: 'textDiffSourceSelector1',
+                    onFetch: (data, source) => this.loadSourceData(data, source, 'text1'),
+                    onEdit: (source) => console.log('Source 1 edited:', source)
+                });
+
+                this.sourceSelector2 = new SourceSelector({
+                    containerId: 'textDiffSourceSelector2',
+                    onFetch: (data, source) => this.loadSourceData(data, source, 'text2'),
+                    onEdit: (source) => console.log('Source 2 edited:', source)
+                });
+            }
         }
 
         /**
          * Show source selector for text input 1
          */
-        showSourceSelector1() {
+        async showSourceSelector1() {
+            if (!this.sourceSelector1) {
+                console.warn('Source selector 1 not initialized yet, trying to initialize...');
+                await this.initializeSourceSelectors();
+            }
             this.sourceSelector1.show();
         }
 
         /**
          * Show source selector for text input 2
          */
-        showSourceSelector2() {
+        async showSourceSelector2() {
+            if (!this.sourceSelector2) {
+                console.warn('Source selector 2 not initialized yet, trying to initialize...');
+                await this.initializeSourceSelectors();
+            }
             this.sourceSelector2.show();
         }
 

@@ -925,6 +925,19 @@ def serve_tool(tool_name):
 
 # Static files are now handled automatically by Flask's built-in static file serving
 
+# Component routes
+@app.route('/components/<component_name>')
+def serve_component(component_name):
+    """Serve reusable component files"""
+    # Get the directory where main.py is located
+    app_dir = Path(__file__).parent.parent
+    component_file = app_dir / "frontend" / "components" / component_name
+    if not component_file.exists():
+        abort(404)
+    
+    with open(component_file, 'r', encoding='utf-8') as f:
+        return f.read()
+
 # Sources API Routes
 @app.route('/api/sources/aws-profiles', methods=['GET'])
 def get_aws_profiles():
