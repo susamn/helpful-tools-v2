@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
             this.initializeElements();
             this.attachEventListeners();
             this.initializeHistoryManager();
+            this.initializeSourceSelectors();
             this.applyFontSize();
         }
 
@@ -58,7 +59,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Font controls
                 fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
-                fontDecreaseBtn: document.getElementById('fontDecreaseBtn')
+                fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
+                
+                // Source selector buttons
+                loadSource1Btn: document.getElementById('loadSource1Btn'),
+                loadSource2Btn: document.getElementById('loadSource2Btn')
             };
             
             this.inputsCollapsed = false;
@@ -87,6 +92,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // File upload listeners
             this.elements.file1Input.addEventListener('change', (e) => this.handleFileUpload(e, 'text1'));
             this.elements.file2Input.addEventListener('change', (e) => this.handleFileUpload(e, 'text2'));
+            
+            // Source selector listeners
+            this.elements.loadSource1Btn.addEventListener('click', () => this.showSourceSelector1());
+            this.elements.loadSource2Btn.addEventListener('click', () => this.showSourceSelector2());
             
             // Text input listeners
             this.elements.text1.addEventListener('input', () => this.updateLineCount());
@@ -647,6 +656,76 @@ document.addEventListener('DOMContentLoaded', function() {
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        /**
+         * Initialize source selectors for both text inputs
+         */
+        initializeSourceSelectors() {
+            // Source selector for Text 1
+            this.sourceSelector1 = new SourceSelector({
+                containerId: 'textDiffSourceSelector1',
+                onFetch: (data, source) => this.loadSourceData(data, source, 'text1'),
+                onEdit: (source) => console.log('Source 1 edited:', source)
+            });
+
+            // Source selector for Text 2
+            this.sourceSelector2 = new SourceSelector({
+                containerId: 'textDiffSourceSelector2',
+                onFetch: (data, source) => this.loadSourceData(data, source, 'text2'),
+                onEdit: (source) => console.log('Source 2 edited:', source)
+            });
+        }
+
+        /**
+         * Show source selector for text input 1
+         */
+        showSourceSelector1() {
+            this.sourceSelector1.show();
+        }
+
+        /**
+         * Show source selector for text input 2
+         */
+        showSourceSelector2() {
+            this.sourceSelector2.show();
+        }
+
+        /**
+         * Load data from source into specified text input
+         */
+        loadSourceData(data, source, targetTextArea) {
+            const textElement = this.elements[targetTextArea];
+            if (textElement) {
+                textElement.value = data;
+                this.updateLineCount();
+                
+                // Show source path in file label
+                const isText1 = targetTextArea === 'text1';
+                const filePathElement = isText1 ? this.elements.leftFilePath : this.elements.rightFilePath;
+                
+                if (filePathElement) {
+                    const sourcePath = this.resolveSourcePath(source);
+                    filePathElement.textContent = this.truncateFilePath(sourcePath);
+                    filePathElement.style.display = 'inline';
+                }
+            }
+        }
+
+        /**
+         * Resolve source path with dynamic variables (same as JSON formatter)
+         */
+        resolveSourcePath(source) {
+            let path = source.pathTemplate || source.path || '';
+            
+            if (source.dynamicVariables) {
+                Object.entries(source.dynamicVariables).forEach(([key, value]) => {
+                    const placeholder = `$${key}`;
+                    path = path.replace(new RegExp('\\' + placeholder, 'g'), value || placeholder);
+                });
+            }
+            
+            return path;
         }
 
         /**
