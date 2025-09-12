@@ -29,6 +29,12 @@ class SourceSelector {
         }).catch(error => {
             console.error('Failed to initialize SourceSelector:', error);
         });
+
+        // Register this instance globally for inline form callbacks
+        if (!window.sourceSelectors) {
+            window.sourceSelectors = {};
+        }
+        window.sourceSelectors[this.options.containerId] = this;
     }
 
     /**
@@ -98,39 +104,42 @@ class SourceSelector {
      */
     getFallbackHTML() {
         return `
-            <div class="modal-overlay source-selector-overlay" id="${this.options.containerId}-overlay" style="display: none;"></div>
-            <div class="modal source-selector-modal" id="${this.options.containerId}" style="display: none;">
+            <div class="source-selector-overlay" id="${this.options.containerId}-overlay" style="display: none;"></div>
+            <div class="source-selector-modal" id="${this.options.containerId}" style="display: none;">
                 <div class="modal-header">
                     <h2>Select a Source</h2>
-                    <button class="modal-close-btn source-selector-close">&times;</button>
+                    <button class="close-btn">&times;</button>
                 </div>
-                <div class="modal-content">
-                    <div class="source-selector-loading" style="display: none;">
-                        <p>Loading sources...</p>
+                <div class="modal-body">
+                    <div class="sources-panel">
+                        <div class="loading-state" id="${this.options.containerId}-loading" style="display: none;">Loading sources...</div>
+                        <div class="empty-state" id="${this.options.containerId}-empty" style="display: none;">
+                            No sources available. <a href="/sources" target="_blank">Create a source</a> to get started.
+                        </div>
+                        <div class="sources-list" id="${this.options.containerId}-list"></div>
                     </div>
-                    <div class="source-selector-empty" style="display: none;">
-                        <p>No sources available. <a href="/sources" target="_blank">Create a source</a> to get started.</p>
-                    </div>
-                    <div class="source-selector-list" id="${this.options.containerId}-list">
-                        <!-- Sources will be populated here -->
+                    <div class="explorer-panel" id="${this.options.containerId}-explorer" style="display: none;">
+                        <div class="panel-header">
+                            <h3>Explorer</h3>
+                            <button class="close-explorer" id="${this.options.containerId}-close-explorer">&times;</button>
+                        </div>
+                        <div class="explorer-content" id="${this.options.containerId}-explorer-content"></div>
                     </div>
                 </div>
             </div>
             
             <!-- Dynamic Variables Edit Modal -->
-            <div class="modal-overlay dynamic-vars-overlay" id="${this.options.containerId}-vars-overlay" style="display: none;"></div>
-            <div class="modal dynamic-vars-modal" id="${this.options.containerId}-vars-modal" style="display: none;">
+            <div class="vars-overlay" id="${this.options.containerId}-vars-overlay" style="display: none;"></div>
+            <div class="vars-modal" id="${this.options.containerId}-vars-modal" style="display: none;">
                 <div class="modal-header">
                     <h2>Edit Dynamic Variables</h2>
-                    <button class="modal-close-btn dynamic-vars-close">&times;</button>
+                    <button class="close-btn">&times;</button>
                 </div>
-                <div class="modal-content">
-                    <div class="dynamic-vars-form" id="${this.options.containerId}-vars-form">
-                        <!-- Dynamic variables form will be populated here -->
-                    </div>
+                <div class="modal-body">
+                    <div class="vars-form" id="${this.options.containerId}-vars-form"></div>
                     <div class="modal-actions">
-                        <button class="btn btn-primary dynamic-vars-save">Save</button>
-                        <button class="btn btn-secondary dynamic-vars-cancel">Cancel</button>
+                        <button class="btn btn-primary">Save</button>
+                        <button class="btn btn-secondary">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -143,13 +152,13 @@ class SourceSelector {
     attachEventListeners() {
         const modal = document.getElementById(this.options.containerId);
         const overlay = document.getElementById(`${this.options.containerId}-overlay`);
-        const closeBtn = modal.querySelector('.source-selector-close');
+        const closeBtn = modal.querySelector('.close-btn');
         
         const varsModal = document.getElementById(`${this.options.containerId}-vars-modal`);
         const varsOverlay = document.getElementById(`${this.options.containerId}-vars-overlay`);
-        const varsCloseBtn = varsModal.querySelector('.dynamic-vars-close');
-        const varsSaveBtn = varsModal.querySelector('.dynamic-vars-save');
-        const varsCancelBtn = varsModal.querySelector('.dynamic-vars-cancel');
+        const varsCloseBtn = varsModal.querySelector('.close-btn');
+        const varsSaveBtn = varsModal.querySelector('.btn-primary');
+        const varsCancelBtn = varsModal.querySelector('.btn-secondary');
 
         // Close main modal
         [overlay, closeBtn].forEach(element => {
@@ -175,8 +184,8 @@ class SourceSelector {
      * Load sources from the API
      */
     async loadSources() {
-        const loadingDiv = document.querySelector('.source-selector-loading');
-        const emptyDiv = document.querySelector('.source-selector-empty');
+        const loadingDiv = document.getElementById(`${this.options.containerId}-loading`);
+        const emptyDiv = document.getElementById(`${this.options.containerId}-empty`);
         const listDiv = document.getElementById(`${this.options.containerId}-list`);
 
         try {
@@ -206,7 +215,7 @@ class SourceSelector {
      */
     renderSources() {
         const listDiv = document.getElementById(`${this.options.containerId}-list`);
-        const emptyDiv = document.querySelector('.source-selector-empty');
+        const emptyDiv = document.getElementById(`${this.options.containerId}-empty`);
 
         if (this.sources.length === 0) {
             emptyDiv.style.display = 'block';
@@ -228,23 +237,17 @@ class SourceSelector {
                         <div class="source-path">${this.escapeHtml(resolvedPath)}</div>
                     </div>
                     <div class="source-actions">
-                        <span class="test-status" id="test-status-${source.id}"></span>
-                        ${this.options.showEditButton && hasDynamicVars ? 
-                            `<button class="source-btn source-btn-edit" data-action="edit" data-source-id="${source.id}">Edit</button>` : ''}
-                        <button class="source-btn source-btn-test" data-action="test" data-source-id="${source.id}">Test</button>
-                        ${this.options.showFetchButton ? 
-                            `<button class="source-btn source-btn-fetch" data-action="fetch" data-source-id="${source.id}">Fetch</button>` : ''}
+                        <div class="source-buttons">
+                            ${this.options.showEditButton && hasDynamicVars ? 
+                                `<button class="source-btn source-btn-edit" data-action="edit" data-source-id="${source.id}">Edit</button>` : ''}
+                            <button class="source-btn source-btn-test" data-action="test" data-source-id="${source.id}">Test</button>
+                            ${this.options.showFetchButton ? 
+                                `<button class="source-btn source-btn-fetch" data-action="fetch" data-source-id="${source.id}">Fetch</button>` : ''}
+                        </div>
+                        <div class="source-status">
+                            <span class="test-status" id="test-status-${source.id}"></span>
+                        </div>
                     </div>
-                </div>
-                <div class="file-tree-container" id="file-tree-${this.options.containerId}-${source.id}" style="display:none;">
-                    <div class="file-tree-header">
-                        <span>Select a file:</span>
-                        <button class="close-tree-btn" onclick="this.parentElement.parentElement.style.display='none'">×</button>
-                    </div>
-                    <div class="file-tree" id="tree-${this.options.containerId}-${source.id}">
-                        <!-- Tree will be populated here -->
-                    </div>
-                </div>
                 </div>
             `;
         }).join('');
@@ -287,33 +290,68 @@ class SourceSelector {
     }
 
     /**
-     * Show the variables editing modal
+     * Show the variables editing form in the explorer panel
      */
     showEditVariables(source) {
         this.currentEditingSource = source;
-        const varsModal = document.getElementById(`${this.options.containerId}-vars-modal`);
-        const varsOverlay = document.getElementById(`${this.options.containerId}-vars-overlay`);
-        const varsForm = document.getElementById(`${this.options.containerId}-vars-form`);
+        const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
+        const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
+        
+        if (!explorerPanel || !explorerContent) {
+            console.error(`Explorer panel not found for ${this.options.containerId}`);
+            return;
+        }
 
         if (!source.dynamicVariables || Object.keys(source.dynamicVariables).length === 0) {
             alert('This source has no dynamic variables to edit.');
             return;
         }
 
-        // Create form for dynamic variables
+        // Show explorer panel
+        explorerPanel.style.display = 'flex';
+
+        // Update panel header
+        const panelHeader = explorerPanel.querySelector('.panel-header h3');
+        if (panelHeader) {
+            panelHeader.textContent = 'Dynamic Variables';
+        }
+
+        // Create variables edit form
+        explorerContent.innerHTML = this.createVariablesEditForm(source);
+    }
+
+    /**
+     * Create variables edit form HTML
+     */
+    createVariablesEditForm(source) {
         const formHTML = Object.entries(source.dynamicVariables).map(([key, value]) => `
-            <div class="dynamic-var-row">
-                <label class="dynamic-var-label">${this.escapeHtml(key)}:</label>
-                <input type="text" class="dynamic-var-input" data-var-key="${key}" value="${this.escapeHtml(value || '')}" placeholder="Enter value for ${key}">
+            <div class="var-row">
+                <label class="var-label">${this.escapeHtml(key)}:</label>
+                <input type="text" class="var-input" data-var-key="${key}" value="${this.escapeHtml(value || '')}" placeholder="Enter value for ${key}">
             </div>
-            <div class="dynamic-var-description">Variable: $${key}</div>
+            <div class="var-description">Variable: $${key}</div>
         `).join('');
 
-        varsForm.innerHTML = formHTML;
-
-        // Show modal
-        varsOverlay.style.display = 'block';
-        varsModal.style.display = 'block';
+        return `
+            <div class="variables-edit-card">
+                <div class="variables-edit-header">
+                    <span class="edit-icon">✏️</span>
+                    <span class="edit-title">Edit Dynamic Variables</span>
+                </div>
+                <div class="variables-edit-details">
+                    <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
+                    <strong>Type:</strong> ${this.escapeHtml(source.type.toUpperCase())}<br>
+                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}
+                </div>
+                <div class="variables-form" id="${this.options.containerId}-inline-vars-form">
+                    ${formHTML}
+                </div>
+                <div class="variables-actions">
+                    <button class="var-btn var-btn-save" onclick="window.sourceSelectors?.['${this.options.containerId}']?.saveInlineVariables()">Save Changes</button>
+                    <button class="var-btn var-btn-cancel" onclick="window.sourceSelectors?.['${this.options.containerId}']?.hideExplorerPanel()">Cancel</button>
+                </div>
+            </div>
+        `;
     }
 
     /**
@@ -329,13 +367,82 @@ class SourceSelector {
     }
 
     /**
-     * Save variables
+     * Save variables from the inline form
+     */
+    async saveInlineVariables() {
+        if (!this.currentEditingSource) return;
+
+        const varsForm = document.getElementById(`${this.options.containerId}-inline-vars-form`);
+        if (!varsForm) return;
+        
+        const inputs = varsForm.querySelectorAll('.var-input');
+        
+        const updatedVars = {};
+        inputs.forEach(input => {
+            updatedVars[input.dataset.varKey] = input.value;
+        });
+
+        // Update the source object locally
+        this.currentEditingSource.dynamicVariables = updatedVars;
+
+        try {
+            // Save to backend
+            const response = await fetch(`/api/sources/${this.currentEditingSource.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: this.currentEditingSource.name,
+                    type: this.currentEditingSource.type,
+                    staticConfig: this.currentEditingSource.staticConfig || {},
+                    pathTemplate: this.currentEditingSource.pathTemplate || this.currentEditingSource.path || '',
+                    dynamicVariables: updatedVars
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    // Update the source in our local list
+                    const sourceIndex = this.sources.findIndex(s => s.id === this.currentEditingSource.id);
+                    if (sourceIndex !== -1) {
+                        this.sources[sourceIndex].dynamicVariables = updatedVars;
+                    }
+                    
+                    // Re-render sources to show updated path
+                    this.renderSources();
+                    
+                    // Hide the explorer panel
+                    this.hideExplorerPanel();
+                    
+                    console.log('Source saved successfully');
+                } else {
+                    throw new Error(result.error || 'Failed to save source');
+                }
+            } else {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error saving source:', error);
+            alert(`Error saving source: ${error.message}`);
+            return;
+        }
+
+        // Trigger edit callback if provided
+        if (this.options.onEdit) {
+            this.options.onEdit(this.currentEditingSource);
+        }
+    }
+
+    /**
+     * Save variables (legacy modal method)
      */
     async saveVariables() {
         if (!this.currentEditingSource) return;
 
         const varsForm = document.getElementById(`${this.options.containerId}-vars-form`);
-        const inputs = varsForm.querySelectorAll('.dynamic-var-input');
+        const inputs = varsForm.querySelectorAll('.var-input');
         
         const updatedVars = {};
         inputs.forEach(input => {
@@ -464,17 +571,41 @@ class SourceSelector {
             const levelClass = level > 0 ? `tree-level-${Math.min(level, 2)}` : '';
             const itemClass = isDirectory ? 'directory' : 'file';
             const nonExplorable = isDirectory && item.explorable === false;
+            
+            // Format file size
             const sizeText = !isDirectory && item.size !== null ? this.formatFileSize(item.size) : '';
+            
+            // Format last modified date
+            let dateText = '';
+            if (item.last_modified || item.modified) {
+                const date = new Date(item.last_modified || item.modified);
+                dateText = date.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                });
+            }
+            
+            // Create metadata section
+            let metadataHtml = '';
+            if (sizeText || dateText || nonExplorable) {
+                metadataHtml = `
+                    <div class="tree-metadata">
+                        ${sizeText ? `<div class="tree-size">${sizeText}</div>` : ''}
+                        ${dateText ? `<div class="tree-date">${dateText}</div>` : ''}
+                        ${nonExplorable ? '<div class="tree-date">(not explorable)</div>' : ''}
+                    </div>
+                `;
+            }
             
             let itemHtml = `
                 <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''}" 
                      data-path="${item.path}" 
                      data-is-directory="${isDirectory}"
                      data-source-id="${source.id}">
-                    <span class="tree-item-icon">${icon}</span>
-                    <span class="tree-item-name">${this.escapeHtml(item.name)}</span>
-                    ${sizeText ? `<span class="tree-item-size">${sizeText}</span>` : ''}
-                    ${nonExplorable ? '<span class="tree-item-size">(not explorable)</span>' : ''}
+                    <span class="tree-icon">${icon}</span>
+                    <span class="tree-name">${this.escapeHtml(item.name)}</span>
+                    ${metadataHtml}
                 </div>
             `;
             
@@ -653,9 +784,52 @@ class SourceSelector {
         // Show explorer panel
         explorerPanel.style.display = 'flex';
 
-        // Clear previous content and render the tree
-        explorerContent.innerHTML = '';
-        this.renderFileTree(directoryData.tree, explorerContent, source, 0);
+        // Reset panel header
+        const panelHeader = explorerPanel.querySelector('.panel-header h3');
+        if (panelHeader) {
+            panelHeader.textContent = 'File Explorer';
+        }
+
+        // Create file explorer card and render the tree
+        explorerContent.innerHTML = this.createFileExplorerCard(source, directoryData);
+        
+        // Render the tree inside the card
+        const treeContainer = explorerContent.querySelector('.file-tree-container');
+        if (treeContainer) {
+            this.renderFileTree(directoryData.tree, treeContainer, source, 0);
+        }
+    }
+
+    /**
+     * Create file explorer card HTML
+     */
+    createFileExplorerCard(source, directoryData) {
+        const itemCount = directoryData.tree ? directoryData.tree.length : 0;
+        const folderCount = directoryData.tree ? directoryData.tree.filter(item => item.is_directory).length : 0;
+        const fileCount = itemCount - folderCount;
+
+        return `
+            <div class="file-explorer-card">
+                <div class="file-explorer-header">
+                    <span class="explorer-icon">📁</span>
+                    <span class="explorer-title">Browse Files & Folders</span>
+                </div>
+                <div class="file-explorer-details">
+                    <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
+                    <strong>Type:</strong> ${this.escapeHtml(source.type.toUpperCase())}<br>
+                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}<br>
+                    <strong>Items:</strong> ${itemCount} total (${folderCount} folders, ${fileCount} files)
+                </div>
+                <div class="file-explorer-content">
+                    <div class="file-tree-header">
+                        <span class="tree-icon">📂</span>
+                        <span class="tree-name">Name</span>
+                        <span class="tree-metadata">Size / Date</span>
+                    </div>
+                    <div class="file-tree-container"></div>
+                </div>
+            </div>
+        `;
     }
 
     /**
@@ -673,12 +847,61 @@ class SourceSelector {
         // Show explorer panel
         explorerPanel.style.display = 'flex';
 
-        // Clear previous content and render file info
-        explorerContent.innerHTML = this.createFileInfoCard(source, fileData);
+        // Reset panel header
+        const panelHeader = explorerPanel.querySelector('.panel-header h3');
+        if (panelHeader) {
+            panelHeader.textContent = 'File Info';
+        }
+
+        // Clear previous content and render file info card
+        explorerContent.innerHTML = this.createFileInfoDisplayCard(source, fileData);
     }
 
     /**
-     * Create file info card HTML
+     * Create file info display card HTML (new style)
+     */
+    createFileInfoDisplayCard(source, fileData) {
+        const fileName = fileData.name || source.name || 'Unknown file';
+        const filePath = fileData.path || source.pathTemplate || 'Unknown path';
+        const fileSize = fileData.size ? this.formatFileSize(fileData.size) : 'Unknown';
+        const lastModified = fileData.last_modified || fileData.modified;
+        const formattedDate = lastModified ? new Date(lastModified).toLocaleString() : 'Unknown';
+
+        return `
+            <div class="file-explorer-card">
+                <div class="file-explorer-header">
+                    <span class="explorer-icon">📄</span>
+                    <span class="explorer-title">File Information</span>
+                </div>
+                <div class="file-explorer-details">
+                    <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
+                    <strong>Type:</strong> ${this.escapeHtml(source.type.toUpperCase())}<br>
+                    <strong>Location:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}
+                </div>
+                <div class="file-explorer-content">
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Filename:</span>
+                        <span class="file-detail-value">${this.escapeHtml(fileName)}</span>
+                    </div>
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Path:</span>
+                        <span class="file-detail-value">${this.escapeHtml(filePath)}</span>
+                    </div>
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Size:</span>
+                        <span class="file-detail-value">${fileSize}</span>
+                    </div>
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Modified:</span>
+                        <span class="file-detail-value">${formattedDate}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Create file info card HTML (legacy method for backward compatibility)
      */
     createFileInfoCard(source, fileData) {
         const fileName = fileData.name || source.name || 'Unknown file';
@@ -722,7 +945,16 @@ class SourceSelector {
         const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
         if (explorerPanel) {
             explorerPanel.style.display = 'none';
+            
+            // Reset panel header
+            const panelHeader = explorerPanel.querySelector('.panel-header h3');
+            if (panelHeader) {
+                panelHeader.textContent = 'Explorer';
+            }
         }
+        
+        // Clear current editing source
+        this.currentEditingSource = null;
     }
 
     /**
@@ -740,6 +972,12 @@ class SourceSelector {
         // Show explorer panel
         explorerPanel.style.display = 'flex';
 
+        // Update panel header
+        const panelHeader = explorerPanel.querySelector('.panel-header h3');
+        if (panelHeader) {
+            panelHeader.textContent = 'Test Result';
+        }
+
         // Create error card
         const errorMessage = testResult.error || testResult.message || 'Unknown error occurred during testing';
         const statusText = testResult.status || 'error';
@@ -753,9 +991,9 @@ class SourceSelector {
                 </div>
                 <div class="test-error-details">
                     <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
-                    <strong>Status:</strong> ${this.escapeHtml(statusText)}<br>
-                    <strong>Response Time:</strong> ${responseTime}<br>
-                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}
+                    <strong>Type:</strong> ${this.escapeHtml(source.type.toUpperCase())}<br>
+                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}<br>
+                    <strong>Status:</strong> ${this.escapeHtml(statusText)} (${responseTime})
                 </div>
                 <div class="test-error-message">${this.escapeHtml(errorMessage)}</div>
             </div>
@@ -777,6 +1015,12 @@ class SourceSelector {
         // Show explorer panel
         explorerPanel.style.display = 'flex';
 
+        // Update panel header
+        const panelHeader = explorerPanel.querySelector('.panel-header h3');
+        if (panelHeader) {
+            panelHeader.textContent = 'Test Result';
+        }
+
         // Create success card
         const successMessage = testResult.message || 'Connection test passed successfully';
         const statusText = testResult.status || 'connected';
@@ -790,9 +1034,9 @@ class SourceSelector {
                 </div>
                 <div class="test-success-details">
                     <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
-                    <strong>Status:</strong> ${this.escapeHtml(statusText)}<br>
-                    <strong>Response Time:</strong> ${responseTime}<br>
-                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}
+                    <strong>Type:</strong> ${this.escapeHtml(source.type.toUpperCase())}<br>
+                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}<br>
+                    <strong>Status:</strong> ${this.escapeHtml(statusText)} (${responseTime})
                 </div>
                 <div class="test-success-message">${this.escapeHtml(successMessage)}</div>
             </div>
@@ -813,7 +1057,7 @@ class SourceSelector {
         const overlay = document.getElementById(`${this.options.containerId}-overlay`);
         
         overlay.style.display = 'block';
-        modal.style.display = 'block';
+        modal.style.display = 'flex';
         this.isVisible = true;
         
         // Reload sources when showing
