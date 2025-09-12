@@ -112,9 +112,15 @@ class SourceSelector {
                 </div>
                 <div class="modal-body">
                     <div class="sources-panel">
+                        <div class="sources-search">
+                            <input type="text" class="search-input" id="${this.options.containerId}-search" placeholder="🔍 Search sources..." autocomplete="off">
+                        </div>
                         <div class="loading-state" id="${this.options.containerId}-loading" style="display: none;">Loading sources...</div>
                         <div class="empty-state" id="${this.options.containerId}-empty" style="display: none;">
                             No sources available. <a href="/sources" target="_blank">Create a source</a> to get started.
+                        </div>
+                        <div class="no-results-state" id="${this.options.containerId}-no-results" style="display: none;">
+                            No sources match your search. Try different keywords.
                         </div>
                         <div class="sources-list" id="${this.options.containerId}-list"></div>
                     </div>
@@ -178,6 +184,12 @@ class SourceSelector {
         if (closeExplorerBtn) {
             closeExplorerBtn.addEventListener('click', () => this.hideExplorerPanel());
         }
+
+        // Search functionality
+        const searchInput = document.getElementById(`${this.options.containerId}-search`);
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => this.filterSources(e.target.value));
+        }
     }
 
     /**
@@ -186,11 +198,13 @@ class SourceSelector {
     async loadSources() {
         const loadingDiv = document.getElementById(`${this.options.containerId}-loading`);
         const emptyDiv = document.getElementById(`${this.options.containerId}-empty`);
+        const noResultsDiv = document.getElementById(`${this.options.containerId}-no-results`);
         const listDiv = document.getElementById(`${this.options.containerId}-list`);
 
         try {
             loadingDiv.style.display = 'block';
             emptyDiv.style.display = 'none';
+            noResultsDiv.style.display = 'none';
             listDiv.innerHTML = '';
 
             const response = await fetch('/api/sources');
@@ -198,6 +212,7 @@ class SourceSelector {
 
             if (result.success && result.sources) {
                 this.sources = Object.values(result.sources);
+                this.allSources = [...this.sources]; // Store all sources for filtering
                 this.renderSources();
             } else {
                 throw new Error(result.error || 'Failed to load sources');
@@ -216,14 +231,22 @@ class SourceSelector {
     renderSources() {
         const listDiv = document.getElementById(`${this.options.containerId}-list`);
         const emptyDiv = document.getElementById(`${this.options.containerId}-empty`);
+        const noResultsDiv = document.getElementById(`${this.options.containerId}-no-results`);
+
+        // Hide all state indicators first
+        emptyDiv.style.display = 'none';
+        noResultsDiv.style.display = 'none';
 
         if (this.sources.length === 0) {
-            emptyDiv.style.display = 'block';
+            // Check if we have all sources but none match the filter
+            if (this.allSources && this.allSources.length > 0) {
+                noResultsDiv.style.display = 'block';
+            } else {
+                emptyDiv.style.display = 'block';
+            }
             listDiv.innerHTML = '';
             return;
         }
-
-        emptyDiv.style.display = 'none';
 
         const sourcesHTML = this.sources.map(source => {
             const hasDynamicVars = source.dynamicVariables && Object.keys(source.dynamicVariables).length > 0;
@@ -287,6 +310,30 @@ class SourceSelector {
         }
 
         return path;
+    }
+
+    /**
+     * Filter sources based on search query
+     */
+    filterSources(query) {
+        if (!query || query.trim() === '') {
+            // Show all sources if no search query
+            this.sources = this.allSources ? [...this.allSources] : [];
+        } else {
+            const searchTerm = query.toLowerCase().trim();
+            this.sources = (this.allSources || []).filter(source => {
+                // Search in source name, type, and resolved path
+                const name = source.name.toLowerCase();
+                const type = source.type.toLowerCase();
+                const path = this.resolveSourcePath(source).toLowerCase();
+                
+                return name.includes(searchTerm) || 
+                       type.includes(searchTerm) || 
+                       path.includes(searchTerm);
+            });
+        }
+        
+        this.renderSources();
     }
 
     /**
@@ -1059,6 +1106,12 @@ class SourceSelector {
         overlay.style.display = 'block';
         modal.style.display = 'flex';
         this.isVisible = true;
+        
+        // Clear search when showing
+        const searchInput = document.getElementById(`${this.options.containerId}-search`);
+        if (searchInput) {
+            searchInput.value = '';
+        }
         
         // Reload sources when showing
         this.loadSources();
