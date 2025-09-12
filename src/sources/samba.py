@@ -8,7 +8,7 @@ from typing import Union, Iterator, List, Dict, Any, Optional
 from urllib.parse import urlparse
 import socket
 
-from .base import BaseDataSource, SourceMetadata, TestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
 from .exceptions import (
     SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
     SourceDataError, SourceTimeoutError, SourceAuthenticationError, SourceConfigurationError
@@ -101,7 +101,7 @@ class SambaSource(BaseDataSource):
             else:
                 raise SourceConnectionError(f"Failed to connect to SMB server: {str(e)}")
     
-    def test_connection(self) -> TestResult:
+    def test_connection(self) -> ConnectionTestResult:
         """Test SMB connection and share access."""
         start_time = datetime.now()
         
@@ -116,7 +116,7 @@ class SambaSource(BaseDataSource):
                 share_found = any(s.name.lower() == share.lower() for s in shares)
                 
                 if not share_found:
-                    return self._cache_test_result(TestResult(
+                    return self._cache_test_result(ConnectionTestResult(
                         success=False,
                         status='error',
                         message=f'SMB share not found: {share}',
@@ -129,7 +129,7 @@ class SambaSource(BaseDataSource):
                     attrs = smb_conn.getAttributes(share, path)
                     metadata = self._parse_smb_attrs(attrs, path)
                     
-                    return self._cache_test_result(TestResult(
+                    return self._cache_test_result(ConnectionTestResult(
                         success=True,
                         status='connected',
                         message=f'Successfully accessed SMB path: {share}{path}',
@@ -139,7 +139,7 @@ class SambaSource(BaseDataSource):
                     
                 except Exception as e:
                     if 'does not exist' in str(e).lower() or 'not found' in str(e).lower():
-                        return self._cache_test_result(TestResult(
+                        return self._cache_test_result(ConnectionTestResult(
                             success=False,
                             status='error',
                             message=f'SMB path not found: {share}{path}',
@@ -147,7 +147,7 @@ class SambaSource(BaseDataSource):
                             error='Path not found'
                         ))
                     elif 'access denied' in str(e).lower() or 'permission' in str(e).lower():
-                        return self._cache_test_result(TestResult(
+                        return self._cache_test_result(ConnectionTestResult(
                             success=False,
                             status='unauthorized',
                             message=f'Access denied to SMB path: {share}{path}',
@@ -159,7 +159,7 @@ class SambaSource(BaseDataSource):
                         
             except Exception as e:
                 if 'access denied' in str(e).lower():
-                    return self._cache_test_result(TestResult(
+                    return self._cache_test_result(ConnectionTestResult(
                         success=False,
                         status='unauthorized',
                         message=f'Access denied to SMB share: {share}',
@@ -170,7 +170,7 @@ class SambaSource(BaseDataSource):
                     raise e
                     
         except SourceAuthenticationError as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='unauthorized',
                 message=str(e),
@@ -178,7 +178,7 @@ class SambaSource(BaseDataSource):
                 error=str(e)
             ))
         except SourceTimeoutError as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='timeout',
                 message=str(e),
@@ -186,7 +186,7 @@ class SambaSource(BaseDataSource):
                 error=str(e)
             ))
         except Exception as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='error',
                 message=f'SMB connection failed: {str(e)}',

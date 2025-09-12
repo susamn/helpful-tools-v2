@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Union, Iterator, List, Dict, Any, Optional
 import stat
 
-from .base import BaseDataSource, SourceMetadata, TestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
 from .exceptions import (
     SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
     SourceDataError, SourceTimeoutError
@@ -23,7 +23,7 @@ class LocalFileSource(BaseDataSource):
         super().__init__(config)
         self._resolved_path = config.get_resolved_path()
     
-    def test_connection(self) -> TestResult:
+    def test_connection(self) -> ConnectionTestResult:
         """Test if the local file/directory exists and is accessible."""
         start_time = datetime.now()
         
@@ -31,7 +31,7 @@ class LocalFileSource(BaseDataSource):
             path = Path(self._resolved_path)
             
             if not path.exists():
-                result = TestResult(
+                result = ConnectionTestResult(
                     success=False,
                     status='error',
                     message=f'Path does not exist: {self._resolved_path}',
@@ -39,7 +39,7 @@ class LocalFileSource(BaseDataSource):
                     error='Path not found'
                 )
             elif not os.access(str(path), os.R_OK):
-                result = TestResult(
+                result = ConnectionTestResult(
                     success=False,
                     status='unauthorized',
                     message=f'No read permission for: {self._resolved_path}',
@@ -48,7 +48,7 @@ class LocalFileSource(BaseDataSource):
                 )
             else:
                 metadata = self._get_path_metadata(path)
-                result = TestResult(
+                result = ConnectionTestResult(
                     success=True,
                     status='connected',
                     message=f'Successfully accessed: {self._resolved_path}',
@@ -57,7 +57,7 @@ class LocalFileSource(BaseDataSource):
                 )
                 
         except Exception as e:
-            result = TestResult(
+            result = ConnectionTestResult(
                 success=False,
                 status='error',
                 message=f'Error accessing path: {str(e)}',

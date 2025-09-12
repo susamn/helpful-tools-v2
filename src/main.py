@@ -1262,7 +1262,7 @@ def test_source_connection(source_type, config, source_data=None):
         source = SourceFactory.create_source(source_config)
         test_result = source.test_connection()
         
-        # Convert TestResult to dictionary format expected by the API
+        # Convert ConnectionTestResult to dictionary format expected by the API
         return {
             'success': test_result.success,
             'status': test_result.status,
@@ -1720,34 +1720,53 @@ def browse_source_directory(source_id):
         source_type = source.get('type')
         config = source.get('config', {})
         
-        # Only support local file sources for now
-        if source_type != 'local_file':
-            return jsonify({'success': False, 'error': 'Directory browsing only supported for local file sources'}), 400
+        # Support local file and S3 sources
+        if source_type not in ['local_file', 's3']:
+            return jsonify({'success': False, 'error': 'Directory browsing only supported for local file and S3 sources'}), 400
         
-        base_path = config.get('path')
-        if not base_path:
-            return jsonify({'success': False, 'error': 'No path specified in source'}), 400
+        # Convert to SourceConfig and create source instance
+        source_config = convert_to_source_config(source)
+        source_instance = SourceFactory.create_source(source_config)
         
-        # Expand user path
-        base_path = os.path.expanduser(base_path)
+        base_path = source_config.get_resolved_path()
         
-        if not os.path.exists(base_path):
-            return jsonify({'success': False, 'error': f'Path does not exist: {base_path}'}), 404
-        
-        if not os.path.isdir(base_path):
-            return jsonify({'success': False, 'error': 'Source path is not a directory'}), 400
-        
-        # Get requested path from query parameter (for lazy loading)
-        requested_path = request.args.get('path', '')
-        current_path = os.path.join(base_path, requested_path) if requested_path else base_path
-        current_path = os.path.normpath(current_path)
-        
-        # Security check - ensure we don't go outside base path
-        if not current_path.startswith(base_path):
-            return jsonify({'success': False, 'error': 'Access denied'}), 403
-        
-        # Get directory contents
-        tree_data = get_directory_tree(current_path, base_path, max_depth=2)
+        if source_type == 'local_file':
+            # Handle local file sources
+            if not base_path:
+                return jsonify({'success': False, 'error': 'No path specified in source'}), 400
+            
+            # Expand user path
+            base_path = os.path.expanduser(base_path)
+            
+            if not os.path.exists(base_path):
+                return jsonify({'success': False, 'error': f'Path does not exist: {base_path}'}), 404
+            
+            if not os.path.isdir(base_path):
+                return jsonify({'success': False, 'error': 'Source path is not a directory'}), 400
+            
+            # Get requested path from query parameter (for lazy loading)
+            requested_path = request.args.get('path', '')
+            current_path = os.path.join(base_path, requested_path) if requested_path else base_path
+            current_path = os.path.normpath(current_path)
+            
+            # Security check - ensure we don't go outside base path
+            if not current_path.startswith(base_path):
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            # Get directory contents
+            tree_data = get_directory_tree(current_path, base_path, max_depth=2)
+            
+        elif source_type == 's3':
+            # Handle S3 sources
+            if not source_instance.is_directory():
+                return jsonify({'success': False, 'error': 'S3 source is not a directory/prefix'}), 400
+            
+            # Get requested prefix from query parameter
+            requested_prefix = request.args.get('path', '')
+            current_path = base_path  # For S3, base_path is the S3 URL
+            
+            # Get S3 directory contents
+            tree_data = get_s3_directory_tree(source_instance, requested_prefix, max_depth=2)
         
         return jsonify({
             'success': True,
@@ -1758,6 +1777,59 @@ def browse_source_directory(source_id):
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+def get_s3_directory_tree(source_instance, prefix="", current_depth=0, max_depth=2):
+    """Get S3 directory tree structure with limited depth"""
+    try:
+        if current_depth >= max_depth:
+            return None
+            
+        items = []
+        
+        # List contents of current prefix
+        contents = source_instance.list_contents(prefix)
+        
+        for item in sorted(contents, key=lambda x: (not x['is_directory'], x['name'])):
+            item_data = {
+                'name': item['name'],
+                'path': item.get('key', item.get('prefix', '')),
+                'is_directory': item['is_directory'],
+                'size': item.get('size'),
+                'modified': item.get('modified')
+            }
+            
+            if item['is_directory']:
+                # Check if directory has contents
+                try:
+                    # Quick check for children
+                    child_contents = source_instance.list_contents(item.get('prefix', ''))
+                    has_contents = len(child_contents) > 0
+                    item_data['has_children'] = has_contents
+                    
+                    if current_depth + 1 < max_depth and has_contents:
+                        # Recursively get children
+                        children = get_s3_directory_tree(
+                            source_instance, 
+                            item.get('prefix', ''), 
+                            current_depth + 1, 
+                            max_depth
+                        )
+                        if children:
+                            item_data['children'] = children
+                    else:
+                        # Mark as non-explorable if at max depth
+                        item_data['explorable'] = current_depth + 1 < max_depth
+                        
+                except Exception:
+                    item_data['has_children'] = False
+                    item_data['error'] = 'Access denied'
+            
+            items.append(item_data)
+        
+        return items
+        
+    except Exception:
+        return []
 
 def get_directory_tree(path, base_path, current_depth=0, max_depth=2):
     """Get directory tree structure with limited depth"""
@@ -1832,48 +1904,97 @@ def get_source_file_data(source_id):
         source_type = source.get('type')
         config = source.get('config', {})
         
-        # Only support local file sources for now
-        if source_type != 'local_file':
-            return jsonify({'success': False, 'error': 'File browsing only supported for local file sources'}), 400
-        
-        base_path = config.get('path')
-        if not base_path:
-            return jsonify({'success': False, 'error': 'No path specified in source'}), 400
+        # Support local file and S3 sources
+        if source_type not in ['local_file', 's3']:
+            return jsonify({'success': False, 'error': 'File browsing only supported for local file and S3 sources'}), 400
         
         # Get the specific file path from query parameter
         file_path = request.args.get('path')
         if not file_path:
             return jsonify({'success': False, 'error': 'File path parameter required'}), 400
         
-        # Expand user path and construct full path
-        base_path = os.path.expanduser(base_path)
-        full_path = os.path.normpath(os.path.join(base_path, file_path))
-        
-        # Security check - ensure we don't go outside base path
-        if not full_path.startswith(base_path):
-            return jsonify({'success': False, 'error': 'Access denied'}), 403
-        
-        if not os.path.exists(full_path):
-            return jsonify({'success': False, 'error': 'File not found'}), 404
-        
-        if os.path.isdir(full_path):
-            return jsonify({'success': False, 'error': 'Path is a directory, not a file'}), 400
-        
-        # Read and return file content
-        try:
-            with open(full_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+        if source_type == 'local_file':
+            base_path = config.get('path')
+            if not base_path:
+                return jsonify({'success': False, 'error': 'No path specified in source'}), 400
             
-            return content, 200, {'Content-Type': 'text/plain'}
+            # Expand user path and construct full path
+            base_path = os.path.expanduser(base_path)
+            full_path = os.path.normpath(os.path.join(base_path, file_path))
             
-        except UnicodeDecodeError:
-            # Try with different encoding
+            # Security check - ensure we don't go outside base path
+            if not full_path.startswith(base_path):
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            if not os.path.exists(full_path):
+                return jsonify({'success': False, 'error': 'File not found'}), 404
+            
+            if os.path.isdir(full_path):
+                return jsonify({'success': False, 'error': 'Path is a directory, not a file'}), 400
+            
+            # Read and return file content
             try:
-                with open(full_path, 'r', encoding='latin-1') as f:
+                with open(full_path, 'r', encoding='utf-8') as f:
                     content = f.read()
+                
                 return content, 200, {'Content-Type': 'text/plain'}
-            except Exception:
-                return jsonify({'success': False, 'error': 'File is not a text file or has unsupported encoding'}), 400
+            except UnicodeDecodeError:
+                # Handle binary files
+                try:
+                    with open(full_path, 'rb') as f:
+                        content = f.read()
+                    return content, 200, {'Content-Type': 'application/octet-stream'}
+                except Exception:
+                    return jsonify({'success': False, 'error': 'Failed to read file'}), 500
+                
+        elif source_type == 's3':
+            # Handle S3 file reading
+            try:
+                source_config = convert_to_source_config(source)
+                s3_source = SourceFactory.create_source(source_config)
+                
+                # Parse the base S3 path
+                bucket = config.get('bucket')
+                if not bucket:
+                    return jsonify({'success': False, 'error': 'No S3 bucket specified in source'}), 400
+                
+                # Construct full S3 key
+                base_key = config.get('key', '')
+                if base_key and not base_key.endswith('/'):
+                    base_key += '/'
+                full_key = base_key + file_path
+                
+                # Create a new S3 source for the specific file
+                file_source_config = SourceConfig(
+                    source_id=source_config.source_id,
+                    name=source_config.name,
+                    source_type='s3',
+                    static_config=source_config.static_config,
+                    path_template=f"s3://{bucket}/{full_key}",
+                    dynamic_variables={},
+                    created_at=source_config.created_at,
+                    updated_at=source_config.updated_at
+                )
+                
+                file_source = SourceFactory.create_source(file_source_config)
+                
+                # Check if it's a file (not directory)
+                if not file_source.is_file():
+                    return jsonify({'success': False, 'error': 'Path is not a file'}), 400
+                
+                # Read file content
+                content = file_source.read_data(mode='text')
+                return content, 200, {'Content-Type': 'text/plain'}
+                
+            except Exception as e:
+                if 'decode' in str(e).lower():
+                    # Try binary mode for non-text files
+                    try:
+                        content = file_source.read_data(mode='binary')
+                        return content, 200, {'Content-Type': 'application/octet-stream'}
+                    except:
+                        pass
+                return jsonify({'success': False, 'error': f'Failed to read S3 file: {str(e)}'}), 500
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1896,9 +2017,18 @@ def fetch_source_data(source_id):
         if source_instance.is_directory():
             # Return directory tree structure for browsing
             try:
-                # Use existing browse logic
                 base_path = source_config.get_resolved_path()
-                tree_data = get_directory_tree(base_path, base_path, max_depth=2)
+                
+                # Handle different source types
+                if source_config.source_type == 'local_file':
+                    tree_data = get_directory_tree(base_path, base_path, max_depth=2)
+                elif source_config.source_type == 's3':
+                    # For S3, use the S3-specific tree function
+                    tree_data = get_s3_directory_tree(source_instance, max_depth=2)
+                else:
+                    # Generic approach using list_contents
+                    contents = source_instance.list_contents()
+                    tree_data = contents  # Basic listing for other source types
                 
                 return jsonify({
                     'success': True,

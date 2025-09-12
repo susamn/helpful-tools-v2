@@ -2,7 +2,7 @@
 Data sources package for the helpful-tools application.
 """
 
-from .base import DataSourceInterface, BaseDataSource, SourceConfig, SourceMetadata, TestResult
+from .base import DataSourceInterface, BaseDataSource, SourceConfig, SourceMetadata, ConnectionTestResult
 from .exceptions import *
 from .local_file import LocalFileSource
 from .s3 import S3Source
@@ -13,7 +13,7 @@ from .factory import SourceFactory, create_source
 
 __all__ = [
     # Base classes
-    'DataSourceInterface', 'BaseDataSource', 'SourceConfig', 'SourceMetadata', 'TestResult',
+    'DataSourceInterface', 'BaseDataSource', 'SourceConfig', 'SourceMetadata', 'ConnectionTestResult',
     
     # Exceptions
     'SourceException', 'SourceNotFoundError', 'SourceConnectionError', 

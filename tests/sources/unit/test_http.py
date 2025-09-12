@@ -13,7 +13,7 @@ from email.utils import formatdate
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from sources.http import HttpSource
-from sources.base import SourceConfig, SourceMetadata, TestResult
+from sources.base import SourceConfig, SourceMetadata, ConnectionTestResult
 from sources.exceptions import (
     SourceNotFoundError, SourceConnectionError, SourcePermissionError, SourceDataError
 )
@@ -119,7 +119,7 @@ class TestHttpSource:
         
         result = source.test_connection()
         
-        assert isinstance(result, TestResult)
+        assert isinstance(result, ConnectionTestResult)
         assert result.success is True
         assert result.status == 'connected'
         assert 'Successfully accessed' in result.message

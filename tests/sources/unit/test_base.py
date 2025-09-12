@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'src'))
 
 from sources.base import (
-    SourceConfig, SourceMetadata, TestResult, DataSourceInterface, BaseDataSource
+    SourceConfig, SourceMetadata, ConnectionTestResult, DataSourceInterface, BaseDataSource
 )
 from sources.exceptions import SourceConfigurationError, SourceConnectionError
 
@@ -157,12 +157,12 @@ class TestSourceMetadata:
         assert metadata.extra is None
 
 
-class TestTestResult:
-    """Test TestResult dataclass functionality."""
+class TestConnectionTestResult:
+    """Test ConnectionTestResult dataclass functionality."""
     
     def test_test_result_success(self):
-        """Test successful TestResult creation."""
-        result = TestResult(
+        """Test successful ConnectionTestResult creation."""
+        result = ConnectionTestResult(
             success=True,
             status='connected',
             message='Connection successful',
@@ -179,8 +179,8 @@ class TestTestResult:
         assert result.error is None
     
     def test_test_result_failure(self):
-        """Test failed TestResult creation."""
-        result = TestResult(
+        """Test failed ConnectionTestResult creation."""
+        result = ConnectionTestResult(
             success=False,
             status='error',
             message='Connection failed',
@@ -200,7 +200,7 @@ class MockDataSource(BaseDataSource):
     """Mock implementation of DataSourceInterface for testing."""
     
     def test_connection(self):
-        result = TestResult(success=True, status='connected', message='Mock connection')
+        result = ConnectionTestResult(success=True, status='connected', message='Mock connection')
         return self._cache_test_result(result)
     
     def get_metadata(self):
@@ -479,7 +479,7 @@ class TestDataSourceInterface:
         
         # Test all interface methods
         result = source.test_connection()
-        assert isinstance(result, TestResult)
+        assert isinstance(result, ConnectionTestResult)
         assert result.success is True
         
         metadata = source.get_metadata()
@@ -510,7 +510,7 @@ class MockDirectoryDataSource(BaseDataSource):
         self._exists = exists
     
     def test_connection(self):
-        result = TestResult(success=True, status='connected', message='Mock connection')
+        result = ConnectionTestResult(success=True, status='connected', message='Mock connection')
         return self._cache_test_result(result)
     
     def get_metadata(self):

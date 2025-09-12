@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import stat
 import socket
 
-from .base import BaseDataSource, SourceMetadata, TestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
 from .exceptions import (
     SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
     SourceDataError, SourceTimeoutError, SourceAuthenticationError, SourceConfigurationError
@@ -110,7 +110,7 @@ class SftpSource(BaseDataSource):
         except Exception as e:
             raise SourceConnectionError(f"Failed to connect to SFTP server: {str(e)}")
     
-    def test_connection(self) -> TestResult:
+    def test_connection(self) -> ConnectionTestResult:
         """Test SFTP connection and path access."""
         start_time = datetime.now()
         
@@ -125,7 +125,7 @@ class SftpSource(BaseDataSource):
                 # Convert to SourceMetadata
                 metadata = self._parse_sftp_attrs(attrs, path)
                 
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=True,
                     status='connected',
                     message=f'Successfully accessed SFTP path: {path}',
@@ -134,7 +134,7 @@ class SftpSource(BaseDataSource):
                 ))
                 
             except FileNotFoundError:
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='error',
                     message=f'SFTP path not found: {path}',
@@ -142,7 +142,7 @@ class SftpSource(BaseDataSource):
                     error='Path not found'
                 ))
             except PermissionError:
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='unauthorized',
                     message=f'Access denied to SFTP path: {path}',
@@ -151,7 +151,7 @@ class SftpSource(BaseDataSource):
                 ))
                 
         except SourceAuthenticationError as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='unauthorized',
                 message=str(e),
@@ -159,7 +159,7 @@ class SftpSource(BaseDataSource):
                 error=str(e)
             ))
         except SourceTimeoutError as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='timeout',
                 message=str(e),
@@ -167,7 +167,7 @@ class SftpSource(BaseDataSource):
                 error=str(e)
             ))
         except Exception as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='error',
                 message=f'SFTP connection failed: {str(e)}',

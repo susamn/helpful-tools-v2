@@ -8,7 +8,7 @@ from typing import Union, Iterator, List, Dict, Any, Optional
 from urllib.parse import urlparse, urljoin
 import time
 
-from .base import BaseDataSource, SourceMetadata, TestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
 from .exceptions import (
     SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
     SourceDataError, SourceTimeoutError, SourceAuthenticationError
@@ -75,7 +75,7 @@ class HttpSource(BaseDataSource):
         
         return self._session
     
-    def test_connection(self) -> TestResult:
+    def test_connection(self) -> ConnectionTestResult:
         """Test HTTP connection and resource access."""
         start_time = datetime.now()
         
@@ -88,7 +88,7 @@ class HttpSource(BaseDataSource):
             
             if response.status_code == 200:
                 metadata = self._parse_http_headers(response.headers)
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=True,
                     status='connected',
                     message=f'Successfully accessed HTTP resource: {self._resolved_path}',
@@ -96,7 +96,7 @@ class HttpSource(BaseDataSource):
                     metadata=metadata
                 ))
             elif response.status_code == 401:
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='unauthorized',
                     message=f'Authentication required for: {self._resolved_path}',
@@ -104,7 +104,7 @@ class HttpSource(BaseDataSource):
                     error='Authentication required'
                 ))
             elif response.status_code == 403:
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='unauthorized',
                     message=f'Access forbidden to: {self._resolved_path}',
@@ -112,7 +112,7 @@ class HttpSource(BaseDataSource):
                     error='Access forbidden'
                 ))
             elif response.status_code == 404:
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='error',
                     message=f'HTTP resource not found: {self._resolved_path}',
@@ -120,7 +120,7 @@ class HttpSource(BaseDataSource):
                     error='Resource not found'
                 ))
             else:
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='error',
                     message=f'HTTP error {response.status_code}: {self._resolved_path}',
@@ -131,7 +131,7 @@ class HttpSource(BaseDataSource):
         except Exception as e:
             error_type = type(e).__name__
             if 'timeout' in error_type.lower() or 'timeout' in str(e).lower():
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='timeout',
                     message=f'HTTP request timeout: {self._resolved_path}',
@@ -139,7 +139,7 @@ class HttpSource(BaseDataSource):
                     error='Request timeout'
                 ))
             else:
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='error',
                     message=f'HTTP connection failed: {str(e)}',

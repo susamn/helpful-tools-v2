@@ -150,6 +150,109 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         assert 'error' in data
     
     @patch('main.get_stored_sources')
+    @patch('boto3.Session')
+    def test_fetch_s3_file_source(self, mock_session_class, mock_get_sources):
+        """Test fetching from S3 file source."""
+        # Mock S3 file source
+        s3_sources = {
+            's3-file-source': {
+                'id': 's3-file-source',
+                'name': 'S3 File Source',
+                'type': 's3',
+                'config': {'path': 's3://test-bucket/test-file.txt'},
+                'pathTemplate': 's3://test-bucket/test-file.txt',
+                'dynamicVariables': {}
+            }
+        }
+        mock_get_sources.return_value = s3_sources
+        
+        # Mock S3 client
+        mock_session = MagicMock()
+        mock_client = MagicMock()
+        mock_session.client.return_value = mock_client
+        mock_session_class.return_value = mock_session
+        
+        # Mock file operations
+        mock_client.head_object.return_value = {}
+        mock_body = MagicMock()
+        mock_body.read.return_value = b'S3 file content'
+        mock_client.get_object.return_value = {'Body': mock_body}
+        
+        response = self.app.get('/api/sources/s3-file-source/fetch')
+        
+        assert response.status_code == 200
+        assert 'application/octet-stream' in response.content_type
+        assert b"S3 file content" in response.data
+    
+    @patch('main.get_stored_sources')
+    @patch('boto3.Session')
+    def test_fetch_s3_directory_source(self, mock_session_class, mock_get_sources):
+        """Test fetching from S3 directory source."""
+        # Mock S3 directory source
+        s3_sources = {
+            's3-dir-source': {
+                'id': 's3-dir-source',
+                'name': 'S3 Directory Source',
+                'type': 's3',
+                'config': {'path': 's3://test-bucket/'},
+                'pathTemplate': 's3://test-bucket/',
+                'dynamicVariables': {}
+            }
+        }
+        mock_get_sources.return_value = s3_sources
+        
+        # Mock S3 client
+        mock_session = MagicMock()
+        mock_client = MagicMock()
+        mock_session.client.return_value = mock_client
+        mock_session_class.return_value = mock_session
+        
+        # Mock S3 list operation for directory detection
+        mock_client.head_bucket.return_value = {}
+        mock_paginator = MagicMock()
+        mock_client.get_paginator.return_value = mock_paginator
+        
+        mock_page_iterator = [
+            {
+                'CommonPrefixes': [{'Prefix': 'docs/'}],
+                'Contents': [
+                    {
+                        'Key': 'file1.txt',
+                        'Size': 1024,
+                        'LastModified': datetime.now(),
+                        'ETag': '"abc123"',
+                        'StorageClass': 'STANDARD'
+                    }
+                ]
+            }
+        ]
+        mock_paginator.paginate.return_value = mock_page_iterator
+        
+        response = self.app.get('/api/sources/s3-dir-source/fetch')
+        
+        assert response.status_code == 200
+        assert response.content_type.startswith('application/json')
+        
+        data = json.loads(response.data)
+        assert data['success'] is True
+        assert data['type'] == 'directory'
+        assert 'tree' in data
+        assert 'base_path' in data
+        
+        # Check tree structure
+        tree = data['tree']
+        assert len(tree) == 2
+        
+        # Find directory and file
+        dir_item = next((item for item in tree if item['is_directory']), None)
+        assert dir_item is not None
+        assert dir_item['name'] == 'docs'
+        
+        file_item = next((item for item in tree if not item['is_directory']), None)
+        assert file_item is not None
+        assert file_item['name'] == 'file1.txt'
+    
+    @patch('main.get_stored_sources')
     def test_fetch_source_not_found(self, mock_get_sources):
         """Test fetching from unknown source ID."""
         mock_get_sources.return_value = self.mock_sources
@@ -228,6 +331,74 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
         assert subfile_item is not None
     
     @patch('main.get_stored_sources')
+    @patch('boto3.Session')
+    def test_browse_s3_directory_source(self, mock_session_class, mock_get_sources):
+        """Test browsing S3 directory source."""
+        # Mock S3 source
+        s3_sources = {
+            's3-dir-source': {
+                'id': 's3-dir-source',
+                'name': 'S3 Directory Source',
+                'type': 's3',
+                'config': {'path': 's3://test-bucket/'},
+                'pathTemplate': 's3://test-bucket/',
+                'dynamicVariables': {}
+            }
+        }
+        mock_get_sources.return_value = s3_sources
+        
+        # Mock S3 client
+        mock_session = MagicMock()
+        mock_client = MagicMock()
+        mock_session.client.return_value = mock_client
+        mock_session_class.return_value = mock_session
+        
+        # Mock S3 list operation
+        mock_paginator = MagicMock()
+        mock_client.get_paginator.return_value = mock_paginator
+        
+        mock_page_iterator = [
+            {
+                'CommonPrefixes': [
+                    {'Prefix': 'docs/'}
+                ],
+                'Contents': [
+                    {
+                        'Key': 'file1.txt',
+                        'Size': 1024,
+                        'LastModified': datetime.now(),
+                        'ETag': '"abc123"',
+                        'StorageClass': 'STANDARD'
+                    }
+                ]
+            }
+        ]
+        mock_paginator.paginate.return_value = mock_page_iterator
+        
+        response = self.app.get('/api/sources/s3-dir-source/browse')
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['success'] is True
+        assert 'tree' in data
+        assert 'base_path' in data
+        
+        # Check tree structure
+        tree = data['tree']
+        assert len(tree) == 2  # Should have docs/ and file1.txt
+        
+        # Find directory
+        dir_item = next((item for item in tree if item['is_directory']), None)
+        assert dir_item is not None
+        assert dir_item['name'] == 'docs'
+        
+        # Find file
+        file_item = next((item for item in tree if not item['is_directory']), None)
+        assert file_item is not None
+        assert file_item['name'] == 'file1.txt'
+        assert file_item['size'] == 1024
+    
+    @patch('main.get_stored_sources')
     def test_browse_non_local_file_source(self, mock_get_sources):
         """Test browsing non-local file source type."""
         sources = {
@@ -247,7 +418,7 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
         assert response.status_code == 400
         data = json.loads(response.data)
         assert data['success'] is False
-        assert 'only supported for local file sources' in data['error']
+        assert 'only supported for local file and S3 sources' in data['error']
 
 
 class TestFileSourceEndpoint(TestSourceAPIEndpoints):

@@ -27,7 +27,7 @@ class SourceMetadata:
 
 
 @dataclass
-class TestResult:
+class ConnectionTestResult:
     """Result of testing a data source connection."""
     success: bool
     status: str  # 'connected', 'error', 'timeout', 'unauthorized'
@@ -85,12 +85,12 @@ class DataSourceInterface(ABC):
         self._validate_config()
 
     @abstractmethod
-    def test_connection(self) -> TestResult:
+    def test_connection(self) -> ConnectionTestResult:
         """
         Test connection to the data source.
         
         Returns:
-            TestResult with connection status and metadata
+            ConnectionTestResult with connection status and metadata
             
         Raises:
             SourceException: If test fails with specific error details
@@ -244,13 +244,13 @@ class BaseDataSource(DataSourceInterface):
     def __init__(self, config: SourceConfig):
         super().__init__(config)
         self._connection = None
-        self._last_test_result: Optional[TestResult] = None
+        self._last_test_result: Optional[ConnectionTestResult] = None
 
-    def get_last_test_result(self) -> Optional[TestResult]:
+    def get_last_test_result(self) -> Optional[ConnectionTestResult]:
         """Get the result of the last connection test."""
         return self._last_test_result
 
-    def _cache_test_result(self, result: TestResult) -> TestResult:
+    def _cache_test_result(self, result: ConnectionTestResult) -> ConnectionTestResult:
         """Cache the test result for later reference."""
         self._last_test_result = result
         return result

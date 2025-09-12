@@ -8,7 +8,7 @@ from typing import Union, Iterator, List, Dict, Any, Optional
 from urllib.parse import urlparse
 import time
 
-from .base import BaseDataSource, SourceMetadata, TestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
 from .exceptions import (
     SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
     SourceDataError, SourceTimeoutError, SourceAuthenticationError, SourceConfigurationError
@@ -71,7 +71,7 @@ class S3Source(BaseDataSource):
         except Exception as e:
             raise SourceConnectionError(f"Failed to create S3 client: {str(e)}")
     
-    def test_connection(self) -> TestResult:
+    def test_connection(self) -> ConnectionTestResult:
         """Test S3 connection and object/bucket access."""
         start_time = datetime.now()
         
@@ -84,7 +84,7 @@ class S3Source(BaseDataSource):
             except Exception as e:
                 error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', 'Unknown')
                 if error_code in ['403', 'Forbidden']:
-                    return self._cache_test_result(TestResult(
+                    return self._cache_test_result(ConnectionTestResult(
                         success=False,
                         status='unauthorized',
                         message=f'Access denied to bucket: {self._bucket}',
@@ -92,7 +92,7 @@ class S3Source(BaseDataSource):
                         error='Permission denied'
                     ))
                 elif error_code in ['404', 'NoSuchBucket']:
-                    return self._cache_test_result(TestResult(
+                    return self._cache_test_result(ConnectionTestResult(
                         success=False,
                         status='error',
                         message=f'Bucket not found: {self._bucket}',
@@ -108,7 +108,7 @@ class S3Source(BaseDataSource):
                     response = s3_client.head_object(Bucket=self._bucket, Key=self._key)
                     metadata = self._parse_s3_metadata(response)
                     
-                    return self._cache_test_result(TestResult(
+                    return self._cache_test_result(ConnectionTestResult(
                         success=True,
                         status='connected',
                         message=f'Successfully accessed S3 object: {self._resolved_path}',
@@ -119,7 +119,7 @@ class S3Source(BaseDataSource):
                 except Exception as e:
                     error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', 'Unknown')
                     if error_code in ['404', 'NoSuchKey']:
-                        return self._cache_test_result(TestResult(
+                        return self._cache_test_result(ConnectionTestResult(
                             success=False,
                             status='error',
                             message=f'Object not found: {self._key}',
@@ -130,7 +130,7 @@ class S3Source(BaseDataSource):
                         raise e
             else:
                 # Just bucket access test
-                return self._cache_test_result(TestResult(
+                return self._cache_test_result(ConnectionTestResult(
                     success=True,
                     status='connected',
                     message=f'Successfully accessed S3 bucket: {self._bucket}',
@@ -138,7 +138,7 @@ class S3Source(BaseDataSource):
                 ))
                 
         except SourceAuthenticationError as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='unauthorized',
                 message=str(e),
@@ -146,7 +146,7 @@ class S3Source(BaseDataSource):
                 error=str(e)
             ))
         except Exception as e:
-            return self._cache_test_result(TestResult(
+            return self._cache_test_result(ConnectionTestResult(
                 success=False,
                 status='error',
                 message=f'S3 connection failed: {str(e)}',
@@ -348,24 +348,40 @@ class S3Source(BaseDataSource):
                 for prefix_info in page.get('CommonPrefixes', []):
                     prefix_name = prefix_info['Prefix'].rstrip('/')
                     directory_name = prefix_name.split('/')[-1] if '/' in prefix_name else prefix_name
+                    
+                    # Skip empty directory names
+                    if not directory_name:
+                        continue
+                    
                     contents.append({
                         'name': directory_name,
                         'path': f"s3://{self._bucket}/{prefix_info['Prefix']}",
                         'type': 'directory',
-                        'prefix': prefix_info['Prefix']
+                        'is_directory': True,
+                        'prefix': prefix_info['Prefix'],
+                        'size': None,
+                        'modified': None
                     })
                 
                 # Add files
                 for obj in page.get('Contents', []):
-                    if obj['Key'] == prefix:  # Skip the prefix itself
+                    # Skip the prefix itself and empty keys
+                    if obj['Key'] == prefix or not obj['Key'].strip() or obj['Key'].endswith('/'):
                         continue
                     
                     file_name = obj['Key'].split('/')[-1] if '/' in obj['Key'] else obj['Key']
+                    
+                    # Skip empty file names
+                    if not file_name:
+                        continue
+                    
                     contents.append({
                         'name': file_name,
                         'path': f"s3://{self._bucket}/{obj['Key']}",
                         'type': 'file',
+                        'is_directory': False,
                         'size': obj['Size'],
+                        'modified': obj['LastModified'].timestamp(),
                         'last_modified': obj['LastModified'].isoformat(),
                         'etag': obj['ETag'].strip('"'),
                         'storage_class': obj.get('StorageClass', 'STANDARD'),
@@ -390,6 +406,47 @@ class S3Source(BaseDataSource):
     def is_listable(self) -> bool:
         """S3 sources support listing."""
         return True
+    
+    def is_directory(self) -> bool:
+        """Check if S3 source points to a directory (prefix)."""
+        # If no key specified, it's a bucket (directory)
+        if not self._key:
+            return self.exists()
+        
+        # If key ends with '/', it's a prefix (directory)
+        if self._key.endswith('/'):
+            return self.exists()
+        
+        # Check if there are objects with this key as a prefix
+        try:
+            s3_client = self._get_s3_client()
+            response = s3_client.list_objects_v2(
+                Bucket=self._bucket,
+                Prefix=self._key + '/',
+                MaxKeys=1
+            )
+            # If there are objects with this prefix, it's a directory
+            return response.get('KeyCount', 0) > 0
+        except Exception:
+            return False
+    
+    def is_file(self) -> bool:
+        """Check if S3 source points to a single object (file)."""
+        # If no key specified, it's a bucket (not a file)
+        if not self._key:
+            return False
+        
+        # If key ends with '/', it's a prefix (not a file)
+        if self._key.endswith('/'):
+            return False
+        
+        # Check if the exact object exists
+        try:
+            s3_client = self._get_s3_client()
+            s3_client.head_object(Bucket=self._bucket, Key=self._key)
+            return True
+        except Exception:
+            return False
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up S3 client connections."""
