@@ -8,14 +8,25 @@
         <button class="modal-close-btn source-selector-close">&times;</button>
     </div>
     <div class="modal-content">
-        <div class="source-selector-loading" style="display: none;">
-            <p>Loading sources...</p>
+        <div class="source-selector-left">
+            <div class="source-selector-loading" style="display: none;">
+                <p>Loading sources...</p>
+            </div>
+            <div class="source-selector-empty" style="display: none;">
+                <p>No sources available. <a href="/sources" target="_blank">Create a source</a> to get started.</p>
+            </div>
+            <div class="source-selector-list" id="sourceSelector-list">
+                <!-- Sources will be populated here -->
+            </div>
         </div>
-        <div class="source-selector-empty" style="display: none;">
-            <p>No sources available. <a href="/sources" target="_blank">Create a source</a> to get started.</p>
-        </div>
-        <div class="source-selector-list" id="sourceSelector-list">
-            <!-- Sources will be populated here -->
+        <div class="source-selector-right" id="sourceSelector-explorer" style="display: none;">
+            <div class="explorer-header">
+                <h3>Explorer</h3>
+                <button class="close-explorer-btn" id="sourceSelector-close-explorer">&times;</button>
+            </div>
+            <div class="explorer-content" id="sourceSelector-explorer-content">
+                <!-- Explorer content will be populated here -->
+            </div>
         </div>
     </div>
 </div>
@@ -41,8 +52,9 @@
 <style>
 /* Source Selector Component Styles */
 .source-selector-modal {
-    width: 750px !important;
-    max-height: 80vh !important;
+    width: 75vw !important;
+    height: 70vh !important;
+    max-height: none !important;
     position: fixed;
     top: 50%;
     left: 50%;
@@ -52,7 +64,10 @@
     border-radius: 5px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     z-index: 1001;
-    max-width: 90%;
+    max-width: none;
+    min-width: 800px;
+    display: flex;
+    flex-direction: column;
 }
 
 .source-selector-overlay {
@@ -112,12 +127,132 @@
 
 .modal-content {
     padding: 15px;
-    max-height: 60vh;
-    overflow-y: auto;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    gap: 15px;
+}
+
+.source-selector-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-width: 33.333%; /* Enforce 1/3 width */
 }
 
 .source-selector-list {
-    /* Remove nested scrolling - let modal-content handle it */
+    flex: 1;
+    overflow-y: auto;
+}
+
+.source-selector-right {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid #ddd;
+    padding-left: 15px;
+    overflow: hidden;
+    max-width: 66.667%; /* Enforce 2/3 width */
+}
+
+.explorer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 15px;
+}
+
+.explorer-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.close-explorer-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.close-explorer-btn:hover {
+    color: #333;
+    background: rgba(0,0,0,0.1);
+    border-radius: 2px;
+}
+
+.explorer-content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.file-info-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+.file-info-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.file-icon {
+    font-size: 24px;
+    margin-right: 10px;
+    color: #007bff;
+}
+
+.file-name {
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+    word-break: break-word;
+}
+
+.file-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.file-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.file-detail-row:last-child {
+    border-bottom: none;
+}
+
+.file-detail-label {
+    font-weight: 500;
+    color: #666;
+    min-width: 60px;
+}
+
+.file-detail-value {
+    color: #333;
+    word-break: break-word;
+    text-align: right;
+    flex: 1;
+    margin-left: 10px;
 }
 
 .source-item {
@@ -424,5 +559,91 @@
 
 .source-selector-empty a:hover {
     text-decoration: underline;
+}
+
+.test-error-card {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+.test-error-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.test-error-icon {
+    font-size: 24px;
+    margin-right: 10px;
+    color: #dc3545;
+}
+
+.test-error-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: #721c24;
+}
+
+.test-error-details {
+    color: #721c24;
+    line-height: 1.4;
+}
+
+.test-error-message {
+    background: #fff;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 10px;
+    font-family: monospace;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.test-success-card {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+.test-success-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.test-success-icon {
+    font-size: 24px;
+    margin-right: 10px;
+    color: #28a745;
+}
+
+.test-success-title {
+    font-weight: bold;
+    font-size: 16px;
+    color: #155724;
+}
+
+.test-success-details {
+    color: #155724;
+    line-height: 1.4;
+}
+
+.test-success-message {
+    background: #fff;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    padding: 10px;
+    margin-top: 10px;
+    font-family: monospace;
+    font-size: 0.9em;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 </style>

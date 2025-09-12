@@ -163,6 +163,12 @@ class SourceSelector {
 
         // Save variables
         varsSaveBtn.addEventListener('click', () => this.saveVariables());
+        
+        // Close explorer panel
+        const closeExplorerBtn = document.getElementById(`${this.options.containerId}-close-explorer`);
+        if (closeExplorerBtn) {
+            closeExplorerBtn.addEventListener('click', () => this.hideExplorerPanel());
+        }
     }
 
     /**
@@ -394,6 +400,9 @@ class SourceSelector {
      */
     async testSourceConnection(source) {
         try {
+            // Clear the explorer panel when starting a new test
+            this.hideExplorerPanel();
+            
             // Disable the test button during testing
             const testBtn = document.querySelector(`[data-action="test"][data-source-id="${source.id}"]`);
             if (testBtn) {
@@ -412,13 +421,24 @@ class SourceSelector {
                 
                 this.showTestStatus(source.id, result.success);
                 
+                // Show detailed test result in right panel
+                if (!result.success) {
+                    this.showTestError(source, result);
+                } else {
+                    // Show success message in the explorer panel
+                    this.showTestSuccess(source, result);
+                }
+                
             } else {
                 const errorResult = await response.json();
-                throw new Error(errorResult.error || `HTTP ${response.status}`);
+                const error = new Error(errorResult.error || `HTTP ${response.status}`);
+                this.showTestError(source, { success: false, message: error.message, error: error.message });
+                throw error;
             }
         } catch (error) {
             console.error('Error testing source:', error);
             this.showTestStatus(source.id, false);
+            this.showTestError(source, { success: false, message: error.message, error: error.message });
         } finally {
             // Re-enable the test button
             const testBtn = document.querySelector(`[data-action="test"][data-source-id="${source.id}"]`);
@@ -583,8 +603,11 @@ class SourceSelector {
                     const result = await response.json();
                     
                     if (result.type === 'directory') {
-                        // Show directory browser
-                        this.showDirectoryBrowser(source, result);
+                        // Show directory browser in explorer panel
+                        this.showExplorerPanel(source, result);
+                    } else if (result.type === 'file') {
+                        // Show file info in explorer panel
+                        this.showFileInfo(source, result);
                     } else {
                         throw new Error('Unknown response type');
                     }
@@ -616,22 +639,164 @@ class SourceSelector {
     }
 
     /**
-     * Show directory browser for directory sources
+     * Show explorer panel with directory browser
      */
-    showDirectoryBrowser(source, directoryData) {
-        const treeContainer = document.getElementById(`file-tree-${this.options.containerId}-${source.id}`);
-        const treeContent = document.getElementById(`tree-${this.options.containerId}-${source.id}`);
+    showExplorerPanel(source, directoryData) {
+        const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
+        const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
         
-        if (!treeContainer || !treeContent) {
-            console.error(`Tree container not found for ${this.options.containerId}-${source.id}`);
+        if (!explorerPanel || !explorerContent) {
+            console.error(`Explorer panel not found for ${this.options.containerId}`);
             return;
         }
 
-        // Show tree container
-        treeContainer.style.display = 'block';
+        // Show explorer panel
+        explorerPanel.style.display = 'flex';
 
-        // Render the tree
-        this.renderFileTree(directoryData.tree, treeContent, source, 0);
+        // Clear previous content and render the tree
+        explorerContent.innerHTML = '';
+        this.renderFileTree(directoryData.tree, explorerContent, source, 0);
+    }
+
+    /**
+     * Show file info in explorer panel
+     */
+    showFileInfo(source, fileData) {
+        const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
+        const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
+        
+        if (!explorerPanel || !explorerContent) {
+            console.error(`Explorer panel not found for ${this.options.containerId}`);
+            return;
+        }
+
+        // Show explorer panel
+        explorerPanel.style.display = 'flex';
+
+        // Clear previous content and render file info
+        explorerContent.innerHTML = this.createFileInfoCard(source, fileData);
+    }
+
+    /**
+     * Create file info card HTML
+     */
+    createFileInfoCard(source, fileData) {
+        const fileName = fileData.name || source.name || 'Unknown file';
+        const filePath = fileData.path || source.pathTemplate || 'Unknown path';
+        const fileSize = fileData.size ? this.formatFileSize(fileData.size) : 'Unknown';
+        const lastModified = fileData.last_modified || fileData.modified;
+        const formattedDate = lastModified ? new Date(lastModified).toLocaleString() : 'Unknown';
+
+        return `
+            <div class="file-info-card">
+                <div class="file-info-header">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name">${this.escapeHtml(fileName)}</span>
+                </div>
+                <div class="file-details">
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Path:</span>
+                        <span class="file-detail-value">${this.escapeHtml(filePath)}</span>
+                    </div>
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Size:</span>
+                        <span class="file-detail-value">${fileSize}</span>
+                    </div>
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Modified:</span>
+                        <span class="file-detail-value">${formattedDate}</span>
+                    </div>
+                    <div class="file-detail-row">
+                        <span class="file-detail-label">Type:</span>
+                        <span class="file-detail-value">${source.type || 'Unknown'}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Hide the explorer panel
+     */
+    hideExplorerPanel() {
+        const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
+        if (explorerPanel) {
+            explorerPanel.style.display = 'none';
+        }
+    }
+
+    /**
+     * Show test error in explorer panel
+     */
+    showTestError(source, testResult) {
+        const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
+        const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
+        
+        if (!explorerPanel || !explorerContent) {
+            console.error(`Explorer panel not found for ${this.options.containerId}`);
+            return;
+        }
+
+        // Show explorer panel
+        explorerPanel.style.display = 'flex';
+
+        // Create error card
+        const errorMessage = testResult.error || testResult.message || 'Unknown error occurred during testing';
+        const statusText = testResult.status || 'error';
+        const responseTime = testResult.response_time ? `${testResult.response_time.toFixed(2)}s` : 'N/A';
+
+        explorerContent.innerHTML = `
+            <div class="test-error-card">
+                <div class="test-error-header">
+                    <span class="test-error-icon">⚠️</span>
+                    <span class="test-error-title">Connection Test Failed</span>
+                </div>
+                <div class="test-error-details">
+                    <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
+                    <strong>Status:</strong> ${this.escapeHtml(statusText)}<br>
+                    <strong>Response Time:</strong> ${responseTime}<br>
+                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}
+                </div>
+                <div class="test-error-message">${this.escapeHtml(errorMessage)}</div>
+            </div>
+        `;
+    }
+
+    /**
+     * Show test success in explorer panel
+     */
+    showTestSuccess(source, testResult) {
+        const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
+        const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
+        
+        if (!explorerPanel || !explorerContent) {
+            console.error(`Explorer panel not found for ${this.options.containerId}`);
+            return;
+        }
+
+        // Show explorer panel
+        explorerPanel.style.display = 'flex';
+
+        // Create success card
+        const successMessage = testResult.message || 'Connection test passed successfully';
+        const statusText = testResult.status || 'connected';
+        const responseTime = testResult.response_time ? `${testResult.response_time.toFixed(2)}s` : 'N/A';
+
+        explorerContent.innerHTML = `
+            <div class="test-success-card">
+                <div class="test-success-header">
+                    <span class="test-success-icon">✅</span>
+                    <span class="test-success-title">Connection Test Successful</span>
+                </div>
+                <div class="test-success-details">
+                    <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
+                    <strong>Status:</strong> ${this.escapeHtml(statusText)}<br>
+                    <strong>Response Time:</strong> ${responseTime}<br>
+                    <strong>Path:</strong> ${this.escapeHtml(this.resolveSourcePath(source))}
+                </div>
+                <div class="test-success-message">${this.escapeHtml(successMessage)}</div>
+            </div>
+        `;
     }
 
     /**
