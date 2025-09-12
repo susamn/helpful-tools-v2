@@ -203,6 +203,19 @@
     margin-right: 8px;
 }
 
+.source-id-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.file-type-icon {
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
 .source-id {
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 10px;
@@ -210,7 +223,6 @@
     background: #f0f0f0;
     padding: 2px 6px;
     border-radius: 2px;
-    flex-shrink: 0;
 }
 
 .source-type {
@@ -583,6 +595,61 @@
     padding: 20px;
     color: #666;
     font-style: italic;
+}
+
+/* Directory Configuration */
+.directory-config-section {
+    margin-bottom: 16px;
+}
+
+.directory-config-section h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin: 0 0 12px 0;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
+}
+
+.directory-config .checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    margin: 0;
+    width: 100%;
+}
+
+.directory-config .checkbox-label input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+}
+
+.directory-config .checkbox-text {
+    font-weight: normal;
+    font-size: 13px;
+    line-height: 1.4;
+    flex: 1;
+    text-align: left;
+}
+
+/* Static Config Section Styling */
+.config-separator {
+    height: 1px;
+    background: #e0e0e0;
+    margin: 20px 0;
+}
+
+.source-popup-content h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin: 16px 0 12px 0;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
 }
 
 .loading::before {

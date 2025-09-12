@@ -118,15 +118,22 @@ class SourcesManager {
             http: '🌍'
         };
 
+        // Determine file/folder icon based on is_directory attribute
+        const fileTypeIcon = source.is_directory ? '📁' : '📄';
+        const levelInfo = source.is_directory && source.level > 0 ? ` (Level: ${source.level})` : '';
+
         const configSummary = this.getHighlightedPathTemplate(source);
         
         return `
             <div class="source-item" data-source-id="${source.id}">
                 <div class="source-header">
                     <div class="source-name">${typeIcons[source.type] || '📄'} ${this.escapeHtml(source.name)}</div>
-                    <div class="source-id">${source.id}</div>
+                    <div class="source-id-container">
+                        <div class="file-type-icon">${fileTypeIcon}</div>
+                        <div class="source-id">${source.id}</div>
+                    </div>
                 </div>
-                <div class="source-type">${source.type.replace('_', ' ').toUpperCase()}</div>
+                <div class="source-type">${source.type.replace('_', ' ').toUpperCase()}${levelInfo}</div>
                 <div class="source-config">${configSummary}</div>
                 <div class="source-footer">
                     <div class="source-status">
@@ -218,6 +225,9 @@ class SourcesManager {
             this.fillDynamicVariables(source.dynamicVariables);
             this.els.dynamicSection.style.display = 'block';
         }
+        
+        // Set up directory fields after static config is rendered
+        this.setupDirectoryFields(source);
         
         document.getElementById('testConnectionBtn').disabled = false;
         
@@ -314,6 +324,9 @@ class SourcesManager {
         
         // Generate static config fields (non-path related)
         this.els.staticConfigFields.innerHTML = await this.generateStaticConfigFields(sourceType);
+        
+        // Set up directory fields for new sources
+        this.setupDirectoryFields();
         
         // Set example path template
         this.setExamplePathTemplate(sourceType);
@@ -444,10 +457,43 @@ class SourcesManager {
         }
     }
 
+    generateDirectoryConfigFields() {
+        return `
+            <div class="directory-config-section">
+                <h4>Directory Configuration</h4>
+                <div class="form-group directory-config">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="isDirectory" name="is_directory">
+                        <span class="checkbox-text">This source points to a directory</span>
+                    </label>
+                    <div class="config-help">Check if this source represents a directory/folder rather than a single file</div>
+                </div>
+                <div class="form-group" id="levelGroup" style="display: none;">
+                    <label for="level">Directory Level</label>
+                    <select id="level" name="level">
+                        <option value="0">0 levels (current directory only)</option>
+                        <option value="1">1 level deep</option>
+                        <option value="2">2 levels deep</option>
+                        <option value="3">3 levels deep</option>
+                        <option value="4">4 levels deep</option>
+                        <option value="5">5 levels deep (maximum)</option>
+                    </select>
+                    <div class="config-help">How many nested directory levels to traverse (maximum 5)</div>
+                </div>
+            </div>
+        `;
+    }
+
     async generateStaticConfigFields(sourceType) {
+        const directoryConfig = this.generateDirectoryConfigFields();
+        
         switch (sourceType) {
             case 'local_file':
-                return '<div class="config-help">No additional static configuration needed for local files</div>';
+                return `
+                    ${directoryConfig}
+                    <div class="config-separator"></div>
+                    <div class="config-help">No additional static configuration needed for local files</div>
+                `;
             
             case 's3':
                 const profiles = await this.getAwsProfiles();
@@ -456,6 +502,9 @@ class SourcesManager {
                 ).join('');
                 
                 return `
+                    ${directoryConfig}
+                    <div class="config-separator"></div>
+                    <h4>AWS Configuration</h4>
                     <div class="form-group">
                         <label for="awsProfile">AWS Profile</label>
                         <select id="awsProfile" name="aws_profile" required>
@@ -477,6 +526,9 @@ class SourcesManager {
                 ).join('');
                 
                 return `
+                    ${directoryConfig}
+                    <div class="config-separator"></div>
+                    <h4>SFTP Connection</h4>
                     <div class="form-group">
                         <label for="sftpHost">Host</label>
                         <input type="text" id="sftpHost" name="host" placeholder="sftp.example.com" required>
@@ -501,6 +553,9 @@ class SourcesManager {
             
             case 'samba':
                 return `
+                    ${directoryConfig}
+                    <div class="config-separator"></div>
+                    <h4>Samba/SMB Connection</h4>
                     <div class="form-group">
                         <label for="sambaHost">Host/Server</label>
                         <input type="text" id="sambaHost" name="host" placeholder="server.example.com" required>
@@ -522,6 +577,9 @@ class SourcesManager {
             
             case 'http':
                 return `
+                    ${directoryConfig}
+                    <div class="config-separator"></div>
+                    <h4>HTTP Configuration</h4>
                     <div class="form-group">
                         <label for="httpMethod">HTTP Method</label>
                         <select id="httpMethod" name="method">
@@ -537,7 +595,11 @@ class SourcesManager {
                 `;
             
             default:
-                return '<div class="config-help">No static configuration needed</div>';
+                return `
+                    ${directoryConfig}
+                    <div class="config-separator"></div>
+                    <div class="config-help">No additional static configuration needed</div>
+                `;
         }
     }
 
@@ -630,7 +692,7 @@ class SourcesManager {
             
             // Extract static config and dynamic variables
             for (const [key, value] of formData.entries()) {
-                if (key !== 'name' && key !== 'type') {
+                if (key !== 'name' && key !== 'type' && key !== 'is_directory' && key !== 'level') {
                     // Check if this is a dynamic variable (starts with var_ or is in dynamic fields)
                     if (this.els.dynamicFields.querySelector(`[name="${key}"]`)) {
                         dynamicVariables[key] = value;
@@ -642,12 +704,20 @@ class SourcesManager {
 
             const pathTemplate = this.els.pathTemplate.value.trim();
             
+            // Get directory values from DOM since they're dynamically created
+            const isDirectoryEl = document.getElementById('isDirectory');
+            const levelEl = document.getElementById('level');
+            const isDirectory = isDirectoryEl ? isDirectoryEl.checked : false;
+            const level = isDirectory && levelEl ? parseInt(levelEl.value, 10) || 0 : 0;
+            
             const sourceData = {
                 name: this.els.sourceName.value,
                 type: this.els.sourceType.value,
                 staticConfig: staticConfig,
                 pathTemplate: pathTemplate,
-                dynamicVariables: dynamicVariables
+                dynamicVariables: dynamicVariables,
+                is_directory: isDirectory,
+                level: level
             };
 
             const isEdit = this.currentEditingId !== null;
@@ -765,6 +835,47 @@ class SourcesManager {
 
     applyFontSize() {
         document.body.style.fontSize = `${this.fontSize}px`;
+    }
+
+    setupDirectoryFields(source = null) {
+        // This method is called after the static config HTML is rendered
+        setTimeout(() => {
+            const isDirectoryEl = document.getElementById('isDirectory');
+            const levelGroupEl = document.getElementById('levelGroup');
+            const levelEl = document.getElementById('level');
+            
+            if (isDirectoryEl) {
+                // Set up event handler
+                isDirectoryEl.onchange = () => this.toggleLevelField();
+                
+                // Populate values if editing
+                if (source) {
+                    isDirectoryEl.checked = source.is_directory || false;
+                    if (levelEl) {
+                        levelEl.value = source.level || '0';
+                    }
+                }
+                
+                // Set initial state
+                this.toggleLevelField();
+            }
+        }, 10); // Small delay to ensure DOM is updated
+    }
+
+    toggleLevelField() {
+        const isDirectoryEl = document.getElementById('isDirectory');
+        const levelGroupEl = document.getElementById('levelGroup');
+        const levelEl = document.getElementById('level');
+        
+        if (isDirectoryEl && levelGroupEl) {
+            const isDirectoryChecked = isDirectoryEl.checked;
+            levelGroupEl.style.display = isDirectoryChecked ? 'block' : 'none';
+            
+            // Reset level to 0 when unchecking directory
+            if (!isDirectoryChecked && levelEl) {
+                levelEl.value = '0';
+            }
+        }
     }
 
     formatTime(isoString) {

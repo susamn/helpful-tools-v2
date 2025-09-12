@@ -73,6 +73,12 @@ def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
                         if k not in ['path', 'url', 'bucket', 'key']}
         dynamic_variables = {}
 
+    # Handle level - only valid if is_directory is True, max 5 levels
+    is_directory = source_data.get('is_directory', False)
+    level = 0
+    if is_directory:
+        level = min(max(source_data.get('level', 0), 0), 5)  # Clamp between 0 and 5
+    
     return SourceConfig(
         source_id=source_data.get('source_id', source_data.get('id', str(uuid.uuid4()))),
         name=source_data.get('name', 'Untitled Source'),
@@ -84,7 +90,9 @@ def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
         updated_at=datetime.fromisoformat(source_data['updated_at']) if source_data.get('updated_at') else datetime.now(),
         last_accessed=datetime.fromisoformat(source_data['last_accessed']) if source_data.get('last_accessed') else None,
         last_tested=datetime.fromisoformat(source_data['last_tested']) if source_data.get('last_tested') else None,
-        status=source_data.get('status', 'created')
+        status=source_data.get('status', 'created'),
+        is_directory=is_directory,
+        level=level
     )
 
 # Store for tools configuration
@@ -1046,6 +1054,12 @@ def create_source():
         # Generate unique ID
         source_id = str(uuid.uuid4())[:8]
         
+        # Handle directory and level attributes
+        is_directory = data.get('is_directory', False)
+        level = 0
+        if is_directory:
+            level = min(max(data.get('level', 0), 0), 5)  # Clamp between 0 and 5
+        
         source = {
             'id': source_id,
             'type': source_type,
@@ -1058,7 +1072,9 @@ def create_source():
             'updated_at': datetime.now().isoformat(),
             'last_accessed': None,
             'last_tested': None,
-            'status': 'created'
+            'status': 'created',
+            'is_directory': is_directory,
+            'level': level
         }
         
         # Store source
@@ -1189,6 +1205,12 @@ def update_source(source_id):
             dynamic_variables = {}
             static_config = {}
         
+        # Handle directory and level attributes
+        is_directory = data.get('is_directory', False)
+        level = 0
+        if is_directory:
+            level = min(max(data.get('level', 0), 0), 5)  # Clamp between 0 and 5
+        
         # Update the source
         updated_source = {
             'id': source_id,
@@ -1201,7 +1223,9 @@ def update_source(source_id):
             'status': 'created',  # Reset status when updated
             'created_at': sources[source_id]['created_at'],  # Keep original creation time
             'updated_at': datetime.now().isoformat(),
-            'last_tested': None  # Reset test status
+            'last_tested': None,  # Reset test status
+            'is_directory': is_directory,
+            'level': level
         }
         
         sources[source_id] = updated_source

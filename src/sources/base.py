@@ -52,12 +52,19 @@ class SourceConfig:
     last_tested: Optional[datetime] = None
     status: str = 'created'
     metadata: Optional[SourceMetadata] = None
+    is_directory: bool = False
+    level: int = 0
 
     def get_resolved_path(self) -> str:
         """Get the resolved path with dynamic variables substituted."""
         path = self.path_template
         for var, value in self.dynamic_variables.items():
             path = path.replace(f'${var}', str(value))
+        
+        # Add trailing slash for directories if not already present
+        if self.is_directory and not path.endswith('/'):
+            path += '/'
+        
         return path
 
     def extract_variables(self) -> List[str]:
