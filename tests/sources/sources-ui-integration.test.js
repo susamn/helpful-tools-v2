@@ -285,7 +285,7 @@ class UIIntegratedSourcesManager {
                 fieldsHtml = `
                     <div class="form-group">
                         <label for="awsProfile">AWS Profile</label>
-                        <select id="awsProfile" name="profile">
+                        <select id="awsProfile" name="aws_profile">
                             <option value="default">default</option>
                             <option value="prod">prod</option>
                         </select>
@@ -398,7 +398,7 @@ class UIIntegratedSourcesManager {
         if (sourceType === 's3') {
             const profileEl = this.mockDOM.getElementById('awsProfile');
             const regionEl = this.mockDOM.getElementById('awsRegion');
-            if (profileEl) formData.staticConfig.profile = profileEl.value;
+            if (profileEl) formData.staticConfig.aws_profile = profileEl.value;
             if (regionEl) formData.staticConfig.region = regionEl.value;
         } else if (sourceType === 'sftp') {
             const hostEl = this.mockDOM.getElementById('sftpHost');
@@ -593,7 +593,7 @@ runner.test('Should populate form correctly when editing source', () => {
         type: 's3',
         pathTemplate: 's3://$bucket/$key',
         dynamicVariables: { bucket: 'my-bucket', key: 'data.json' },
-        staticConfig: { region: 'us-west-2', profile: 'prod' }
+        staticConfig: { region: 'us-west-2', aws_profile: 'prod' }
     };
     
     manager.showEditSourcePopup(testSource);

@@ -1302,7 +1302,7 @@ def test_s3_connection(config):
         
         bucket = config.get('bucket')
         key = config.get('key')
-        profile = config.get('profile', 'default')
+        profile = config.get('aws_profile', 'default')
         region = config.get('region')
         
         if not bucket or not key:

@@ -451,7 +451,7 @@ runner.test('Should build correct source payload', () => {
     const formData = {
         name: 'Test S3 Source',
         type: 's3',
-        staticConfig: { region: 'us-east-1', profile: 'default' },
+        staticConfig: { region: 'us-east-1', aws_profile: 'default' },
         pathTemplate: 's3://$bucket/$key',
         dynamicVariables: { bucket: 'my-bucket', key: 'data.json' }
     };

@@ -239,7 +239,7 @@ class SourcesManager {
             'path': 'filePath',
             'bucket': 's3Bucket',
             'key': 's3Key',
-            'profile': 'awsProfile',
+            'aws_profile': 'awsProfile',
             'region': 's3Region',
             'host': 'sftpHost',
             'port': 'sftpPort',
@@ -349,7 +349,7 @@ class SourcesManager {
                     </div>
                     <div class="form-group">
                         <label for="awsProfile">AWS Profile</label>
-                        <select id="awsProfile" name="profile" required>
+                        <select id="awsProfile" name="aws_profile" required>
                             <option value="">Select AWS profile...</option>
                             ${profileOptions}
                         </select>
@@ -458,7 +458,7 @@ class SourcesManager {
                 return `
                     <div class="form-group">
                         <label for="awsProfile">AWS Profile</label>
-                        <select id="awsProfile" name="profile" required>
+                        <select id="awsProfile" name="aws_profile" required>
                             <option value="">Select AWS profile...</option>
                             ${profileOptions}
                         </select>
