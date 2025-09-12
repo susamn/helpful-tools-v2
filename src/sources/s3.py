@@ -375,18 +375,23 @@ class S3Source(BaseDataSource):
                     if not file_name:
                         continue
                     
-                    contents.append({
+                    # Use base class method for consistent timestamp formatting
+                    time_data = self.format_last_modified(obj['LastModified'])
+                    
+                    item_info = {
                         'name': file_name,
                         'path': f"s3://{self._bucket}/{obj['Key']}",
                         'type': 'file',
                         'is_directory': False,
                         'size': obj['Size'],
-                        'modified': obj['LastModified'].timestamp(),
-                        'last_modified': obj['LastModified'].isoformat(),
                         'etag': obj['ETag'].strip('"'),
                         'storage_class': obj.get('StorageClass', 'STANDARD'),
                         'key': obj['Key']
-                    })
+                    }
+                    # Add standardized time fields
+                    item_info.update(time_data)
+                    
+                    contents.append(item_info)
             
             return contents
             

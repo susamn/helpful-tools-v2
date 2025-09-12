@@ -358,10 +358,11 @@
     flex-direction: column;
     align-items: flex-end;
     gap: 2px;
-    font-size: 10px;
+    font-size: 9px;
     color: #666;
     text-align: right;
-    min-width: 80px;
+    min-width: 120px;
+    max-width: 120px;
 }
 
 .tree-size {
@@ -371,7 +372,12 @@
 
 .tree-date {
     color: #6c757d;
-    font-size: 9px;
+    font-size: 8px;
+    line-height: 1.1;
+    word-wrap: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tree-item.non-explorable {
@@ -768,7 +774,8 @@
 }
 
 .file-tree-header .tree-metadata {
-    min-width: 80px;
+    min-width: 120px;
+    max-width: 120px;
     text-align: right;
 }
 

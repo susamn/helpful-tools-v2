@@ -622,15 +622,53 @@ class SourceSelector {
             // Format file size
             const sizeText = !isDirectory && item.size !== null ? this.formatFileSize(item.size) : '';
             
-            // Format last modified date
+            // Format last modified date - prioritize last_modified (ISO string) over modified (timestamp)
             let dateText = '';
+            
+            // Debug: log the raw date data
             if (item.last_modified || item.modified) {
-                const date = new Date(item.last_modified || item.modified);
-                dateText = date.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric',
-                    year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                console.log('Date debug for', item.name, ':', { 
+                    last_modified: item.last_modified, 
+                    modified: item.modified,
+                    type_last: typeof item.last_modified,
+                    type_mod: typeof item.modified
                 });
+            }
+            
+            if (item.last_modified) {
+                try {
+                    const date = new Date(item.last_modified);
+                    // Show full ISO format with date and time
+                    dateText = date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit', 
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                } catch (e) {
+                    console.warn('Invalid last_modified date:', item.last_modified);
+                    // Fallback to raw value if parsing fails
+                    dateText = item.last_modified;
+                }
+            } else if (item.modified) {
+                try {
+                    // Handle both timestamp and ISO string formats for backward compatibility
+                    const date = new Date(typeof item.modified === 'number' ? item.modified * 1000 : item.modified);
+                    dateText = date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit', 
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                } catch (e) {
+                    console.warn('Invalid modified date:', item.modified);
+                    // Fallback to raw value if parsing fails
+                    dateText = String(item.modified);
+                }
             }
             
             // Create metadata section
@@ -871,7 +909,7 @@ class SourceSelector {
                     <div class="file-tree-header">
                         <span class="tree-icon">📂</span>
                         <span class="tree-name">Name</span>
-                        <span class="tree-metadata">Size / Date</span>
+                        <span class="tree-metadata">Size / Last Modified</span>
                     </div>
                     <div class="file-tree-container"></div>
                 </div>

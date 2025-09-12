@@ -268,15 +268,23 @@ class LocalFileSource(BaseDataSource):
             for item in target_path.iterdir():
                 try:
                     stat_result = item.stat()
-                    contents.append({
+                    
+                    # Use base class method for consistent timestamp formatting
+                    time_data = self.format_last_modified(stat_result.st_mtime)
+                    
+                    item_info = {
                         'name': item.name,
                         'path': str(item),
                         'type': 'directory' if item.is_dir() else 'file',
+                        'is_directory': item.is_dir(),
                         'size': stat_result.st_size if item.is_file() else None,
-                        'last_modified': datetime.fromtimestamp(stat_result.st_mtime).isoformat(),
                         'permissions': oct(stat_result.st_mode)[-3:],
                         'is_symlink': item.is_symlink()
-                    })
+                    }
+                    # Add standardized time fields
+                    item_info.update(time_data)
+                    
+                    contents.append(item_info)
                 except (OSError, PermissionError):
                     # Skip items we can't access
                     contents.append({

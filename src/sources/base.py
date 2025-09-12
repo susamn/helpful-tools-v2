@@ -237,6 +237,68 @@ class DataSourceInterface(ABC):
             'status': self.config.status
         }
 
+    @staticmethod
+    def format_last_modified(last_modified) -> Dict[str, Any]:
+        """
+        Format last_modified data consistently across all source types.
+        
+        Args:
+            last_modified: Can be datetime, timestamp (float/int), or ISO string
+            
+        Returns:
+            Dictionary with formatted timestamp data
+        """
+        if last_modified is None:
+            return {
+                'modified': None,
+                'last_modified': None
+            }
+        
+        try:
+            # Handle different input types
+            if isinstance(last_modified, datetime):
+                dt = last_modified
+            elif isinstance(last_modified, (int, float)):
+                dt = datetime.fromtimestamp(last_modified)
+            elif isinstance(last_modified, str):
+                # Try to parse ISO format first
+                try:
+                    # Handle ISO format with Z timezone
+                    if last_modified.endswith('Z'):
+                        dt = datetime.fromisoformat(last_modified[:-1] + '+00:00')
+                    else:
+                        dt = datetime.fromisoformat(last_modified)
+                except ValueError:
+                    # Try parsing as timestamp string
+                    try:
+                        timestamp = float(last_modified)
+                        dt = datetime.fromtimestamp(timestamp)
+                    except ValueError:
+                        # Unknown string format, return None
+                        return {
+                            'modified': None,
+                            'last_modified': None
+                        }
+            else:
+                # Unknown type, return None
+                return {
+                    'modified': None,
+                    'last_modified': None
+                }
+            
+            # Return consistent format
+            return {
+                'modified': dt.timestamp(),  # For API compatibility
+                'last_modified': dt.isoformat()  # For display/sorting
+            }
+            
+        except (ValueError, TypeError):
+            # If parsing fails, return None
+            return {
+                'modified': None,
+                'last_modified': None
+            }
+
 
 class BaseDataSource(DataSourceInterface):
     """Base implementation with common functionality."""

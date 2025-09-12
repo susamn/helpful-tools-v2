@@ -1790,13 +1790,18 @@ def get_s3_directory_tree(source_instance, prefix="", current_depth=0, max_depth
         contents = source_instance.list_contents(prefix)
         
         for item in sorted(contents, key=lambda x: (not x['is_directory'], x['name'])):
+            # Use base source method for consistent timestamp formatting
+            from src.sources.base import DataSourceInterface
+            time_data = DataSourceInterface.format_last_modified(item.get('modified'))
+            
             item_data = {
                 'name': item['name'],
                 'path': item.get('key', item.get('prefix', '')),
                 'is_directory': item['is_directory'],
-                'size': item.get('size'),
-                'modified': item.get('modified')
+                'size': item.get('size')
             }
+            # Add standardized time fields
+            item_data.update(time_data)
             
             if item['is_directory']:
                 # Check if directory has contents
@@ -1854,13 +1859,18 @@ def get_directory_tree(path, base_path, current_depth=0, max_depth=2):
                 stat_info = os.stat(item_path)
                 is_dir = os.path.isdir(item_path)
                 
+                # Use base source method for consistent timestamp formatting
+                from src.sources.base import DataSourceInterface
+                time_data = DataSourceInterface.format_last_modified(stat_info.st_mtime)
+                
                 item_data = {
                     'name': item_name,
                     'path': item_rel_path.replace('\\', '/'),  # Normalize path separators
                     'is_directory': is_dir,
-                    'size': stat_info.st_size if not is_dir else None,
-                    'modified': stat_info.st_mtime
+                    'size': stat_info.st_size if not is_dir else None
                 }
+                # Add standardized time fields
+                item_data.update(time_data)
                 
                 if is_dir:
                     # Check if directory has contents and if we can go deeper
