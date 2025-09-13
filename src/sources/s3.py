@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Union, Iterator, List, Dict, Any, Optional
 from urllib.parse import urlparse
 import time
+import configparser
+from pathlib import Path
 
 from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
 from .exceptions import (
@@ -452,6 +454,73 @@ class S3Source(BaseDataSource):
             return True
         except Exception:
             return False
+    
+    def supports_expiry(self) -> bool:
+        """S3 source supports credential expiry through AWS profiles."""
+        return True
+    
+    def get_expiry_time(self) -> Optional[datetime]:
+        """
+        Get AWS credential expiry time from the credentials file.
+        
+        Returns:
+            datetime: Expiry time if found in AWS credentials, None otherwise
+        """
+        try:
+            # Get the AWS profile name
+            profile = self.config.static_config.get('aws_profile', 'default')
+            
+            # Read AWS credentials file
+            credentials_path = Path.home() / '.aws' / 'credentials'
+            if not credentials_path.exists():
+                return None
+            
+            config = configparser.ConfigParser()
+            config.read(credentials_path)
+            
+            # Check if the profile exists
+            if profile not in config.sections():
+                return None
+            
+            # Look for expiration field
+            profile_section = config[profile]
+            expiry_field = None
+            
+            # Common expiry field names in AWS credentials
+            expiry_fields = ['expires_at', 'expiry_time', 'expiration', 'aws_session_token_expiry']
+            
+            for field in expiry_fields:
+                if field in profile_section:
+                    expiry_field = profile_section[field]
+                    break
+            
+            if not expiry_field:
+                return None
+            
+            # Parse the expiry time - try different formats
+            try:
+                # ISO format (YYYY-MM-DDTHH:MM:SSZ)
+                if 'T' in expiry_field:
+                    if expiry_field.endswith('Z'):
+                        return datetime.fromisoformat(expiry_field[:-1] + '+00:00')
+                    else:
+                        return datetime.fromisoformat(expiry_field)
+                
+                # Unix timestamp
+                if expiry_field.isdigit():
+                    return datetime.fromtimestamp(int(expiry_field))
+                
+                # Try other common formats
+                from dateutil import parser
+                return parser.parse(expiry_field)
+                
+            except (ValueError, ImportError):
+                # If dateutil is not available or parsing fails, return None
+                return None
+                
+        except Exception:
+            # If any error occurs reading credentials, return None
+            return None
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up S3 client connections."""

@@ -234,6 +234,19 @@ class DataSourceInterface(ABC):
     def is_file(self) -> bool:
         """Check if source points to a single file."""
         return True
+    
+    def supports_expiry(self) -> bool:
+        """Check if source supports credential expiry."""
+        return False
+    
+    def get_expiry_time(self) -> Optional[datetime]:
+        """
+        Get credential expiry time if supported.
+        
+        Returns:
+            datetime: Expiry time if available, None otherwise
+        """
+        return None
 
     def get_connection_info(self) -> Dict[str, Any]:
         """Get connection information for debugging."""

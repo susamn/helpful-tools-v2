@@ -1096,7 +1096,15 @@ def get_sources():
     """Get all data sources"""
     try:
         sources = get_stored_sources()
-        return jsonify({'success': True, 'sources': list(sources.values())})
+        
+        # Add expiry information to each source
+        sources_with_expiry = []
+        for source in sources.values():
+            source_with_expiry = source.copy()
+            source_with_expiry['expiry'] = get_source_expiry_info(source)
+            sources_with_expiry.append(source_with_expiry)
+        
+        return jsonify({'success': True, 'sources': sources_with_expiry})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1108,7 +1116,23 @@ def get_source(source_id):
         if source_id not in sources:
             return jsonify({'success': False, 'error': 'Source not found'}), 404
         
-        return jsonify(sources[source_id])
+        source = sources[source_id].copy()
+        source['expiry'] = get_source_expiry_info(sources[source_id])
+        
+        return jsonify(source)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/sources/<source_id>/expiry', methods=['GET'])
+def get_source_expiry(source_id):
+    """Get expiry information for a specific source"""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+        
+        expiry_info = get_source_expiry_info(sources[source_id])
+        return jsonify({'success': True, 'expiry': expiry_info})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -1731,6 +1755,47 @@ def store_sources(sources):
             json.dump(sources, f, indent=2)
     except Exception as e:
         print(f"Error storing sources: {e}")
+
+def get_source_expiry_info(source_data):
+    """Get expiry information for a source"""
+    try:
+        # Convert to SourceConfig and create source instance
+        source_config = convert_to_source_config(source_data)
+        source_instance = SourceFactory.create_source(source_config)
+        
+        # Check if source supports expiry
+        supports_expiry = source_instance.supports_expiry()
+        
+        if not supports_expiry:
+            return {
+                'supports_expiry': False,
+                'status': 'not_supported'
+            }
+        
+        # Get expiry time
+        expiry_time = source_instance.get_expiry_time()
+        
+        if expiry_time is None:
+            return {
+                'supports_expiry': True,
+                'status': 'no_expiration',
+                'expiry_time': None
+            }
+        
+        # Return expiry information
+        return {
+            'supports_expiry': True,
+            'status': 'expires',
+            'expiry_time': expiry_time.isoformat(),
+            'expiry_timestamp': expiry_time.timestamp()
+        }
+        
+    except Exception as e:
+        return {
+            'supports_expiry': False,
+            'status': 'error',
+            'error': str(e)
+        }
 
 @app.route('/api/sources/<source_id>/browse', methods=['GET'])
 def browse_source_directory(source_id):

@@ -9,11 +9,13 @@ class SourcesManager {
         this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '13');
         this.sources = [];
         this.currentEditingId = null;
+        this.countdownTimer = null;
         
         this.initElements();
         this.attachEvents();
         this.applyFontSize();
         this.loadSources();
+        this.startCountdownTimer();
     }
 
     initElements() {
@@ -141,6 +143,9 @@ class SourcesManager {
                         <span>${source.status}</span>
                         ${source.last_tested ? `<span class="test-time">tested ${this.formatTime(source.last_tested)}</span>` : ''}
                     </div>
+                    <div class="source-expiry">
+                        ${this.renderExpiryInfo(source.expiry)}
+                    </div>
                     <div class="source-actions">
                         <button class="source-btn test" onclick="sourcesManager.testSource('${source.id}')">Test</button>
                         <button class="source-btn edit" onclick="sourcesManager.editSource('${source.id}')">Edit</button>
@@ -172,6 +177,88 @@ class SourcesManager {
         }
 
         return highlightedPath;
+    }
+
+    renderExpiryInfo(expiry) {
+        if (!expiry) {
+            return '<span class="expiry-status unknown">⏳ Checking expiry...</span>';
+        }
+
+        if (!expiry.supports_expiry) {
+            return '<span class="expiry-status not-supported">🚫 Not supported</span>';
+        }
+
+        if (expiry.status === 'no_expiration') {
+            return '<span class="expiry-status no-expiration">♾️ No expiration</span>';
+        }
+
+        if (expiry.status === 'expires' && expiry.expiry_timestamp) {
+            const expiryTime = new Date(expiry.expiry_timestamp * 1000);
+            const now = new Date();
+            const timeDiff = expiryTime.getTime() - now.getTime();
+            
+            if (timeDiff <= 0) {
+                return '<span class="expiry-status expired">⚠️ Expired</span>';
+            }
+            
+            const countdown = this.formatCountdown(timeDiff);
+            const statusClass = timeDiff < 24 * 60 * 60 * 1000 ? 'expiring-soon' : 'expires';
+            
+            return `<span class="expiry-status ${statusClass}" data-expiry-timestamp="${expiry.expiry_timestamp}">⏰ Expires in ${countdown}</span>`;
+        }
+
+        if (expiry.status === 'error') {
+            return '<span class="expiry-status error">❌ Error checking expiry</span>';
+        }
+
+        return '<span class="expiry-status unknown">❓ Unknown status</span>';
+    }
+
+    formatCountdown(milliseconds) {
+        const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (days > 0) {
+            return `${days}d ${hours}h`;
+        } else if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
+    }
+
+    startCountdownTimer() {
+        // Clear existing timer
+        if (this.countdownTimer) {
+            clearInterval(this.countdownTimer);
+        }
+
+        // Update countdown every 60 seconds
+        this.countdownTimer = setInterval(() => {
+            this.updateCountdowns();
+        }, 60000);
+    }
+
+    updateCountdowns() {
+        const expiryElements = document.querySelectorAll('.expiry-status[data-expiry-timestamp]');
+        
+        expiryElements.forEach(element => {
+            const expiryTimestamp = parseInt(element.dataset.expiryTimestamp);
+            const expiryTime = new Date(expiryTimestamp * 1000);
+            const now = new Date();
+            const timeDiff = expiryTime.getTime() - now.getTime();
+            
+            if (timeDiff <= 0) {
+                element.textContent = '⚠️ Expired';
+                element.className = 'expiry-status expired';
+            } else {
+                const countdown = this.formatCountdown(timeDiff);
+                const statusClass = timeDiff < 24 * 60 * 60 * 1000 ? 'expiring-soon' : 'expires';
+                element.textContent = `⏰ Expires in ${countdown}`;
+                element.className = `expiry-status ${statusClass}`;
+            }
+        });
     }
 
     showAddSourcePopup() {

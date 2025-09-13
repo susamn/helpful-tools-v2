@@ -202,9 +202,30 @@
     border-color: #ccc;
 }
 
+.source-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
 .source-info {
     flex: 1;
     cursor: default;
+}
+
+.source-expiry-selector {
+    flex-shrink: 0;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.source-type-icon {
+    font-size: 16px;
+    line-height: 1;
 }
 
 .source-name {
@@ -781,5 +802,63 @@
 
 .file-tree-container {
     padding: 12px;
+}
+
+/* Source Expiry Styles (matching sources app) */
+.source-expiry-selector .expiry-status {
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.source-expiry-selector .expiry-status.not-supported {
+    background: #f0f0f0;
+    color: #666;
+    border: 1px solid #ddd;
+}
+
+.source-expiry-selector .expiry-status.no-expiration {
+    background: #e8f5e8;
+    color: #2d5a2d;
+    border: 1px solid #a8d8a8;
+}
+
+.source-expiry-selector .expiry-status.expires {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.source-expiry-selector .expiry-status.expiring-soon {
+    background: #ffcccc;
+    color: #cc0000;
+    border: 1px solid #ffaaaa;
+    animation: blink 2s infinite;
+}
+
+.source-expiry-selector .expiry-status.expired {
+    background: #ff4444;
+    color: #ffffff;
+    border: 1px solid #cc0000;
+    font-weight: bold;
+}
+
+.source-expiry-selector .expiry-status.error {
+    background: #ffe6e6;
+    color: #cc0000;
+    border: 1px solid #ffcccc;
+}
+
+.source-expiry-selector .expiry-status.unknown {
+    background: #f8f9fa;
+    color: #6c757d;
+    border: 1px solid #dee2e6;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.5; }
 }
 </style>

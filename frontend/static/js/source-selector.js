@@ -251,13 +251,20 @@ class SourceSelector {
         const sourcesHTML = this.sources.map(source => {
             const hasDynamicVars = source.dynamicVariables && Object.keys(source.dynamicVariables).length > 0;
             const resolvedPath = this.resolveSourcePath(source);
+            const fileTypeIcon = source.is_directory ? '📁' : '📄';
 
             return `
                 <div class="source-item" data-source-id="${source.id}">
-                    <div class="source-info">
-                        <div class="source-name">${this.escapeHtml(source.name)}</div>
-                        <div class="source-type">${this.escapeHtml(source.type.toUpperCase())}</div>
-                        <div class="source-path">${this.escapeHtml(resolvedPath)}</div>
+                    <div class="source-header">
+                        <div class="source-info">
+                            <div class="source-name">${this.escapeHtml(source.name)}</div>
+                            <div class="source-type">${this.escapeHtml(source.type.toUpperCase())}</div>
+                            <div class="source-path">${this.escapeHtml(resolvedPath)}</div>
+                        </div>
+                        <div class="source-expiry-selector">
+                            ${this.renderExpiryInfo(source.expiry)}
+                            <div class="source-type-icon">${fileTypeIcon}</div>
+                        </div>
                     </div>
                     <div class="source-actions">
                         <div class="source-buttons">
@@ -294,6 +301,61 @@ class SourceSelector {
                 }
             }
         });
+    }
+
+    /**
+     * Render expiry information for a source (same as sources app)
+     */
+    renderExpiryInfo(expiry) {
+        if (!expiry) {
+            return '<span class="expiry-status unknown">⏳ Checking expiry...</span>';
+        }
+
+        if (!expiry.supports_expiry) {
+            return '<span class="expiry-status not-supported">🚫 Not supported</span>';
+        }
+
+        if (expiry.status === 'no_expiration') {
+            return '<span class="expiry-status no-expiration">♾️ No expiration</span>';
+        }
+
+        if (expiry.status === 'expires' && expiry.expiry_timestamp) {
+            const expiryTime = new Date(expiry.expiry_timestamp * 1000);
+            const now = new Date();
+            const timeDiff = expiryTime.getTime() - now.getTime();
+            
+            if (timeDiff <= 0) {
+                return '<span class="expiry-status expired">⚠️ Expired</span>';
+            }
+            
+            const countdown = this.formatCountdown(timeDiff);
+            const statusClass = timeDiff < 24 * 60 * 60 * 1000 ? 'expiring-soon' : 'expires';
+            
+            return `<span class="expiry-status ${statusClass}" data-expiry-timestamp="${expiry.expiry_timestamp}">⏰ Expires in ${countdown}</span>`;
+        }
+
+        if (expiry.status === 'error') {
+            return '<span class="expiry-status error">❌ Error checking expiry</span>';
+        }
+
+        return '<span class="expiry-status unknown">❓ Unknown status</span>';
+    }
+
+    /**
+     * Format countdown time (same as sources app)
+     */
+    formatCountdown(milliseconds) {
+        const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+
+        if (days > 0) {
+            return `${days}d ${hours}h`;
+        } else if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
     }
 
     /**
