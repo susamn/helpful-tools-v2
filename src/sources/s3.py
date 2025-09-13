@@ -487,7 +487,7 @@ class S3Source(BaseDataSource):
             expiry_field = None
             
             # Common expiry field names in AWS credentials
-            expiry_fields = ['expires_at', 'expiry_time', 'expiration', 'aws_session_token_expiry']
+            expiry_fields = ['expires_at', 'expiry_time', 'expiration', 'aws_session_token_expiry', 'token_expiration']
             
             for field in expiry_fields:
                 if field in profile_section:

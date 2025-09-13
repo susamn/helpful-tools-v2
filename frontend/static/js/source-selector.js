@@ -782,11 +782,16 @@ class SourceSelector {
      */
     async selectFile(filePath, source, element) {
         try {
-            // Remove previous selection
-            const treeContainer = document.getElementById(`tree-${this.options.containerId}-${source.id}`);
-            treeContainer.querySelectorAll('.tree-item.selected').forEach(el => {
-                el.classList.remove('selected');
-            });
+            // Remove previous selection from the file tree container
+            const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
+            if (explorerContent) {
+                const treeContainer = explorerContent.querySelector('.file-tree-container');
+                if (treeContainer) {
+                    treeContainer.querySelectorAll('.tree-item.selected').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                }
+            }
             
             // Mark current item as selected
             element.classList.add('selected');
