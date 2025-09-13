@@ -522,6 +522,34 @@ class S3Source(BaseDataSource):
             # If any error occurs reading credentials, return None
             return None
     
+    def _build_child_path(self, parent_path: Optional[str], item: Dict[str, Any]) -> str:
+        """
+        Build child path for S3 directory exploration.
+        
+        Args:
+            parent_path: Parent S3 prefix path (can be None for root)
+            item: Directory item metadata containing 'prefix' or 'name'
+            
+        Returns:
+            S3 prefix path for child directory
+        """
+        if 'prefix' in item:
+            # Use the full prefix if available
+            return item['prefix']
+        elif 'key' in item:
+            # Use key for files (though this shouldn't happen for directories)
+            return item['key']
+        else:
+            # Build from parent path and item name
+            if parent_path is None or parent_path == '':
+                # Root level
+                return f"{item['name']}/"
+            else:
+                # Ensure parent path ends with '/'
+                if not parent_path.endswith('/'):
+                    parent_path += '/'
+                return f"{parent_path}{item['name']}/"
+    
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up S3 client connections."""
         if self._s3_client:

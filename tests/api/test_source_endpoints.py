@@ -55,25 +55,40 @@ class TestSourceAPIEndpoints:
                 'id': 'file-source-1',
                 'name': 'Test File Source',
                 'type': 'local_file',
-                'config': {'path': self.test_file},
+                'staticConfig': {},
                 'pathTemplate': self.test_file,
-                'dynamicVariables': {}
+                'dynamicVariables': {},
+                'created_at': '2023-01-01T00:00:00',
+                'updated_at': '2023-01-01T00:00:00',
+                'status': 'created',
+                'is_directory': False,
+                'level': 0
             },
             'dir-source-1': {
                 'id': 'dir-source-1',
                 'name': 'Test Directory Source',
                 'type': 'local_file',
-                'config': {'path': self.temp_dir},
+                'staticConfig': {},
                 'pathTemplate': self.temp_dir,
-                'dynamicVariables': {}
+                'dynamicVariables': {},
+                'created_at': '2023-01-01T00:00:00',
+                'updated_at': '2023-01-01T00:00:00',
+                'status': 'created',
+                'is_directory': True,
+                'level': 2
             },
             'nonexistent-source': {
                 'id': 'nonexistent-source',
                 'name': 'Nonexistent Source',
                 'type': 'local_file',
-                'config': {'path': '/nonexistent/path'},
+                'staticConfig': {},
                 'pathTemplate': '/nonexistent/path',
-                'dynamicVariables': {}
+                'dynamicVariables': {},
+                'created_at': '2023-01-01T00:00:00',
+                'updated_at': '2023-01-01T00:00:00',
+                'status': 'created',
+                'is_directory': False,
+                'level': 0
             }
         }
     
@@ -150,8 +165,8 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         assert 'error' in data
     
     @patch('main.get_stored_sources')
-    @patch('boto3.Session')
-    def test_fetch_s3_file_source(self, mock_session_class, mock_get_sources):
+    @patch('sources.s3.S3Source._get_s3_client')
+    def test_fetch_s3_file_source(self, mock_get_client, mock_get_sources):
         """Test fetching from S3 file source."""
         # Mock S3 file source
         s3_sources = {
@@ -159,18 +174,21 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
                 'id': 's3-file-source',
                 'name': 'S3 File Source',
                 'type': 's3',
-                'config': {'path': 's3://test-bucket/test-file.txt'},
+                'staticConfig': {'aws_access_key_id': 'test', 'aws_secret_access_key': 'test'},
                 'pathTemplate': 's3://test-bucket/test-file.txt',
-                'dynamicVariables': {}
+                'dynamicVariables': {},
+                'created_at': '2023-01-01T00:00:00',
+                'updated_at': '2023-01-01T00:00:00',
+                'status': 'created',
+                'is_directory': False,
+                'level': 0
             }
         }
         mock_get_sources.return_value = s3_sources
         
-        # Mock S3 client
-        mock_session = MagicMock()
+        # Mock S3 client directly
         mock_client = MagicMock()
-        mock_session.client.return_value = mock_client
-        mock_session_class.return_value = mock_session
+        mock_get_client.return_value = mock_client
         
         # Mock file operations
         mock_client.head_object.return_value = {}
@@ -181,12 +199,12 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         response = self.app.get('/api/sources/s3-file-source/fetch')
         
         assert response.status_code == 200
-        assert 'application/octet-stream' in response.content_type
+        assert 'text/plain' in response.content_type
         assert b"S3 file content" in response.data
     
     @patch('main.get_stored_sources')
-    @patch('boto3.Session')
-    def test_fetch_s3_directory_source(self, mock_session_class, mock_get_sources):
+    @patch('sources.s3.S3Source._get_s3_client')
+    def test_fetch_s3_directory_source(self, mock_get_client, mock_get_sources):
         """Test fetching from S3 directory source."""
         # Mock S3 directory source
         s3_sources = {
@@ -194,18 +212,21 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
                 'id': 's3-dir-source',
                 'name': 'S3 Directory Source',
                 'type': 's3',
-                'config': {'path': 's3://test-bucket/'},
+                'staticConfig': {'aws_access_key_id': 'test', 'aws_secret_access_key': 'test'},
                 'pathTemplate': 's3://test-bucket/',
-                'dynamicVariables': {}
+                'dynamicVariables': {},
+                'created_at': '2023-01-01T00:00:00',
+                'updated_at': '2023-01-01T00:00:00',
+                'status': 'created',
+                'is_directory': True,
+                'level': 2
             }
         }
         mock_get_sources.return_value = s3_sources
         
-        # Mock S3 client
-        mock_session = MagicMock()
+        # Mock S3 client directly
         mock_client = MagicMock()
-        mock_session.client.return_value = mock_client
-        mock_session_class.return_value = mock_session
+        mock_get_client.return_value = mock_client
         
         # Mock S3 list operation for directory detection
         mock_client.head_bucket.return_value = {}
@@ -331,8 +352,8 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
         assert subfile_item is not None
     
     @patch('main.get_stored_sources')
-    @patch('boto3.Session')
-    def test_browse_s3_directory_source(self, mock_session_class, mock_get_sources):
+    @patch('sources.s3.S3Source._get_s3_client')
+    def test_browse_s3_directory_source(self, mock_get_client, mock_get_sources):
         """Test browsing S3 directory source."""
         # Mock S3 source
         s3_sources = {
@@ -340,18 +361,21 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
                 'id': 's3-dir-source',
                 'name': 'S3 Directory Source',
                 'type': 's3',
-                'config': {'path': 's3://test-bucket/'},
+                'staticConfig': {'aws_access_key_id': 'test', 'aws_secret_access_key': 'test'},
                 'pathTemplate': 's3://test-bucket/',
-                'dynamicVariables': {}
+                'dynamicVariables': {},
+                'created_at': '2023-01-01T00:00:00',
+                'updated_at': '2023-01-01T00:00:00',
+                'status': 'created',
+                'is_directory': True,
+                'level': 2
             }
         }
         mock_get_sources.return_value = s3_sources
         
-        # Mock S3 client
-        mock_session = MagicMock()
+        # Mock S3 client directly
         mock_client = MagicMock()
-        mock_session.client.return_value = mock_client
-        mock_session_class.return_value = mock_session
+        mock_get_client.return_value = mock_client
         
         # Mock S3 list operation
         mock_paginator = MagicMock()
@@ -506,7 +530,12 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
                 'type': 'http',
                 'config': {'url': 'http://example.com'},
                 'pathTemplate': 'http://example.com',
-                'dynamicVariables': {}
+                'dynamicVariables': {},
+                'created_at': '2023-01-01T00:00:00',
+                'updated_at': '2023-01-01T00:00:00',
+                'status': 'created',
+                'is_directory': False,
+                'level': 0
             }
         }
         mock_get_sources.return_value = sources
@@ -516,7 +545,7 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
         assert response.status_code == 400
         data = json.loads(response.data)
         assert data['success'] is False
-        assert 'only supported for local file sources' in data['error']
+        assert 'only supported for local file and S3 sources' in data['error']
 
 
 class TestDirectoryTreeFunction(TestSourceAPIEndpoints):

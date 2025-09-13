@@ -1839,11 +1839,17 @@ def browse_source_directory(source_id):
             current_path = os.path.normpath(current_path)
             
             # Security check - ensure we don't go outside base path
-            if not current_path.startswith(base_path):
+            # Normalize base_path for proper comparison
+            normalized_base_path = os.path.normpath(base_path)
+            if not current_path.startswith(normalized_base_path):
                 return jsonify({'success': False, 'error': 'Access denied'}), 403
             
-            # Get directory contents
-            tree_data = get_directory_tree(current_path, base_path, max_depth=2)
+            # Get directory contents using source-specific level configuration
+            # For local file sources, we need to pass the full current_path when browsing subdirectories
+            if requested_path:
+                tree_data = source_instance.explore_directory_tree(current_path)
+            else:
+                tree_data = source_instance.explore_directory_tree(None)
             
         elif source_type == 's3':
             # Handle S3 sources
@@ -1854,8 +1860,8 @@ def browse_source_directory(source_id):
             requested_prefix = request.args.get('path', '')
             current_path = base_path  # For S3, base_path is the S3 URL
             
-            # Get S3 directory contents
-            tree_data = get_s3_directory_tree(source_instance, requested_prefix, max_depth=2)
+            # Get S3 directory contents using source-specific level configuration
+            tree_data = source_instance.explore_directory_tree(requested_prefix if requested_prefix else None)
         
         return jsonify({
             'success': True,
@@ -1865,7 +1871,17 @@ def browse_source_directory(source_id):
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        # Provide more user-friendly error messages for common directory browsing issues
+        error_message = str(e)
+        if 'permission denied' in error_message.lower():
+            error_message = 'Permission denied accessing the directory'
+        elif 'no such file or directory' in error_message.lower():
+            error_message = 'Directory path not found'
+        elif 'connection' in error_message.lower() or 'timeout' in error_message.lower():
+            error_message = 'Failed to connect to the source'
+        elif 'credentials' in error_message.lower() or 'unauthorized' in error_message.lower():
+            error_message = 'Invalid or expired credentials'
+        return jsonify({'success': False, 'error': error_message}), 500
 
 def get_s3_directory_tree(source_instance, prefix="", current_depth=0, max_depth=2):
     """Get S3 directory tree structure with limited depth"""
@@ -2001,7 +2017,6 @@ def get_source_file_data(source_id):
 
         source = sources[source_id]
         source_type = source.get('type')
-        config = source.get('config', {})
         
         # Support local file and S3 sources
         if source_type not in ['local_file', 's3']:
@@ -2012,17 +2027,20 @@ def get_source_file_data(source_id):
         if not file_path:
             return jsonify({'success': False, 'error': 'File path parameter required'}), 400
         
+        # Convert to SourceConfig and create source instance
+        source_config = convert_to_source_config(source)
+        source_instance = SourceFactory.create_source(source_config)
+        
         if source_type == 'local_file':
-            base_path = config.get('path')
-            if not base_path:
-                return jsonify({'success': False, 'error': 'No path specified in source'}), 400
+            base_path = source_config.get_resolved_path()
             
             # Expand user path and construct full path
             base_path = os.path.expanduser(base_path)
             full_path = os.path.normpath(os.path.join(base_path, file_path))
             
             # Security check - ensure we don't go outside base path
-            if not full_path.startswith(base_path):
+            normalized_base_path = os.path.normpath(base_path)
+            if not full_path.startswith(normalized_base_path):
                 return jsonify({'success': False, 'error': 'Access denied'}), 403
             
             if not os.path.exists(full_path):
@@ -2049,16 +2067,17 @@ def get_source_file_data(source_id):
         elif source_type == 's3':
             # Handle S3 file reading
             try:
-                source_config = convert_to_source_config(source)
-                s3_source = SourceFactory.create_source(source_config)
+                # Parse the S3 path from the source configuration
+                base_s3_path = source_config.get_resolved_path()
+                if not base_s3_path.startswith('s3://'):
+                    return jsonify({'success': False, 'error': 'Invalid S3 path in source'}), 400
                 
-                # Parse the base S3 path
-                bucket = config.get('bucket')
-                if not bucket:
-                    return jsonify({'success': False, 'error': 'No S3 bucket specified in source'}), 400
+                # Extract bucket and base key from the S3 path
+                s3_parts = base_s3_path[5:].split('/', 1)  # Remove 's3://' prefix
+                bucket = s3_parts[0]
+                base_key = s3_parts[1] if len(s3_parts) > 1 else ''
                 
                 # Construct full S3 key
-                base_key = config.get('key', '')
                 if base_key and not base_key.endswith('/'):
                     base_key += '/'
                 full_key = base_key + file_path
@@ -2118,16 +2137,12 @@ def fetch_source_data(source_id):
             try:
                 base_path = source_config.get_resolved_path()
                 
-                # Handle different source types
-                if source_config.source_type == 'local_file':
-                    tree_data = get_directory_tree(base_path, base_path, max_depth=2)
-                elif source_config.source_type == 's3':
-                    # For S3, use the S3-specific tree function
-                    tree_data = get_s3_directory_tree(source_instance, max_depth=2)
+                # Use source-specific level configuration for directory exploration
+                if source_instance.is_listable():
+                    tree_data = source_instance.explore_directory_tree()
                 else:
-                    # Generic approach using list_contents
-                    contents = source_instance.list_contents()
-                    tree_data = contents  # Basic listing for other source types
+                    # Fallback for sources that don't support directory listing
+                    tree_data = []
                 
                 return jsonify({
                     'success': True,
@@ -2150,7 +2165,17 @@ def fetch_source_data(source_id):
             return jsonify({'success': False, 'error': 'Source is neither a file nor directory'}), 400
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        # Provide more user-friendly error messages for common file access issues
+        error_message = str(e)
+        if 'permission denied' in error_message.lower():
+            error_message = 'Permission denied accessing the file or directory'
+        elif 'no such file or directory' in error_message.lower():
+            error_message = 'File or directory not found'
+        elif 'connection' in error_message.lower() or 'timeout' in error_message.lower():
+            error_message = 'Failed to connect to the source'
+        elif 'credentials' in error_message.lower() or 'unauthorized' in error_message.lower():
+            error_message = 'Invalid or expired credentials'
+        return jsonify({'success': False, 'error': error_message}), 500
 
 @app.route('/api/sources/<source_id>/data', methods=['GET'])
 def get_source_data(source_id):

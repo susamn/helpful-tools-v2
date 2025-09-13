@@ -203,6 +203,110 @@ class DataSourceInterface(ABC):
         """
         pass
 
+    def explore_directory_tree(self, start_path: Optional[str] = None, current_depth: int = 0) -> List[Dict[str, Any]]:
+        """
+        Explore directory tree structure with level-based depth control.
+        
+        Args:
+            start_path: Optional starting path (uses source path if None)
+            current_depth: Current recursion depth (for internal use)
+            
+        Returns:
+            List of directory tree items with metadata and children
+            
+        Raises:
+            SourceNotFoundError: If path doesn't exist
+            SourceConnectionError: If can't connect to source
+            NotImplementedError: If source doesn't support directory exploration
+        """
+        max_depth = self.config.level
+        
+        # If max depth is 0, just list current level without children
+        if max_depth == 0:
+            return self._get_flat_listing(start_path, True)
+        
+        # Get recursive tree structure
+        return self._get_recursive_tree(start_path, current_depth, max_depth)
+    
+    def _get_flat_listing(self, path: Optional[str], at_max_depth: bool = False) -> List[Dict[str, Any]]:
+        """
+        Get flat listing of items at current path.
+        
+        Args:
+            path: Path to list
+            at_max_depth: Whether we're at maximum depth (affects metadata)
+            
+        Returns:
+            List of items with basic metadata
+        """
+        try:
+            items = self.list_contents(path)
+            
+            # Add exploration metadata
+            for item in items:
+                if item.get('is_directory', False):
+                    item['has_children'] = not at_max_depth  # Assume has children unless at max depth
+                    item['explorable'] = not at_max_depth
+                    item['children'] = []  # Empty list for compatibility, no children loaded for flat listing
+                
+            return items
+        except Exception:
+            return []
+    
+    def _get_recursive_tree(self, start_path: Optional[str], current_depth: int, max_depth: int) -> List[Dict[str, Any]]:
+        """
+        Get recursive tree structure up to max_depth.
+        
+        Args:
+            start_path: Starting path
+            current_depth: Current depth level
+            max_depth: Maximum depth to explore
+            
+        Returns:
+            List of items with nested children
+        """
+        try:
+            items = self.list_contents(start_path)
+            
+            for item in items:
+                if item.get('is_directory', False):
+                    # Check if we can go deeper
+                    if current_depth < max_depth:
+                        try:
+                            # Recursively get children
+                            child_path = self._build_child_path(start_path, item)
+                            children = self._get_recursive_tree(child_path, current_depth + 1, max_depth)
+                            item['children'] = children
+                            item['has_children'] = len(children) > 0
+                            item['explorable'] = current_depth + 1 < max_depth
+                        except Exception:
+                            item['children'] = []
+                            item['has_children'] = False
+                            item['explorable'] = False
+                            item['error'] = 'Access denied'
+                    else:
+                        # At max depth, don't load children but provide empty list for compatibility
+                        item['children'] = []
+                        item['has_children'] = True  # Assume has children
+                        item['explorable'] = False  # Can't explore further
+                
+            return items
+        except Exception:
+            return []
+    
+    def _build_child_path(self, parent_path: Optional[str], item: Dict[str, Any]) -> str:
+        """
+        Build child path for directory exploration. Override in subclasses.
+        
+        Args:
+            parent_path: Parent directory path
+            item: Directory item metadata
+            
+        Returns:
+            Full path to child directory
+        """
+        raise NotImplementedError("Subclasses must implement _build_child_path")
+
     def _validate_config(self) -> None:
         """Validate the source configuration."""
         missing_vars = self.config.validate_variables()

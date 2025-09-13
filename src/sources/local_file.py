@@ -316,3 +316,23 @@ class LocalFileSource(BaseDataSource):
         """Check if the source points to a single file."""
         path = Path(self._resolved_path)
         return path.exists() and path.is_file()
+    
+    def _build_child_path(self, parent_path: Optional[str], item: Dict[str, Any]) -> str:
+        """
+        Build child path for local file directory exploration.
+        
+        Args:
+            parent_path: Parent directory path
+            item: Directory item metadata containing 'path' or 'name'
+            
+        Returns:
+            Full path to child directory
+        """
+        if parent_path is None:
+            parent_path = self._resolved_path
+        
+        # Use item's full path if available, otherwise join parent with item name
+        if 'path' in item:
+            return item['path']
+        else:
+            return os.path.join(parent_path, item['name'])
