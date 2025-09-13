@@ -2071,7 +2071,7 @@ def get_source_file_data(source_id):
                 base_s3_path = source_config.get_resolved_path()
                 if not base_s3_path.startswith('s3://'):
                     return jsonify({'success': False, 'error': 'Invalid S3 path in source'}), 400
-                
+                '''
                 # Extract bucket and base key from the S3 path
                 s3_parts = base_s3_path[5:].split('/', 1)  # Remove 's3://' prefix
                 bucket = s3_parts[0]
@@ -2081,14 +2081,15 @@ def get_source_file_data(source_id):
                 if base_key and not base_key.endswith('/'):
                     base_key += '/'
                 full_key = base_key + file_path
-                
+                '''
+
                 # Create a new S3 source for the specific file
                 file_source_config = SourceConfig(
                     source_id=source_config.source_id,
                     name=source_config.name,
                     source_type='s3',
                     static_config=source_config.static_config,
-                    path_template=f"s3://{bucket}/{full_key}",
+                    path_template=file_path,
                     dynamic_variables={},
                     created_at=source_config.created_at,
                     updated_at=source_config.updated_at
