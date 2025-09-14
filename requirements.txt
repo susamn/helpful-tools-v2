@@ -1,3 +1,18 @@
+# Core application dependencies
 Flask==3.0.0
 PyYAML==6.0.1
 xmltodict==0.13.0
+
+# Testing dependencies
+pytest==7.4.3
+requests-mock==1.11.0
+pytest-mock==3.11.1
+requests==2.31.0
+
+# BDD Testing dependencies (essential only)
+behave==1.2.6
+selenium==4.15.0
+webdriver-manager==4.0.1
+
+# Development dependencies (optional)
+colorama==0.4.6

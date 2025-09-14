@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 
 def setup_venv():
-    # Get project root directory (two levels up from this script)
-    project_root = Path(__file__).parent.parent.parent
+    # Get project root directory (script is now in root)
+    project_root = Path(__file__).parent
     os.chdir(project_root)
     venv_path = project_root / "venv"
     
