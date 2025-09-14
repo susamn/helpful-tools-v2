@@ -1322,189 +1322,20 @@ def test_source_connection(source_type, config, source_data=None):
     except Exception as e:
         return {'success': False, 'error': f'Test failed: {str(e)}'}
 
-def test_local_file(config):
-    """Test local file access"""
-    import os
-    file_path = config.get('path')
-    if not file_path:
-        return {'success': False, 'error': 'No file path specified'}
-    
-    if not os.path.exists(file_path):
-        return {'success': False, 'status': 'error', 'error': f'File not found: {file_path}'}
-    
-    if not os.access(file_path, os.R_OK):
-        return {'success': False, 'error': f'File not readable: {file_path}'}
-    
-    file_size = os.path.getsize(file_path)
-    return {
-        'success': True, 
-        'status': 'connected',
-        'message': f'File accessible, size: {file_size} bytes'
-    }
-
-def test_s3_connection(config):
-    """Test S3 connection"""
-    try:
-        import boto3
-        from botocore.exceptions import ClientError, NoCredentialsError
-        
-        bucket = config.get('bucket')
-        key = config.get('key')
-        profile = config.get('aws_profile', 'default')
-        region = config.get('region')
-        
-        if not bucket or not key:
-            return {'success': False, 'error': 'Bucket and key are required'}
-        
-        # Create session with profile
-        session = boto3.Session(profile_name=profile)
-        s3 = session.client('s3', region_name=region) if region else session.client('s3')
-        
-        # Test by checking if object exists
-        s3.head_object(Bucket=bucket, Key=key)
-        
-        return {
-            'success': True,
-            'message': f'S3 object accessible: s3://{bucket}/{key}'
-        }
-    except ImportError:
-        return {'success': False, 'error': 'boto3 library not available'}
-    except NoCredentialsError:
-        return {'success': False, 'error': f'No AWS credentials found for profile: {profile}'}
-    except ClientError as e:
-        error_code = e.response['Error']['Code']
-        if error_code == '404':
-            return {'success': False, 'error': f'S3 object not found: s3://{bucket}/{key}'}
-        else:
-            return {'success': False, 'error': f'S3 error: {e.response["Error"]["Message"]}'}
-
-def test_sftp_connection(config):
-    """Test SFTP connection"""
-    try:
-        import paramiko
-        
-        host = config.get('host')
-        port = int(config.get('port', 22))
-        username = config.get('username')
-        key_file = config.get('key_file')
-        path = config.get('path')
-        
-        if not all([host, username, key_file, path]):
-            return {'success': False, 'error': 'Host, username, key file, and path are required'}
-        
-        # Create SSH client
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        # Connect using key file
-        ssh.connect(host, port=port, username=username, key_filename=key_file, timeout=10)
-        
-        # Test SFTP
-        sftp = ssh.open_sftp()
-        try:
-            stat = sftp.stat(path)
-            file_size = stat.st_size
-            message = f'SFTP file accessible, size: {file_size} bytes'
-        except FileNotFoundError:
-            return {'success': False, 'error': f'SFTP file not found: {path}'}
-        finally:
-            sftp.close()
-            ssh.close()
-        
-        return {'success': True, 'message': message}
-    except ImportError:
-        return {'success': False, 'error': 'paramiko library not available'}
-    except Exception as e:
-        return {'success': False, 'error': f'SFTP connection failed: {str(e)}'}
-
-def test_samba_connection(config):
-    """Test Samba/SMB connection"""
-    try:
-        from smb.SMBConnection import SMBConnection
-        
-        host = config.get('host')
-        share = config.get('share')
-        username = config.get('username')
-        password = config.get('password')
-        path = config.get('path', '')
-        
-        if not all([host, share, username, password]):
-            return {'success': False, 'error': 'Host, share, username, and password are required'}
-        
-        # Create SMB connection
-        conn = SMBConnection(username, password, 'client', host, use_ntlm_v2=True)
-        
-        # Connect
-        if not conn.connect(host, 139, timeout=10):
-            return {'success': False, 'error': 'Failed to connect to SMB server'}
-        
-        try:
-            # Test by listing the path
-            files = conn.listPath(share, path or '/')
-            message = f'SMB share accessible, found {len(files)} items'
-        except Exception as e:
-            return {'success': False, 'error': f'SMB path access failed: {str(e)}'}
-        finally:
-            conn.close()
-        
-        return {'success': True, 'message': message}
-    except ImportError:
-        return {'success': False, 'error': 'pysmb library not available'}
-    except Exception as e:
-        return {'success': False, 'error': f'SMB connection failed: {str(e)}'}
-
-def test_http_connection(config):
-    """Test HTTP connection"""
-    import urllib.request
-    import urllib.error
-    import json
-    
-    url = config.get('url')
-    method = config.get('method', 'GET')
-    headers_str = config.get('headers', '{}')
-    
-    if not url:
-        return {'success': False, 'error': 'URL is required'}
-    
-    try:
-        # Parse headers
-        headers = json.loads(headers_str) if headers_str else {}
-        
-        # Create request
-        req = urllib.request.Request(url, method=method)
-        for key, value in headers.items():
-            req.add_header(key, value)
-        
-        # Make request with timeout
-        with urllib.request.urlopen(req, timeout=10) as response:
-            status_code = response.getcode()
-            content_length = response.headers.get('Content-Length', 'unknown')
-            
-        return {
-            'success': True,
-            'message': f'HTTP {method} successful, status: {status_code}, size: {content_length} bytes'
-        }
-    except urllib.error.HTTPError as e:
-        return {'success': False, 'error': f'HTTP error {e.code}: {e.reason}'}
-    except urllib.error.URLError as e:
-        return {'success': False, 'error': f'URL error: {e.reason}'}
-    except json.JSONDecodeError:
-        return {'success': False, 'error': 'Invalid JSON in headers'}
-    except Exception as e:
-        return {'success': False, 'error': f'HTTP test failed: {str(e)}'}
+# NOTE: Vestigial connection test functions removed - now handled by sources package
 
 def resolve_dynamic_path(path_template, dynamic_variables):
     """Resolve dynamic variables in a path template"""
     import re
     resolved_path = path_template
-    
+
     # Find all variables in format $variableName
     variables = re.findall(r'\$(\w+)', path_template)
-    
+
     for var in variables:
         value = dynamic_variables.get(var, '')
         resolved_path = resolved_path.replace(f'${var}', value)
-    
+
     return resolved_path
 
 def extract_dynamic_variables(path_template):
@@ -1883,129 +1714,7 @@ def browse_source_directory(source_id):
             error_message = 'Invalid or expired credentials'
         return jsonify({'success': False, 'error': error_message}), 500
 
-def get_s3_directory_tree(source_instance, prefix="", current_depth=0, max_depth=2):
-    """Get S3 directory tree structure with limited depth"""
-    try:
-        if current_depth >= max_depth:
-            return None
-            
-        items = []
-        
-        # List contents of current prefix
-        contents = source_instance.list_contents(prefix)
-        
-        for item in sorted(contents, key=lambda x: (not x['is_directory'], x['name'])):
-            # Use base source method for consistent timestamp formatting
-            from src.sources.base import DataSourceInterface
-            time_data = DataSourceInterface.format_last_modified(item.get('modified'))
-            
-            item_data = {
-                'name': item['name'],
-                'path': item.get('key', item.get('prefix', '')),
-                'is_directory': item['is_directory'],
-                'size': item.get('size')
-            }
-            # Add standardized time fields
-            item_data.update(time_data)
-            
-            if item['is_directory']:
-                # Check if directory has contents
-                try:
-                    # Quick check for children
-                    child_contents = source_instance.list_contents(item.get('prefix', ''))
-                    has_contents = len(child_contents) > 0
-                    item_data['has_children'] = has_contents
-                    
-                    if current_depth + 1 < max_depth and has_contents:
-                        # Recursively get children
-                        children = get_s3_directory_tree(
-                            source_instance, 
-                            item.get('prefix', ''), 
-                            current_depth + 1, 
-                            max_depth
-                        )
-                        if children:
-                            item_data['children'] = children
-                    else:
-                        # Mark as non-explorable if at max depth
-                        item_data['explorable'] = current_depth + 1 < max_depth
-                        
-                except Exception:
-                    item_data['has_children'] = False
-                    item_data['error'] = 'Access denied'
-            
-            items.append(item_data)
-        
-        return items
-        
-    except Exception:
-        return []
-
-def get_directory_tree(path, base_path, current_depth=0, max_depth=2):
-    """Get directory tree structure with limited depth"""
-    try:
-        if current_depth >= max_depth:
-            return None
-            
-        items = []
-        
-        # Get relative path from base for consistent referencing
-        rel_path = os.path.relpath(path, base_path) if path != base_path else ''
-        
-        for item_name in sorted(os.listdir(path)):
-            item_path = os.path.join(path, item_name)
-            item_rel_path = os.path.join(rel_path, item_name) if rel_path else item_name
-            
-            # Skip hidden files and directories
-            if item_name.startswith('.'):
-                continue
-            
-            try:
-                stat_info = os.stat(item_path)
-                is_dir = os.path.isdir(item_path)
-                
-                # Use base source method for consistent timestamp formatting
-                from src.sources.base import DataSourceInterface
-                time_data = DataSourceInterface.format_last_modified(stat_info.st_mtime)
-                
-                item_data = {
-                    'name': item_name,
-                    'path': item_rel_path.replace('\\', '/'),  # Normalize path separators
-                    'is_directory': is_dir,
-                    'size': stat_info.st_size if not is_dir else None
-                }
-                # Add standardized time fields
-                item_data.update(time_data)
-                
-                if is_dir:
-                    # Check if directory has contents and if we can go deeper
-                    try:
-                        has_contents = len([f for f in os.listdir(item_path) if not f.startswith('.')]) > 0
-                        item_data['has_children'] = has_contents
-                        
-                        if current_depth + 1 < max_depth and has_contents:
-                            # Recursively get children
-                            children = get_directory_tree(item_path, base_path, current_depth + 1, max_depth)
-                            if children:
-                                item_data['children'] = children
-                        else:
-                            # Mark as non-explorable if at max depth
-                            item_data['explorable'] = current_depth + 1 < max_depth
-                            
-                    except PermissionError:
-                        item_data['has_children'] = False
-                        item_data['error'] = 'Permission denied'
-                
-                items.append(item_data)
-                
-            except (OSError, PermissionError) as e:
-                # Skip items we can't access
-                continue
-        
-        return items
-        
-    except (OSError, PermissionError):
-        return []
+# NOTE: Directory tree functions removed - now handled by sources package
 
 @app.route('/api/sources/<source_id>/file', methods=['GET'])
 def get_source_file_data(source_id):
@@ -2071,17 +1780,6 @@ def get_source_file_data(source_id):
                 base_s3_path = source_config.get_resolved_path()
                 if not base_s3_path.startswith('s3://'):
                     return jsonify({'success': False, 'error': 'Invalid S3 path in source'}), 400
-                '''
-                # Extract bucket and base key from the S3 path
-                s3_parts = base_s3_path[5:].split('/', 1)  # Remove 's3://' prefix
-                bucket = s3_parts[0]
-                base_key = s3_parts[1] if len(s3_parts) > 1 else ''
-                
-                # Construct full S3 key
-                if base_key and not base_key.endswith('/'):
-                    base_key += '/'
-                full_key = base_key + file_path
-                '''
 
                 # Create a new S3 source for the specific file
                 file_source_config = SourceConfig(

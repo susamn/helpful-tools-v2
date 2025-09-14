@@ -549,42 +549,68 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
 
 
 class TestDirectoryTreeFunction(TestSourceAPIEndpoints):
-    """Test get_directory_tree function."""
-    
+    """Test directory tree functionality using new source system."""
+
     def test_directory_tree_max_depth(self):
         """Test directory tree respects max depth."""
-        from main import get_directory_tree
-        
-        tree = get_directory_tree(self.temp_dir, self.temp_dir, max_depth=2)
-        
+        # Create source config with level 2 (max depth)
+        config = SourceConfig(
+            source_id='test-dir',
+            name='Test Directory',
+            source_type='local_file',
+            static_config={},
+            path_template=self.temp_dir,
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            is_directory=True,
+            level=2
+        )
+
+        source = LocalFileSource(config)
+        tree = source.explore_directory_tree()
+
         # Should have top-level items
         assert len(tree) >= 2
-        
+
         # Find subdir item
         subdir_item = next((item for item in tree if item['name'] == 'subdir'), None)
         assert subdir_item is not None
         assert subdir_item['is_directory'] is True
         assert 'children' in subdir_item
-        
+
         # Check depth 1 children
         subdir_children = subdir_item['children']
         assert len(subdir_children) >= 1
-        
+
         # Find deeper directory
         deeper_item = next((item for item in subdir_children if item['name'] == 'deeper'), None)
         assert deeper_item is not None
         assert deeper_item['is_directory'] is True
-        
+
         # At max depth, should not have children or be marked as non-explorable
         assert 'explorable' in deeper_item
         assert deeper_item['explorable'] is False
-    
+
     def test_directory_tree_file_metadata(self):
         """Test directory tree includes file metadata."""
-        from main import get_directory_tree
-        
-        tree = get_directory_tree(self.temp_dir, self.temp_dir, max_depth=1)
-        
+        # Create source config with level 1
+        config = SourceConfig(
+            source_id='test-dir',
+            name='Test Directory',
+            source_type='local_file',
+            static_config={},
+            path_template=self.temp_dir,
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            is_directory=True,
+            level=1
+        )
+
+        source = LocalFileSource(config)
+        tree = source.explore_directory_tree()
+
         # Find test.txt
         test_file_item = next((item for item in tree if item['name'] == 'test.txt'), None)
         assert test_file_item is not None
@@ -593,32 +619,60 @@ class TestDirectoryTreeFunction(TestSourceAPIEndpoints):
         assert 'modified' in test_file_item
         assert test_file_item['size'] > 0
         assert isinstance(test_file_item['modified'], float)
-    
+
     def test_directory_tree_empty_directory(self):
         """Test directory tree with empty directory."""
-        from main import get_directory_tree
-        
         empty_dir = os.path.join(self.temp_dir, 'empty')
         os.makedirs(empty_dir)
-        
-        tree = get_directory_tree(empty_dir, empty_dir, max_depth=1)
-        
+
+        # Create source config for empty directory
+        config = SourceConfig(
+            source_id='test-empty-dir',
+            name='Test Empty Directory',
+            source_type='local_file',
+            static_config={},
+            path_template=empty_dir,
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            is_directory=True,
+            level=1
+        )
+
+        source = LocalFileSource(config)
+        tree = source.explore_directory_tree()
+
         assert tree == []  # Should return empty list for empty directory
-    
-    def test_directory_tree_hidden_files(self):
-        """Test directory tree skips hidden files."""
-        from main import get_directory_tree
-        
+
+    def test_directory_tree_includes_hidden_files(self):
+        """Test directory tree includes hidden files (new behavior)."""
         # Create hidden file
         hidden_file = os.path.join(self.temp_dir, '.hidden')
         with open(hidden_file, 'w') as f:
             f.write("hidden content")
-        
-        tree = get_directory_tree(self.temp_dir, self.temp_dir, max_depth=1)
-        
-        # Should not include hidden file
+
+        # Create source config
+        config = SourceConfig(
+            source_id='test-dir',
+            name='Test Directory',
+            source_type='local_file',
+            static_config={},
+            path_template=self.temp_dir,
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            is_directory=True,
+            level=1
+        )
+
+        source = LocalFileSource(config)
+        tree = source.explore_directory_tree()
+
+        # Should include hidden file (new source system behavior)
         hidden_item = next((item for item in tree if item['name'] == '.hidden'), None)
-        assert hidden_item is None
+        assert hidden_item is not None
+        assert hidden_item['is_directory'] is False
+        assert 'size' in hidden_item
 
 
 class TestErrorHandling(TestSourceAPIEndpoints):
