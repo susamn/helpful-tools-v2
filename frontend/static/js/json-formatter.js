@@ -12,10 +12,12 @@ class JsonFormatter {
         this.markupEnabled = true;
         this.indentPrefs = { type: 'spaces', size: 2 };
         this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '12');
+        this.currentSource = null;  // Track current source for validation
         this.initializeElements();
         this.attachEventListeners();
         this.initializeHistoryManager();
         this.initializeSourceSelector(); // This is now async but we don't need to wait
+        this.initializeValidation();
         this.applyFontSize();
     }
 
@@ -25,7 +27,7 @@ class JsonFormatter {
             jsonInput: document.getElementById('jsonInput'),
             jsonOutput: document.getElementById('jsonOutput'),
             jsonOutputFormatted: document.getElementById('jsonOutputFormatted'),
-            
+
             // Action buttons
             formatBtn: document.getElementById('formatBtn'),
             minifyBtn: document.getElementById('minifyBtn'),
@@ -34,17 +36,17 @@ class JsonFormatter {
             copyBtn: document.getElementById('copyBtn'),
             copyFormattedBtn: document.getElementById('copyFormattedBtn'),
             loadFromSourceBtn: document.getElementById('loadFromSourceBtn'),
-            
+
             // File upload elements
             fileInput: document.getElementById('fileInput'),
             uploadFileBtn: document.getElementById('uploadFileBtn'),
             filePathLabel: document.getElementById('filePathLabel'),
-            
+
             // Collapsible controls
             expandAllBtn: document.getElementById('expandAllBtn'),
             collapseAllBtn: document.getElementById('collapseAllBtn'),
             toggleMarkupBtn: document.getElementById('toggleMarkupBtn'),
-            
+
             // Controls
             indentType: document.getElementById('indentType'),
             indentSize: document.getElementById('indentSize'),
@@ -52,7 +54,13 @@ class JsonFormatter {
             fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
             jsonPathInput: document.getElementById('jsonPathInput'),
             clearSearchBtn: document.getElementById('clearSearchBtn'),
-            
+
+            // Validation elements
+            validationControls: document.getElementById('validationControls'),
+            validationStatus: document.getElementById('validationStatus'),
+            validatorSelect: document.getElementById('validatorSelect'),
+            validateBtn: document.getElementById('validateBtn'),
+
             // Status
             statusMessages: document.getElementById('statusMessages'),
             jsonStatus: document.getElementById('jsonStatus'),
@@ -105,9 +113,17 @@ class JsonFormatter {
 
         // Source selector
         this.elements.loadFromSourceBtn.addEventListener('click', () => this.openSourceSelector());
-        
+
         // File upload
         this.elements.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+        // Validation controls
+        if (this.elements.validateBtn) {
+            this.elements.validateBtn.addEventListener('click', () => this.validateData());
+        }
+        if (this.elements.validatorSelect) {
+            this.elements.validatorSelect.addEventListener('change', () => this.onValidatorChanged());
+        }
     }
 
     /**
@@ -968,11 +984,15 @@ class JsonFormatter {
         this.elements.jsonPathInput.value = '';
         this.lastOutputText = '';
         this.resetJsonStats();
-        this.showMessage('Inputs cleared.', 'success');
-        
+
         // Clear file path label
         this.elements.filePathLabel.style.display = 'none';
         this.elements.filePathLabel.textContent = '';
+
+        // Disable validation
+        this.disableValidation();
+
+        this.showMessage('Inputs cleared.', 'success');
     }
 
     /**
@@ -1361,23 +1381,26 @@ class JsonFormatter {
         try {
             // Set the data in the input area
             this.elements.jsonInput.value = data;
-            
+
             // Show the source URL/path in the file path label
             const resolvedPath = this.resolveSourcePath(source);
             this.elements.filePathLabel.textContent = this.truncateFilePath(resolvedPath);
             this.elements.filePathLabel.style.display = 'inline';
-            
+
             // Auto-format the JSON if it's valid
             this.formatJson();
-            
+
             // Update stats
             this.updateJsonStats();
-            
+
+            // Enable validation for this source
+            this.enableValidationForSource(source);
+
             // Save to history
             this.saveToHistory(data, `load-from-source-${source.type}`);
-            
+
             this.showMessage(`Loaded data from source: ${source.name}`, 'success');
-            
+
         } catch (error) {
             console.error('Error loading source data:', error);
             this.showMessage(`Error loading source data: ${error.message}`, 'error');
@@ -1442,6 +1465,144 @@ class JsonFormatter {
         // Get the end of the path
         const truncatedPath = '...' + pathPart.slice(-(availableForPath));
         return truncatedPath + fileName;
+    }
+
+    /**
+     * Initialize validation utilities
+     */
+    initializeValidation() {
+        if (window.validationUtils) {
+            this.validationUtils = window.validationUtils;
+        } else {
+            console.warn('ValidationUtils not available - validation features disabled');
+        }
+    }
+
+    /**
+     * Handle validator selection change
+     */
+    onValidatorChanged() {
+        if (this.elements.validatorSelect.value) {
+            this.elements.validateBtn.disabled = false;
+        } else {
+            this.elements.validateBtn.disabled = true;
+            this.validationUtils?.clearValidationStatus(this.elements.validationStatus);
+        }
+    }
+
+    /**
+     * Validate the current JSON data
+     */
+    async validateData() {
+        if (!this.validationUtils) {
+            this.showMessage('Validation not available', 'error');
+            return;
+        }
+
+        const validatorId = this.elements.validatorSelect.value;
+        if (!validatorId) {
+            this.showMessage('Please select a validator', 'warning');
+            return;
+        }
+
+        const jsonData = this.elements.jsonInput.value.trim();
+        if (!jsonData) {
+            this.showMessage('No data to validate', 'warning');
+            return;
+        }
+
+        // Show validation in progress
+        this.validationUtils.showValidationInProgress(this.elements.validationStatus);
+        this.elements.validateBtn.disabled = true;
+
+        try {
+            const result = await this.validationUtils.validateData(validatorId, jsonData, this.currentSource?.id);
+
+            // Get validator info for display
+            const validator = this.validationUtils.getValidator(validatorId);
+            const validatorName = validator?.name || 'Unknown';
+            const validatorType = validator?.type || 'unknown';
+
+            // Update validation status display
+            this.validationUtils.updateValidationStatus(
+                this.elements.validationStatus,
+                result,
+                validatorName,
+                validatorType
+            );
+
+            // Show message
+            if (result.success && result.valid) {
+                this.showMessage(`✅ Data is valid according to ${validatorName}`, 'success');
+            } else {
+                const errors = result.errors || ['Validation failed'];
+                this.showMessage(`❌ Validation failed: ${errors.join(', ')}`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Validation error:', error);
+            this.showMessage(`Validation error: ${error.message}`, 'error');
+            this.validationUtils.clearValidationStatus(this.elements.validationStatus);
+        } finally {
+            this.elements.validateBtn.disabled = false;
+        }
+    }
+
+    /**
+     * Enable validation controls for a source
+     */
+    async enableValidationForSource(source) {
+        this.currentSource = source;
+
+        if (!this.validationUtils) {
+            return;
+        }
+
+        // Show validation controls
+        if (this.elements.validationControls) {
+            this.elements.validationControls.style.display = 'flex';
+        }
+
+        // Load validators for this source
+        try {
+            const hasValidators = await this.validationUtils.populateValidatorSelect(
+                this.elements.validatorSelect,
+                source.id
+            );
+
+            if (hasValidators) {
+                this.showMessage(`Validation available for source: ${source.name}`, 'info');
+            } else {
+                this.showMessage(`No validators configured for source: ${source.name}`, 'warning');
+            }
+        } catch (error) {
+            console.error('Error loading validators:', error);
+            this.showMessage('Error loading validators', 'error');
+        }
+    }
+
+    /**
+     * Disable validation controls
+     */
+    disableValidation() {
+        this.currentSource = null;
+
+        if (this.elements.validationControls) {
+            this.elements.validationControls.style.display = 'none';
+        }
+
+        if (this.validationUtils) {
+            this.validationUtils.clearValidationStatus(this.elements.validationStatus);
+        }
+
+        if (this.elements.validatorSelect) {
+            this.elements.validatorSelect.innerHTML = '<option value="">Select validator...</option>';
+            this.elements.validatorSelect.disabled = true;
+        }
+
+        if (this.elements.validateBtn) {
+            this.elements.validateBtn.disabled = true;
+        }
     }
 }
 
