@@ -200,14 +200,14 @@ class TestResolveVariablesAPI:
 
 class TestSourceCRUDWithDynamicVariables:
     """Test source CRUD operations with dynamic variables."""
-    
+
     def setup_method(self):
         """Setup for each test."""
         self.app = app
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
     
-    def test_create_source_with_dynamic_variables(self):
+    def test_create_source_with_dynamic_variables(self, clean_sources):
         """Test creating a source with dynamic variables."""
         source_data = {
             "name": "Test Dynamic Source",
@@ -235,7 +235,7 @@ class TestSourceCRUDWithDynamicVariables:
         assert source_data["pathTemplate"] == "/folder/$file"
         assert source_data["dynamicVariables"]["file"] == "test.txt"
     
-    def test_create_s3_source_with_multiple_variables(self):
+    def test_create_s3_source_with_multiple_variables(self, clean_sources):
         """Test creating S3 source with multiple dynamic variables."""
         source_data = {
             "name": "S3 Dynamic Source",
@@ -260,7 +260,7 @@ class TestSourceCRUDWithDynamicVariables:
         data = json.loads(response.data)
         assert data["success"] == True
     
-    def test_update_source_dynamic_variables(self):
+    def test_update_source_dynamic_variables(self, clean_sources):
         """Test updating a source's dynamic variables."""
         # First create a source
         create_data = {
@@ -297,7 +297,7 @@ class TestSourceCRUDWithDynamicVariables:
         source_data = json.loads(get_response.data)
         assert source_data["dynamicVariables"]["file"] == "new.txt"
     
-    def test_create_source_without_dynamic_variables(self):
+    def test_create_source_without_dynamic_variables(self, clean_sources):
         """Test creating a source without dynamic variables (backward compatibility)."""
         source_data = {
             "name": "Static Source",

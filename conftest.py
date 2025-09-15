@@ -6,6 +6,9 @@ Handles port detection, server status checking, and test environment setup.
 import os
 import pytest
 import warnings
+import json
+import tempfile
+import shutil
 from pathlib import Path
 
 
@@ -128,6 +131,186 @@ def skip_if_server_not_running(server_running):
     """Fixture to skip tests if server is not running."""
     if not server_running:
         pytest.skip("Server is not running - skipping integration test")
+
+
+# Source management and cleanup utilities
+
+def get_sources_file_path():
+    """Get the path to the sources.json file."""
+    # Use the old config directory location for backward compatibility
+    sources_file = Path.home() / '.helpful-tools' / 'sources.json'
+    return sources_file
+
+
+def get_test_sources_backup_path():
+    """Get the path for backing up existing sources during tests."""
+    sources_file = get_sources_file_path()
+    return sources_file.with_suffix('.json.test_backup')
+
+
+def load_sources():
+    """Load sources from the sources.json file."""
+    sources_file = get_sources_file_path()
+    if not sources_file.exists():
+        return {}
+
+    try:
+        with open(sources_file, 'r') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+
+def save_sources(sources):
+    """Save sources to the sources.json file."""
+    sources_file = get_sources_file_path()
+    sources_file.parent.mkdir(exist_ok=True, parents=True)
+
+    try:
+        with open(sources_file, 'w') as f:
+            json.dump(sources, f, indent=2)
+    except IOError as e:
+        print(f"Warning: Failed to save sources: {e}")
+
+
+def backup_existing_sources():
+    """Backup existing sources before tests start."""
+    sources_file = get_sources_file_path()
+    backup_file = get_test_sources_backup_path()
+
+    if sources_file.exists():
+        try:
+            shutil.copy2(sources_file, backup_file)
+            return True
+        except IOError as e:
+            print(f"Warning: Failed to backup sources: {e}")
+            return False
+    return False
+
+
+def restore_sources_backup():
+    """Restore sources from backup after tests complete."""
+    sources_file = get_sources_file_path()
+    backup_file = get_test_sources_backup_path()
+
+    try:
+        if backup_file.exists():
+            shutil.copy2(backup_file, sources_file)
+            backup_file.unlink()  # Remove backup file
+        else:
+            # No backup exists, remove the sources file if it exists
+            if sources_file.exists():
+                sources_file.unlink()
+    except IOError as e:
+        print(f"Warning: Failed to restore sources backup: {e}")
+
+
+def clean_test_sources():
+    """Clean up any sources created during tests."""
+    sources = load_sources()
+    test_sources_removed = 0
+
+    # Remove sources that look like test sources (have 'test' in name or use temp paths)
+    sources_to_remove = []
+    for source_id, source in sources.items():
+        source_name = source.get('name', '').lower()
+        path_template = source.get('pathTemplate', '').lower()
+
+        # Check if this looks like a test source
+        is_test_source = (
+            'test' in source_name or
+            '/tmp/' in path_template or
+            '/temp/' in path_template or
+            'tempfile' in path_template or
+            source_name.startswith('temp') or
+            source_name.startswith('mock')
+        )
+
+        if is_test_source:
+            sources_to_remove.append(source_id)
+
+    # Remove identified test sources
+    for source_id in sources_to_remove:
+        del sources[source_id]
+        test_sources_removed += 1
+
+    if test_sources_removed > 0:
+        save_sources(sources)
+        print(f"🧹 Cleaned up {test_sources_removed} test sources")
+
+    return test_sources_removed
+
+
+@pytest.fixture(scope="session", autouse=True)
+def sources_cleanup():
+    """Session-level fixture to handle source cleanup before and after tests."""
+    # Backup existing sources before tests start
+    backup_created = backup_existing_sources()
+
+    yield
+
+    # After all tests complete, clean up and restore
+    clean_test_sources()
+
+    if backup_created:
+        restore_sources_backup()
+        print("🔄 Restored original sources from backup")
+    else:
+        print("📝 No original sources to restore")
+
+
+@pytest.fixture(scope="function")
+def clean_sources():
+    """Function-level fixture to ensure clean source state for each test."""
+    # Store sources that existed before the test
+    initial_sources = load_sources()
+    initial_source_ids = set(initial_sources.keys())
+
+    yield
+
+    # After test completes, remove any new sources created during the test
+    current_sources = load_sources()
+    current_source_ids = set(current_sources.keys())
+
+    # Find sources created during this test
+    new_source_ids = current_source_ids - initial_source_ids
+
+    if new_source_ids:
+        # Remove new sources
+        for source_id in new_source_ids:
+            del current_sources[source_id]
+
+        save_sources(current_sources)
+        print(f"🧹 Cleaned up {len(new_source_ids)} sources created during test")
+
+
+@pytest.fixture
+def temp_sources_backup():
+    """Fixture to temporarily backup and restore sources for a test."""
+    # Create a temporary backup
+    temp_backup = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+    sources = load_sources()
+
+    try:
+        json.dump(sources, temp_backup, indent=2)
+        temp_backup.close()
+
+        yield temp_backup.name
+
+    finally:
+        # Restore from temporary backup
+        try:
+            with open(temp_backup.name, 'r') as f:
+                restored_sources = json.load(f)
+            save_sources(restored_sources)
+        except (IOError, json.JSONDecodeError):
+            pass
+
+        # Clean up temporary file
+        try:
+            os.unlink(temp_backup.name)
+        except OSError:
+            pass
 
 
 
