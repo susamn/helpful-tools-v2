@@ -91,9 +91,16 @@ class JsonFormatter {
         this.elements.indentSize.addEventListener('change', () => this.updateIndentPreference());
         this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
         this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
-        this.elements.jsonPathInput.addEventListener('input', () => this.performJsonPathLookup());
+        let jsonPathTimeout;
         this.elements.jsonPathInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') this.performJsonPathLookup();
+            clearTimeout(jsonPathTimeout);
+            if (e.key === 'Enter') {
+                this.performJsonPathLookup();
+            } else {
+                jsonPathTimeout = setTimeout(() => {
+                    this.performJsonPathLookup();
+                }, 1000);
+            }
         });
         this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
 
@@ -802,11 +809,12 @@ class JsonFormatter {
             return;
         }
 
-        const outputText = this.lastOutputText || this.elements.jsonOutput.value;
-        if (!outputText) {
-            this.showMessage('No JSON data to search', 'warning');
+        if (!this.originalOutputData) {
+            this.showMessage('Please format some JSON first.', 'warning');
             return;
         }
+
+        const outputText = this.originalOutputData.text;
 
         try {
             // Check if the current data is JSONL
@@ -816,9 +824,17 @@ class JsonFormatter {
             } else {
                 // Regular JSON path lookup
                 const parsed = JSON.parse(outputText);
-                const result = this.evaluateJsonPath(parsed, path);
+                const evalResult = this.evaluateJsonPath(parsed, path);
+
+                if (evalResult.error) {
+                    this.showMessage(`Invalid JSONPath expression: ${evalResult.error}`, 'error');
+                    return;
+                }
+
+                const result = evalResult.result;
+                console.log('JSONPath result:', result);
                 
-                if (result !== null) {
+                if (result && result.length > 0) {
                     // Display result in output window
                     const formattedResult = this.formatJsonWithIndent(result);
                     this.displayOutput(formattedResult, result, true);  // Mark as JSONPath result
@@ -882,31 +898,9 @@ class JsonFormatter {
      */
     evaluateJsonPath(obj, path) {
         try {
-            // Remove leading $ if present
-            path = path.replace(/^\$\.?/, '');
-            
-            if (!path) return obj;
-            
-            // Split path into parts
-            const parts = path.split(/\.|\[|\]/).filter(p => p !== '');
-            
-            let current = obj;
-            for (const part of parts) {
-                if (current === null || current === undefined) {
-                    return null;
-                }
-                
-                // Handle array indices
-                if (/^\d+$/.test(part)) {
-                    current = current[parseInt(part)];
-                } else {
-                    current = current[part];
-                }
-            }
-            
-            return current;
-        } catch {
-            return null;
+            return { result: jsonpath.query(obj, path) };
+        } catch (e) {
+            return { error: e.message };
         }
     }
 

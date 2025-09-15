@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JSONPath Tests for JSON Formatter</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsonpath@1.1.1/jsonpath.min.js"></script>
+    <style>
+        body { font-family: sans-serif; }
+        .results .pass { color: green; }
+        .results .fail { color: red; }
+    </style>
+</head>
+<body>
+    <h1>JSONPath Tests for JSON Formatter</h1>
+    <div class="results"></div>
+
+    <script>
+        // Mock dependencies for JsonFormatter
+        window.createHistoryManager = () => ({ addHistoryEntry: () => {} });
+        window.createSourceSelector = async () => ({ show: () => {} });
+        window.validationUtils = { populateValidatorSelect: () => {}, clearValidationStatus: () => {} };
+        
+        // Mock DOM elements that are used in the constructor
+        document.body.innerHTML += `
+            <div id="jsonInput"></div>
+            <div id="jsonOutput"></div>
+            <div id="jsonOutputFormatted"></div>
+            <button id="formatBtn"></button>
+            <button id="minifyBtn"></button>
+            <button id="stringifyBtn"></button>
+            <button id="clearBtn"></button>
+            <button id="copyBtn"></button>
+            <button id="copyFormattedBtn"></button>
+            <button id="loadFromSourceBtn"></button>
+            <input id="fileInput">
+            <button id="uploadFileBtn"></button>
+            <span id="filePathLabel"></span>
+            <button id="expandAllBtn"></button>
+            <button id="collapseAllBtn"></button>
+            <button id="toggleMarkupBtn"></button>
+            <select id="indentType"></select>
+            <select id="indentSize"></select>
+            <button id="fontIncreaseBtn"></button>
+            <button id="fontDecreaseBtn"></button>
+            <input id="jsonPathInput">
+            <button id="clearSearchBtn"></button>
+            <div id="validationControls"></div>
+            <div id="validationStatus"></div>
+            <select id="validatorSelect"></select>
+            <button id="validateBtn"></button>
+            <div id="statusMessages"></div>
+            <div id="jsonStatus"></div>
+            <div id="jsonSize"></div>
+            <div id="jsonLines"></div>
+            <div id="jsonObjects"></div>
+            <div id="jsonArrays"></div>
+            <div id="jsonProperties"></div>
+        `;
+    </script>
+    <script src="../../frontend/static/js/json-formatter.js"></script>
+    <script>
+        const resultsDiv = document.querySelector('.results');
+        let testsRun = 0;
+        let testsFailed = 0;
+
+        function test(name, fn) {
+            testsRun++;
+            try {
+                fn();
+                resultsDiv.innerHTML += `<div class="pass">✅ ${name}</div>`;
+            } catch (e) {
+                testsFailed++;
+                resultsDiv.innerHTML += `<div class="fail">❌ ${name}</div>`;
+                console.error(e);
+            }
+        }
+
+        function assertEquals(actual, expected, message) {
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                throw new Error(message || `Expected ${JSON.stringify(expected)}, but got ${JSON.stringify(actual)}`);
+            }
+        }
+
+        const formatter = new JsonFormatter();
+        const data = {
+            "store": {
+                "book": [
+                    {
+                        "category": "reference",
+                        "author": "Nigel Rees",
+                        "title": "Sayings of the Century",
+                        "price": 8.95
+                    },
+                    {
+                        "category": "fiction",
+                        "author": "Evelyn Waugh",
+                        "title": "Sword of Honour",
+                        "price": 12.99
+                    },
+                    {
+                        "category": "fiction",
+                        "author": "Herman Melville",
+                        "title": "Moby Dick",
+                        "isbn": "0-553-21311-3",
+                        "price": 8.99
+                    },
+                    {
+                        "category": "fiction",
+                        "author": "J. R. R. Tolkien",
+                        "title": "The Lord of the Rings",
+                        "isbn": "0-395-19395-8",
+                        "price": 22.99
+                    }
+                ],
+                "bicycle": {
+                    "color": "red",
+                    "price": 19.95
+                }
+            },
+            "expensive": 10
+        };
+
+        test('JSONPath - Get all authors', () => {
+            const result = formatter.evaluateJsonPath(data, '$.store.book[*].author');
+            assertEquals(result, ["Nigel Rees", "Evelyn Waugh", "Herman Melville", "J. R. R. Tolkien"]);
+        });
+
+        test('JSONPath - Get first book', () => {
+            const result = formatter.evaluateJsonPath(data, '$.store.book[0]');
+            assertEquals(result, data.store.book[0]);
+        });
+        
+        test('JSONPath - Get last book', () => {
+            const result = formatter.evaluateJsonPath(data, '$.store.book[(@.length-1)]');
+            assertEquals(result, [data.store.book[3]]);
+        });
+
+        test('JSONPath - Get all books with ISBN', () => {
+            const result = formatter.evaluateJsonPath(data, '$.store.book[?(@.isbn)]');
+            assertEquals(result, [data.store.book[2], data.store.book[3]]);
+        });
+
+        test('JSONPath - Get all books cheaper than 10', () => {
+            const result = formatter.evaluateJsonPath(data, '$.store.book[?(@.price < 10)]');
+            assertEquals(result, [data.store.book[0], data.store.book[2]]);
+        });
+
+        test('JSONPath - Deep scan for all prices', () => {
+            const result = formatter.evaluateJsonPath(data, '$..price');
+            assertEquals(result, [8.95, 12.99, 8.99, 22.99, 19.95]);
+        });
+
+        resultsDiv.innerHTML += `<div>---</div><div>${testsRun} tests run, ${testsFailed} failed.</div>`;
+    </script>
+</body>
+</html>
