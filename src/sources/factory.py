@@ -88,7 +88,9 @@ class SourceFactory:
             updated_at=source_data.get('updated_at', datetime.now()),
             last_accessed=source_data.get('last_accessed'),
             last_tested=source_data.get('last_tested'),
-            status=source_data.get('status', 'created')
+            status=source_data.get('status', 'created'),
+            is_directory=source_data.get('is_directory'),
+            level=source_data.get('level', 0)
         )
         
         return cls.create_source(config)

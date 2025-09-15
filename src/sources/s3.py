@@ -416,14 +416,19 @@ class S3Source(BaseDataSource):
     
     def is_directory(self) -> bool:
         """Check if S3 source points to a directory (prefix)."""
+        # First check config override
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return self.config.is_directory
+
+        # Fallback to S3 structure-based detection
         # If no key specified, it's a bucket (directory)
         if not self._key:
             return self.exists()
-        
+
         # If key ends with '/', it's a prefix (directory)
         if self._key.endswith('/'):
             return self.exists()
-        
+
         # Check if there are objects with this key as a prefix
         try:
             s3_client = self._get_s3_client()
@@ -439,14 +444,19 @@ class S3Source(BaseDataSource):
     
     def is_file(self) -> bool:
         """Check if S3 source points to a single object (file)."""
+        # First check config override (inverse of is_directory)
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return not self.config.is_directory
+
+        # Fallback to S3 structure-based detection
         # If no key specified, it's a bucket (not a file)
         if not self._key:
             return False
-        
+
         # If key ends with '/', it's a prefix (not a file)
         if self._key.endswith('/'):
             return False
-        
+
         # Check if the exact object exists
         try:
             s3_client = self._get_s3_client()

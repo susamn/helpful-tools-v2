@@ -52,7 +52,7 @@ class SourceConfig:
     last_tested: Optional[datetime] = None
     status: str = 'created'
     metadata: Optional[SourceMetadata] = None
-    is_directory: bool = False
+    is_directory: Optional[bool] = None
     level: int = 0
 
     def get_resolved_path(self) -> str:
@@ -333,10 +333,16 @@ class DataSourceInterface(ABC):
     
     def is_directory(self) -> bool:
         """Check if source points to a directory/collection."""
+        # Check config override first
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return self.config.is_directory
         return False
     
     def is_file(self) -> bool:
         """Check if source points to a single file."""
+        # Check config override first (inverse of is_directory)
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return not self.config.is_directory
         return True
     
     def supports_expiry(self) -> bool:

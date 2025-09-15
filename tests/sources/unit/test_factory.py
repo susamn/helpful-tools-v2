@@ -383,3 +383,164 @@ class TestCreateSourceFunction:
         source = create_source(config)
         assert isinstance(source, LocalFileSource)
         assert source.config == config
+
+
+class TestIsDirectoryAndLevelSupport:
+    """Test is_directory and level field support in factory."""
+
+    def test_create_source_from_dict_with_is_directory_true(self):
+        """Test creating source with is_directory=True."""
+        source_data = {
+            'source_id': 'test-dir-123',
+            'name': 'Test Directory Source',
+            'source_type': 'local_file',
+            'staticConfig': {},
+            'pathTemplate': '/tmp/test_dir',
+            'dynamicVariables': {},
+            'is_directory': True,
+            'level': 2
+        }
+
+        source = SourceFactory.create_source_from_dict(source_data)
+        assert isinstance(source, LocalFileSource)
+        assert source.config.is_directory is True
+        assert source.config.level == 2
+        assert source.is_directory() is True
+        assert source.is_file() is False
+
+    def test_create_source_from_dict_with_is_directory_false(self):
+        """Test creating source with is_directory=False."""
+        source_data = {
+            'source_id': 'test-file-123',
+            'name': 'Test File Source',
+            'source_type': 'local_file',
+            'staticConfig': {},
+            'pathTemplate': '/tmp/test.txt',
+            'dynamicVariables': {},
+            'is_directory': False,
+            'level': 0
+        }
+
+        source = SourceFactory.create_source_from_dict(source_data)
+        assert isinstance(source, LocalFileSource)
+        assert source.config.is_directory is False
+        assert source.config.level == 0
+        assert source.is_directory() is False
+        assert source.is_file() is True
+
+    def test_create_source_from_dict_without_is_directory(self):
+        """Test backward compatibility - source without is_directory field."""
+        source_data = {
+            'source_id': 'test-legacy-123',
+            'name': 'Test Legacy Source',
+            'source_type': 'local_file',
+            'staticConfig': {},
+            'pathTemplate': '/tmp/test.txt',
+            'dynamicVariables': {}
+            # Note: no is_directory or level fields
+        }
+
+        source = SourceFactory.create_source_from_dict(source_data)
+        assert isinstance(source, LocalFileSource)
+        assert source.config.is_directory is None  # default value when not specified
+        assert source.config.level == 0  # default value
+        # Behavior should fall back to filesystem detection
+
+    def test_create_source_from_dict_level_validation(self):
+        """Test that level field is properly set."""
+        for level in [0, 1, 2, 3, 4, 5]:
+            source_data = {
+                'source_id': f'test-level-{level}',
+                'name': f'Test Level {level}',
+                'source_type': 'local_file',
+                'staticConfig': {},
+                'pathTemplate': '/tmp/test_dir',
+                'dynamicVariables': {},
+                'is_directory': True,
+                'level': level
+            }
+
+            source = SourceFactory.create_source_from_dict(source_data)
+            assert source.config.level == level
+
+    def test_create_source_from_dict_s3_directory(self):
+        """Test creating S3 source with is_directory=True."""
+        source_data = {
+            'source_id': 'test-s3-dir',
+            'name': 'Test S3 Directory',
+            'source_type': 's3',
+            'staticConfig': {'aws_profile': 'default'},
+            'pathTemplate': 's3://my-bucket/data/',
+            'dynamicVariables': {},
+            'is_directory': True,
+            'level': 1
+        }
+
+        source = SourceFactory.create_source_from_dict(source_data)
+        assert isinstance(source, S3Source)
+        assert source.config.is_directory is True
+        assert source.config.level == 1
+        assert source.is_directory() is True
+        assert source.is_file() is False
+
+    def test_create_source_from_dict_s3_file(self):
+        """Test creating S3 source with is_directory=False."""
+        source_data = {
+            'source_id': 'test-s3-file',
+            'name': 'Test S3 File',
+            'source_type': 's3',
+            'staticConfig': {'aws_profile': 'default'},
+            'pathTemplate': 's3://my-bucket/data/file.txt',
+            'dynamicVariables': {},
+            'is_directory': False,
+            'level': 0
+        }
+
+        source = SourceFactory.create_source_from_dict(source_data)
+        assert isinstance(source, S3Source)
+        assert source.config.is_directory is False
+        assert source.config.level == 0
+        assert source.is_directory() is False
+        assert source.is_file() is True
+
+    def test_create_source_from_dict_sftp_directory(self):
+        """Test creating SFTP source with is_directory=True."""
+        source_data = {
+            'source_id': 'test-sftp-dir',
+            'name': 'Test SFTP Directory',
+            'source_type': 'sftp',
+            'staticConfig': {'username': 'user'},
+            'pathTemplate': 'sftp://example.com/remote/dir/',
+            'dynamicVariables': {},
+            'is_directory': True,
+            'level': 3
+        }
+
+        source = SourceFactory.create_source_from_dict(source_data)
+        assert isinstance(source, SftpSource)
+        assert source.config.is_directory is True
+        assert source.config.level == 3
+        assert source.is_directory() is True  # Should respect config override
+        assert source.is_file() is False
+
+    def test_create_source_direct_config_with_is_directory(self):
+        """Test creating source with SourceConfig directly including is_directory."""
+        config = SourceConfig(
+            source_id='test-config-123',
+            name='Test Config Source',
+            source_type='local_file',
+            static_config={},
+            path_template='/tmp/test_dir',
+            dynamic_variables={},
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+            is_directory=True,
+            level=2
+        )
+
+        source = SourceFactory.create_source(config)
+        assert isinstance(source, LocalFileSource)
+        assert source.config.is_directory is True
+        assert source.config.level == 2
+        assert source.is_directory() is True
+        assert source.is_file() is False

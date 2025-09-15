@@ -309,11 +309,21 @@ class LocalFileSource(BaseDataSource):
     
     def is_directory(self) -> bool:
         """Check if the source points to a directory."""
+        # First check config override
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return self.config.is_directory
+
+        # Fallback to filesystem check
         path = Path(self._resolved_path)
         return path.exists() and path.is_dir()
     
     def is_file(self) -> bool:
         """Check if the source points to a single file."""
+        # First check config override (inverse of is_directory)
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return not self.config.is_directory
+
+        # Fallback to filesystem check
         path = Path(self._resolved_path)
         return path.exists() and path.is_file()
     
