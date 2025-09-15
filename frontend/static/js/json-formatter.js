@@ -13,11 +13,15 @@ class JsonFormatter {
         this.indentPrefs = { type: 'spaces', size: 2 };
         this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '12');
         this.currentSource = null;  // Track current source for validation
+        this.availablePaths = [];  // Store extracted JSONPath suggestions
+        this.autocompleteVisible = false;  // Track autocomplete dropdown state
+        this.selectedSuggestionIndex = -1;  // Track selected suggestion
         this.initializeElements();
         this.attachEventListeners();
         this.initializeHistoryManager();
         this.initializeSourceSelector(); // This is now async but we don't need to wait
         this.initializeValidation();
+        this.initializeAutocomplete();
         this.applyFontSize();
     }
 
@@ -54,6 +58,7 @@ class JsonFormatter {
             fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
             jsonPathInput: document.getElementById('jsonPathInput'),
             clearSearchBtn: document.getElementById('clearSearchBtn'),
+            autocompleteDropdown: null, // Will be created dynamically
 
             // Validation elements
             validationControls: document.getElementById('validationControls'),
@@ -92,13 +97,39 @@ class JsonFormatter {
         this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
         this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
         let jsonPathTimeout;
+        this.elements.jsonPathInput.addEventListener('keydown', (e) => {
+            // Handle autocomplete navigation
+            if (this.autocompleteVisible) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.navigateAutocomplete(1);
+                    return;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.navigateAutocomplete(-1);
+                    return;
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (this.selectedSuggestionIndex >= 0) {
+                        this.selectSuggestion();
+                        return;
+                    }
+                } else if (e.key === 'Escape') {
+                    this.hideAutocomplete();
+                    return;
+                }
+            }
+        });
+
         this.elements.jsonPathInput.addEventListener('keyup', (e) => {
             clearTimeout(jsonPathTimeout);
             if (e.key === 'Enter') {
+                this.hideAutocomplete();
                 this.performJsonPathLookup();
             } else {
                 jsonPathTimeout = setTimeout(() => {
                     this.performJsonPathLookup();
+                    this.showContextualSuggestions();
                 }, 1000);
             }
         });
@@ -961,7 +992,8 @@ class JsonFormatter {
      */
     clearSearch() {
         this.elements.jsonPathInput.value = '';
-        
+        this.hideAutocomplete();
+
         // Restore original data if available
         if (this.originalOutputData) {
             this.displayOutput(this.originalOutputData.text, this.originalOutputData.parsedData, false);
@@ -973,6 +1005,367 @@ class JsonFormatter {
                 const cleaned = content.replace(/class="search-match"/g, '').replace(/class="search-path"/g, '');
                 this.elements.jsonOutputFormatted.innerHTML = cleaned;
             }
+        }
+    }
+
+    /**
+     * Show contextual suggestions based on current JSONPath input
+     */
+    showContextualSuggestions() {
+        if (!this.originalOutputData) return;
+
+        const currentInput = this.elements.jsonPathInput.value;
+        const suggestions = this.getContextualSuggestions(currentInput);
+
+        if (suggestions.length > 0) {
+            this.showAutocompleteDropdown(suggestions);
+        } else {
+            this.hideAutocomplete();
+        }
+    }
+
+    /**
+     * Get current expression context for union support
+     */
+    getCurrentExpressionContext(fullInput) {
+        const cursorPos = this.elements.jsonPathInput.selectionStart || fullInput.length;
+
+        // Find the current expression within comma-separated list
+        const beforeCursor = fullInput.substring(0, cursorPos);
+        const afterCursor = fullInput.substring(cursorPos);
+
+        // Find the start of current expression (last comma before cursor)
+        const lastCommaIndex = beforeCursor.lastIndexOf(',');
+        let expressionStart = lastCommaIndex >= 0 ? lastCommaIndex + 1 : 0;
+
+        // Skip whitespace after comma
+        while (expressionStart < fullInput.length && /\s/.test(fullInput[expressionStart])) {
+            expressionStart++;
+        }
+
+        // Find the end of current expression (first comma after cursor)
+        const nextCommaIndex = afterCursor.indexOf(',');
+        const expressionEnd = nextCommaIndex >= 0 ? cursorPos + nextCommaIndex : fullInput.length;
+
+        const currentExpression = fullInput.substring(expressionStart, expressionEnd).trim();
+
+        return {
+            currentExpression,
+            expressionStart,
+            expressionEnd,
+            beforeExpression: fullInput.substring(0, expressionStart),
+            afterExpression: fullInput.substring(expressionEnd)
+        };
+    }
+
+    /**
+     * Get contextual suggestions for the current JSONPath input
+     */
+    getContextualSuggestions(input) {
+        if (!input || !this.originalOutputData) return [];
+
+        try {
+            // Handle union expressions (comma-separated)
+            const context = this.getCurrentExpressionContext(input);
+            const currentExpression = context.currentExpression;
+
+            if (!currentExpression) return [];
+
+            // Check if this is JSONL data
+            const inputText = this.elements.jsonInput.value.trim();
+            const isJsonlData = this.isJsonl(inputText);
+
+            let data;
+            if (isJsonlData) {
+                // For JSONL, use the first object as a sample for suggestions
+                const jsonObjects = this.parseJsonlObjects(inputText);
+                if (jsonObjects.length === 0) return [];
+                data = jsonObjects[0]; // Use first object as template
+            } else {
+                // Parse regular JSON data
+                data = JSON.parse(this.originalOutputData.text);
+            }
+
+            return this.getSuggestionsForExpression(data, currentExpression, context);
+        } catch (error) {
+            console.error('Error getting contextual suggestions:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Get suggestions for a single expression
+     */
+    getSuggestionsForExpression(data, expression, context) {
+        // Don't suggest for empty expressions
+        if (!expression) {
+            return [];
+        }
+
+        // If expression is just '$', show root properties
+        if (expression === '$') {
+            return this.getRootSuggestions(data).map(suggestion => ({
+                text: suggestion,
+                replaceStart: context.expressionStart,
+                replaceEnd: context.expressionEnd
+            }));
+        }
+
+        // If expression ends with '.', show properties for that path
+        if (expression.endsWith('.')) {
+            const basePath = expression.slice(0, -1);
+            if (!basePath || basePath === '') return [];
+
+            return this.getPropertySuggestions(data, basePath).map(suggestion => ({
+                text: expression + suggestion,
+                replaceStart: context.expressionStart,
+                replaceEnd: context.expressionEnd
+            }));
+        }
+
+        // If expression ends with '[', show array indices or filters
+        if (expression.endsWith('[')) {
+            const basePath = expression.slice(0, -1);
+            if (!basePath || basePath === '') return [];
+
+            return this.getArraySuggestions(data, basePath).map(suggestion => ({
+                text: expression + suggestion + ']',
+                replaceStart: context.expressionStart,
+                replaceEnd: context.expressionEnd
+            }));
+        }
+
+        // If we're in the middle of typing a property name
+        const lastDotIndex = expression.lastIndexOf('.');
+        if (lastDotIndex > 0) {
+            const parentPath = expression.substring(0, lastDotIndex);
+            const partialProperty = expression.substring(lastDotIndex + 1);
+
+            // Validate parent path
+            if (!parentPath || parentPath === '') return [];
+
+            const parentSuggestions = this.getPropertySuggestions(data, parentPath);
+
+            return parentSuggestions
+                .filter(suggestion => suggestion.toLowerCase().startsWith(partialProperty.toLowerCase()))
+                .map(suggestion => ({
+                    text: parentPath + '.' + suggestion,
+                    replaceStart: context.expressionStart,
+                    replaceEnd: context.expressionEnd
+                }));
+        }
+
+        return [];
+    }
+
+    /**
+     * Get suggestions for root level properties
+     */
+    getRootSuggestions(data) {
+        if (Array.isArray(data)) {
+            return ['$[0]', '$[*]', '$[(@.length-1)]'];
+        } else if (typeof data === 'object' && data !== null) {
+            return Object.keys(data).map(key => `$.${key}`);
+        }
+        return [];
+    }
+
+    /**
+     * Get property suggestions for a given path
+     */
+    getPropertySuggestions(data, path) {
+        try {
+            // Evaluate the path to get the target object
+            const result = jsonpath.query(data, path);
+            if (result.length === 0) return [];
+
+            const target = result[0];
+            if (Array.isArray(target)) {
+                return ['[0]', '[*]', '[(@.length-1)]'];
+            } else if (typeof target === 'object' && target !== null) {
+                return Object.keys(target);
+            }
+
+            return [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    /**
+     * Get array-related suggestions
+     */
+    getArraySuggestions(data, path) {
+        try {
+            const result = jsonpath.query(data, path);
+            if (result.length === 0) return [];
+
+            const target = result[0];
+            if (Array.isArray(target)) {
+                const suggestions = ['*', '0'];
+                if (target.length > 1) suggestions.push('1');
+                if (target.length > 2) suggestions.push('2');
+                suggestions.push('(@.length-1)');
+
+                // Add filter suggestions if objects in array
+                if (target.length > 0 && typeof target[0] === 'object' && target[0] !== null) {
+                    const sampleKeys = Object.keys(target[0]);
+                    sampleKeys.slice(0, 3).forEach(key => {
+                        suggestions.push(`?(@.${key})`);
+                    });
+                }
+
+                return suggestions;
+            }
+
+            return [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    /**
+     * Initialize autocomplete functionality
+     */
+    initializeAutocomplete() {
+        // Create autocomplete dropdown element
+        this.elements.autocompleteDropdown = document.createElement('div');
+        this.elements.autocompleteDropdown.className = 'jsonpath-autocomplete';
+        this.elements.autocompleteDropdown.style.display = 'none';
+
+        // Position it relative to the JSONPath input
+        document.body.appendChild(this.elements.autocompleteDropdown);
+    }
+
+    /**
+     * Show autocomplete dropdown with suggestions
+     */
+    showAutocompleteDropdown(suggestions) {
+        if (suggestions.length === 0) {
+            this.hideAutocomplete();
+            return;
+        }
+
+        // Clear existing content
+        this.elements.autocompleteDropdown.innerHTML = '';
+
+        // Store suggestions for selection
+        this.currentSuggestions = suggestions;
+
+        // Add suggestions
+        suggestions.forEach((suggestion, index) => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+
+            // Handle both old format (string) and new format (object)
+            const displayText = typeof suggestion === 'object' ? suggestion.text : suggestion;
+            item.textContent = displayText;
+
+            item.addEventListener('click', () => {
+                this.applySuggestion(suggestion);
+            });
+
+            if (index === this.selectedSuggestionIndex) {
+                item.classList.add('selected');
+            }
+
+            this.elements.autocompleteDropdown.appendChild(item);
+        });
+
+        // Position the dropdown
+        this.positionAutocompleteDropdown();
+
+        // Show the dropdown
+        this.elements.autocompleteDropdown.style.display = 'block';
+        this.autocompleteVisible = true;
+    }
+
+    /**
+     * Apply a suggestion to the input field
+     */
+    applySuggestion(suggestion) {
+        if (typeof suggestion === 'object') {
+            // New format with precise replacement
+            const fullInput = this.elements.jsonPathInput.value;
+            const beforeReplacement = fullInput.substring(0, suggestion.replaceStart);
+            const afterReplacement = fullInput.substring(suggestion.replaceEnd);
+            const newValue = beforeReplacement + suggestion.text + afterReplacement;
+
+            this.elements.jsonPathInput.value = newValue;
+
+            // Set cursor position after the inserted text
+            const newCursorPos = suggestion.replaceStart + suggestion.text.length;
+            this.elements.jsonPathInput.setSelectionRange(newCursorPos, newCursorPos);
+        } else {
+            // Old format - replace entire value
+            this.elements.jsonPathInput.value = suggestion;
+        }
+
+        this.hideAutocomplete();
+        this.elements.jsonPathInput.focus();
+    }
+
+    /**
+     * Hide autocomplete dropdown
+     */
+    hideAutocomplete() {
+        if (this.elements.autocompleteDropdown) {
+            this.elements.autocompleteDropdown.style.display = 'none';
+        }
+        this.autocompleteVisible = false;
+        this.selectedSuggestionIndex = -1;
+    }
+
+    /**
+     * Position autocomplete dropdown relative to input
+     */
+    positionAutocompleteDropdown() {
+        if (!this.elements.jsonPathInput || !this.elements.autocompleteDropdown) return;
+
+        const inputRect = this.elements.jsonPathInput.getBoundingClientRect();
+        const dropdown = this.elements.autocompleteDropdown;
+
+        dropdown.style.position = 'fixed';
+        dropdown.style.left = inputRect.left + 'px';
+        dropdown.style.top = (inputRect.bottom + 2) + 'px';
+        dropdown.style.width = Math.max(inputRect.width, 200) + 'px';
+        dropdown.style.zIndex = '1000';
+    }
+
+    /**
+     * Navigate autocomplete suggestions with keyboard
+     */
+    navigateAutocomplete(direction) {
+        const items = this.elements.autocompleteDropdown.querySelectorAll('.autocomplete-item');
+        if (items.length === 0) return;
+
+        // Remove current selection
+        if (this.selectedSuggestionIndex >= 0 && items[this.selectedSuggestionIndex]) {
+            items[this.selectedSuggestionIndex].classList.remove('selected');
+        }
+
+        // Update index
+        this.selectedSuggestionIndex += direction;
+        if (this.selectedSuggestionIndex >= items.length) {
+            this.selectedSuggestionIndex = 0;
+        } else if (this.selectedSuggestionIndex < 0) {
+            this.selectedSuggestionIndex = items.length - 1;
+        }
+
+        // Add new selection
+        if (items[this.selectedSuggestionIndex]) {
+            items[this.selectedSuggestionIndex].classList.add('selected');
+            items[this.selectedSuggestionIndex].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    /**
+     * Select the currently highlighted suggestion
+     */
+    selectSuggestion() {
+        if (this.selectedSuggestionIndex >= 0 && this.currentSuggestions && this.currentSuggestions[this.selectedSuggestionIndex]) {
+            const suggestion = this.currentSuggestions[this.selectedSuggestionIndex];
+            this.applySuggestion(suggestion);
         }
     }
 

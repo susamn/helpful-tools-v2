@@ -540,6 +540,43 @@
             color: #721c24;
         }
 
+        /* JSONPath Autocomplete Dropdown Styles */
+        .jsonpath-autocomplete {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .autocomplete-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        .autocomplete-item:hover {
+            background: #f0f8ff;
+            color: #0066cc;
+        }
+
+        .autocomplete-item.selected {
+            background: #4a90e2;
+            color: white;
+        }
+
+        .autocomplete-item.selected:hover {
+            background: #357abd;
+        }
+
     </style>
 </head>
 <body>
