@@ -837,20 +837,30 @@ class JsonFormatter {
             } else {
                 // Regular JSON path lookup
                 const parsed = JSON.parse(outputText);
-                const evalResult = this.evaluateJsonPath(parsed, path);
+                const paths = path.split(',').map(p => p.trim());
+                const allResults = [];
+                let error = null;
 
-                if (evalResult.error) {
-                    this.showMessage(`Invalid JSONPath expression: ${evalResult.error}`, 'error');
+                for (const p of paths) {
+                    const evalResult = this.evaluateJsonPath(parsed, p);
+                    if (evalResult.error) {
+                        error = evalResult.error;
+                        break;
+                    }
+                    allResults.push(...evalResult.result);
+                }
+
+                if (error) {
+                    this.showMessage(`Invalid JSONPath expression: ${error}`, 'error');
                     return;
                 }
 
-                const result = evalResult.result;
-                console.log('JSONPath result:', result);
+                console.log('JSONPath result:', allResults);
                 
-                if (result && result.length > 0) {
+                if (allResults && allResults.length > 0) {
                     // Display result in output window
-                    const formattedResult = this.formatJsonWithIndent(result);
-                    this.displayOutput(formattedResult, result, true);  // Mark as JSONPath result
+                    const formattedResult = this.formatJsonWithIndent(allResults);
+                    this.displayOutput(formattedResult, allResults, true);  // Mark as JSONPath result
                     this.highlightJsonPath(path);
                     this.showMessage('JSONPath result displayed in output', 'success');
                 } else {
@@ -870,14 +880,28 @@ class JsonFormatter {
             const inputText = this.elements.jsonInput.value.trim();
             const jsonObjects = this.parseJsonlObjects(inputText);
             const results = [];
-            
+            const paths = path.split(',').map(p => p.trim());
+
             jsonObjects.forEach((obj, index) => {
-                const evalResult = this.evaluateJsonPath(obj, path);
-                if (evalResult.result && evalResult.result.length > 0) {
+                const lineResults = [];
+                let error = null;
+                for (const p of paths) {
+                    const evalResult = this.evaluateJsonPath(obj, p);
+                    if (evalResult.error) {
+                        error = evalResult.error;
+                        break;
+                    }
+                    lineResults.push(...evalResult.result);
+                }
+
+                if (error) {
+                    this.showMessage(`Invalid JSONPath expression in object ${index}: ${error}`, 'error');
+                    // Continue to next line
+                } else if (lineResults.length > 0) {
                     results.push({
                         from_object: index,
                         value: {
-                            result: evalResult.result
+                            result: lineResults
                         }
                     });
                 }
