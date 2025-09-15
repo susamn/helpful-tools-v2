@@ -279,16 +279,19 @@
             align-items: center;
             gap: 4px;
             font-size: 11px;
+            flex: 1; /* Allow this to grow */
         }
         .search-controls label {
             color: #555;
         }
         .search-controls input {
-            width: 200px;
+            flex: 1; /* Allow input to grow */
             padding: 3px 6px;
-            font-size: 11px;
+            font-size: 0.85em;
+            font-weight: bold;
             border: 1px solid #a0a0a0;
             background: white;
+            min-width: 100px; /* Minimum width */
         }
         
         /* JSON syntax highlighting */

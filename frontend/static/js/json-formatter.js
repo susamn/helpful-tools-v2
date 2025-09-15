@@ -108,6 +108,14 @@ class JsonFormatter {
         // Input change detection for real-time stats
         this.elements.jsonInput.addEventListener('input', () => this.updateJsonStats());
 
+        let formatTimeout;
+        this.elements.jsonInput.addEventListener('keyup', () => {
+            clearTimeout(formatTimeout);
+            formatTimeout = setTimeout(() => {
+                this.formatJson();
+            }, 1000);
+        });
+
         // Prevent form submission on Enter key
         this.elements.jsonInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
@@ -761,6 +769,7 @@ class JsonFormatter {
     updateIndentPreference() {
         this.indentPrefs.type = this.elements.indentType.value;
         this.indentPrefs.size = parseInt(this.elements.indentSize.value);
+        this.formatJson();
     }
 
     /**
