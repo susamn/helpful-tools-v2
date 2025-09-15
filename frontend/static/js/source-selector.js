@@ -690,102 +690,71 @@ class SourceSelector {
         const html = items.map(item => {
             const isDirectory = item.is_directory;
             const icon = isDirectory ? '📁' : '📄';
-            const levelClass = level > 0 ? `tree-level-${Math.min(level, 2)}` : '';
+            const levelClass = level > 0 ? `tree-level-${Math.min(level, 3)}` : '';
             const itemClass = isDirectory ? 'directory' : 'file';
             const nonExplorable = isDirectory && item.explorable === false;
-            
+            const hasChildren = isDirectory && item.children && item.children.length > 0;
+
             // Format file size
             const sizeText = !isDirectory && item.size !== null ? this.formatFileSize(item.size) : '';
             
-            // Format last modified date - prioritize last_modified (ISO string) over modified (timestamp)
+            // Format last modified date
             let dateText = '';
-            
-            // Debug: log the raw date data
-            if (item.last_modified || item.modified) {
-                console.log('Date debug for', item.name, ':', { 
-                    last_modified: item.last_modified, 
-                    modified: item.modified,
-                    type_last: typeof item.last_modified,
-                    type_mod: typeof item.modified
-                });
-            }
-            
             if (item.last_modified) {
                 try {
                     const date = new Date(item.last_modified);
-                    // Show full ISO format with date and time
                     dateText = date.toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: '2-digit', 
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit'
                     });
-                } catch (e) {
-                    console.warn('Invalid last_modified date:', item.last_modified);
-                    // Fallback to raw value if parsing fails
-                    dateText = item.last_modified;
-                }
-            } else if (item.modified) {
-                try {
-                    // Handle both timestamp and ISO string formats for backward compatibility
-                    const date = new Date(typeof item.modified === 'number' ? item.modified * 1000 : item.modified);
-                    dateText = date.toLocaleString('en-US', {
-                        year: 'numeric',
-                        month: '2-digit', 
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                    });
-                } catch (e) {
-                    console.warn('Invalid modified date:', item.modified);
-                    // Fallback to raw value if parsing fails
-                    dateText = String(item.modified);
-                }
+                } catch (e) { dateText = item.last_modified; }
             }
-            
-            // Create metadata section
-            let metadataHtml = '';
-            if (sizeText || dateText || nonExplorable) {
-                metadataHtml = `
-                    <div class="tree-metadata">
-                        ${sizeText ? `<div class="tree-size">${sizeText}</div>` : ''}
-                        ${dateText ? `<div class="tree-date">${dateText}</div>` : ''}
-                        ${nonExplorable ? '<div class="tree-date">(not explorable)</div>' : ''}
-                    </div>
-                `;
-            }
-            
+
             let itemHtml = `
-                <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''}" 
-                     data-path="${item.path}" 
-                     data-is-directory="${isDirectory}"
-                     data-source-id="${source.id}">
-                    <span class="tree-icon">${icon}</span>
-                    <span class="tree-name">${this.escapeHtml(item.name)}</span>
-                    ${metadataHtml}
-                </div>
+                <div class="tree-item-container">
+                    <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''}" 
+                         data-path="${item.path}" 
+                         data-is-directory="${isDirectory}"
+                         data-source-id="${source.id}">
+                        ${isDirectory ? `<span class="tree-toggle">${hasChildren ? '+' : ''}</span>` : '<span class="tree-toggle-placeholder"></span>'}
+                        <span class="tree-icon">${icon}</span>
+                        <span class="tree-name">${this.escapeHtml(item.name)}</span>
+                        <div class="tree-metadata">
+                            ${sizeText ? `<div class="tree-size">${sizeText}</div>` : ''}
+                            ${dateText ? `<div class="tree-date">${dateText}</div>` : ''}
+                        </div>
+                    </div>
             `;
             
-            // Add children if present
-            if (item.children && item.children.length > 0) {
+            if (hasChildren) {
                 const childContainer = document.createElement('div');
+                childContainer.className = 'tree-children collapsed';
                 this.renderFileTree(item.children, childContainer, source, level + 1);
-                itemHtml += childContainer.innerHTML;
+                itemHtml += childContainer.outerHTML;
             }
             
+            itemHtml += '</div>';
             return itemHtml;
         }).join('');
         
         container.innerHTML = html;
         
-        // Add click handlers for files
+        // Add click handlers
         container.querySelectorAll('.tree-item.file').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.selectFile(item.dataset.path, source, item);
+            });
+        });
+
+        container.querySelectorAll('.tree-toggle').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const children = e.target.parentElement.nextElementSibling;
+                if (children && children.classList.contains('tree-children')) {
+                    children.classList.toggle('collapsed');
+                    e.target.textContent = children.classList.contains('collapsed') ? '+' : '-';
+                }
             });
         });
     }
