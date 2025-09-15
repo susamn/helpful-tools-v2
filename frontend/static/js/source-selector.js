@@ -412,7 +412,11 @@ class SourceSelector {
         }
 
         if (!source.dynamicVariables || Object.keys(source.dynamicVariables).length === 0) {
-            alert('This source has no dynamic variables to edit.');
+            if (typeof showStatusMessage === 'function') {
+                showStatusMessage('This source has no dynamic variables to edit.', 'info', 3000);
+            } else {
+                alert('This source has no dynamic variables to edit.');
+            }
             return;
         }
 
@@ -534,7 +538,11 @@ class SourceSelector {
             }
         } catch (error) {
             console.error('Error saving source:', error);
-            alert(`Error saving source: ${error.message}`);
+            if (typeof showStatusMessage === 'function') {
+                showStatusMessage(`Error saving source: ${error.message}`, 'error', 4000);
+            } else {
+                alert(`Error saving source: ${error.message}`);
+            }
             return;
         }
 
@@ -598,7 +606,11 @@ class SourceSelector {
             }
         } catch (error) {
             console.error('Error saving source:', error);
-            alert(`Error saving source: ${error.message}`);
+            if (typeof showStatusMessage === 'function') {
+                showStatusMessage(`Error saving source: ${error.message}`, 'error', 4000);
+            } else {
+                alert(`Error saving source: ${error.message}`);
+            }
             return;
         }
 
@@ -818,11 +830,19 @@ class SourceSelector {
                 }
             } else {
                 const error = await response.json();
-                alert(`Error loading file: ${error.error}`);
+                if (typeof showStatusMessage === 'function') {
+                    showStatusMessage(`Error loading file: ${error.error}`, 'error', 4000);
+                } else {
+                    alert(`Error loading file: ${error.error}`);
+                }
             }
         } catch (error) {
             console.error('Error selecting file:', error);
-            alert('Error loading file content');
+            if (typeof showStatusMessage === 'function') {
+                showStatusMessage('Error loading file content', 'error', 4000);
+            } else {
+                alert('Error loading file content');
+            }
         }
     }
 
@@ -910,7 +930,11 @@ class SourceSelector {
             }
         } catch (error) {
             console.error('Error fetching source data:', error);
-            alert(`Error fetching data: ${error.message}`);
+            if (typeof showStatusMessage === 'function') {
+                showStatusMessage(`Error fetching data: ${error.message}`, 'error', 4000);
+            } else {
+                alert(`Error fetching data: ${error.message}`);
+            }
         } finally {
             // Re-enable fetch button
             const fetchBtn = document.querySelector(`[data-action="fetch"][data-source-id="${source.id}"]`);

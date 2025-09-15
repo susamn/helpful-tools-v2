@@ -799,9 +799,19 @@ class SourcesManager {
                     this.generateDynamicFields(result.variables);
                     this.els.dynamicSection.style.display = 'block';
                     this.updateStatus(`Found ${result.variables.length} dynamic variable(s): ${result.variables.join(', ')}`);
+
+                    // Show info notification for variables found
+                    if (typeof showStatusMessage === 'function') {
+                        showStatusMessage(`Found ${result.variables.length} dynamic variable(s): ${result.variables.join(', ')}`, 'info', 3000);
+                    }
                 } else {
                     this.els.dynamicSection.style.display = 'none';
                     this.updateStatus('No dynamic variables found in path template');
+
+                    // Show info notification
+                    if (typeof showStatusMessage === 'function') {
+                        showStatusMessage('No dynamic variables found in path template', 'info', 2500);
+                    }
                 }
             } else {
                 this.showError('Failed to resolve variables: ' + result.error);
@@ -897,7 +907,7 @@ class SourcesManager {
 
             if (result.success) {
                 const action = isEdit ? 'updated' : 'created';
-                this.updateStatus(`Source "${sourceData.name}" ${action} successfully`);
+                this.showSuccess(`Source "${sourceData.name}" ${action} successfully`);
                 this.hideSourcePopup();
                 this.loadSources();
             } else {
@@ -920,9 +930,9 @@ class SourcesManager {
             const result = await response.json();
             
             if (result.success) {
-                this.updateStatus(`Connection test successful: ${result.message}`);
+                this.showSuccess(`Connection test successful: ${result.message}`);
             } else {
-                this.updateStatus(`Connection test failed: ${result.error}`);
+                this.showError(`Connection test failed: ${result.error}`);
             }
             
             // Reload sources to update status
@@ -951,7 +961,7 @@ class SourcesManager {
             const result = await response.json();
 
             if (result.success) {
-                this.updateStatus('Source deleted successfully');
+                this.showSuccess('Source deleted successfully');
                 this.loadSources();
             } else {
                 this.showError('Failed to delete source: ' + result.error);
@@ -971,7 +981,7 @@ class SourcesManager {
             const result = await response.json();
 
             if (result.success) {
-                this.updateStatus('Source duplicated successfully');
+                this.showSuccess('Source duplicated successfully');
                 this.loadSources();
             } else {
                 this.showError('Failed to duplicate source: ' + result.error);
@@ -985,9 +995,23 @@ class SourcesManager {
         this.els.statusText.textContent = message;
     }
 
+    showSuccess(message) {
+        this.els.statusText.textContent = message;
+
+        // Use the top-right notification system
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage(message, 'success', 3000);
+        }
+    }
+
     showError(message) {
         this.els.statusText.textContent = `Error: ${message}`;
         console.error(message);
+
+        // Use the top-right notification system
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage(message, 'error', 4000);
+        }
     }
 
     changeFontSize(delta) {
@@ -1118,7 +1142,7 @@ class SourcesManager {
             }
         } catch (error) {
             console.error('Error loading validator types:', error);
-            this.updateStatus('Error loading validator types', 'error');
+            this.showError('Error loading validator types');
         }
     }
 
@@ -1132,11 +1156,11 @@ class SourcesManager {
                 document.getElementById('validatorPopupTitle').textContent =
                     `Validators for ${this.getSourceName(sourceId)} (${data.validators.length})`;
             } else {
-                this.updateStatus(`Error loading validators: ${data.error}`, 'error');
+                this.showError(`Error loading validators: ${data.error}`);
             }
         } catch (error) {
             console.error('Error loading validators:', error);
-            this.updateStatus('Error loading validators', 'error');
+            this.showError('Error loading validators');
         }
     }
 
@@ -1210,11 +1234,11 @@ class SourcesManager {
                 this.updateSchemaHelp();
                 this.renderValidatorConfig(validator.config || {});
             } else {
-                this.updateStatus(`Error loading validator: ${data.error}`, 'error');
+                this.showError(`Error loading validator: ${data.error}`);
             }
         } catch (error) {
             console.error('Error loading validator:', error);
-            this.updateStatus('Error loading validator', 'error');
+            this.showError('Error loading validator');
         }
     }
 
@@ -1309,7 +1333,7 @@ class SourcesManager {
         const schemaContent = document.getElementById('validatorSchema').value.trim();
 
         if (!name || !type || !schemaContent) {
-            this.updateStatus('Please fill in all required fields', 'error');
+            this.showError('Please fill in all required fields');
             return;
         }
 
@@ -1341,15 +1365,15 @@ class SourcesManager {
             const data = await response.json();
 
             if (data.success) {
-                this.updateStatus(this.currentEditingValidatorId ? 'Validator updated successfully' : 'Validator created successfully', 'success');
+                this.showSuccess(this.currentEditingValidatorId ? 'Validator updated successfully' : 'Validator created successfully');
                 this.hideValidatorForm();
                 this.loadValidators(this.currentSourceId);
             } else {
-                this.updateStatus(`Error: ${data.error}`, 'error');
+                this.showError(`Error: ${data.error}`);
             }
         } catch (error) {
             console.error('Error saving validator:', error);
-            this.updateStatus('Error saving validator', 'error');
+            this.showError('Error saving validator');
         }
     }
 
@@ -1366,14 +1390,14 @@ class SourcesManager {
             const data = await response.json();
 
             if (data.success) {
-                this.updateStatus('Validator deleted successfully', 'success');
+                this.showSuccess('Validator deleted successfully');
                 this.loadValidators(this.currentSourceId);
             } else {
-                this.updateStatus(`Error deleting validator: ${data.error}`, 'error');
+                this.showError(`Error deleting validator: ${data.error}`);
             }
         } catch (error) {
             console.error('Error deleting validator:', error);
-            this.updateStatus('Error deleting validator', 'error');
+            this.showError('Error deleting validator');
         }
     }
 
@@ -1390,7 +1414,7 @@ class SourcesManager {
         const schemaContent = document.getElementById('validatorSchema').value.trim();
 
         if (!type || !schemaContent) {
-            this.updateStatus('Please select a validator type and enter schema content', 'error');
+            this.showError('Please select a validator type and enter schema content');
             return;
         }
 
@@ -1414,7 +1438,7 @@ class SourcesManager {
             const createData = await createResponse.json();
 
             if (!createData.success) {
-                this.updateStatus(`Error creating test validator: ${createData.error}`, 'error');
+                this.showError(`Error creating test validator: ${createData.error}`);
                 return;
             }
 
@@ -1440,17 +1464,17 @@ class SourcesManager {
             if (testData.success) {
                 const result = testData.validation.validation_results[0];
                 if (result.valid) {
-                    this.updateStatus('✅ Validation passed!', 'success');
+                    this.showSuccess('✅ Validation passed!');
                 } else {
-                    this.updateStatus(`❌ Validation failed: ${result.errors.join(', ')}`, 'error');
+                    this.showError(`❌ Validation failed: ${result.errors.join(', ')}`);
                 }
             } else {
-                this.updateStatus(`Error testing validator: ${testData.error}`, 'error');
+                this.showError(`Error testing validator: ${testData.error}`);
             }
 
         } catch (error) {
             console.error('Error testing validator:', error);
-            this.updateStatus('Error testing validator', 'error');
+            this.showError('Error testing validator');
         }
     }
 
@@ -1473,16 +1497,16 @@ class SourcesManager {
             if (data.success) {
                 const result = data.validation.validation_results[0];
                 if (result.valid) {
-                    this.updateStatus('✅ Validation passed!', 'success');
+                    this.showSuccess('✅ Validation passed!');
                 } else {
-                    this.updateStatus(`❌ Validation failed: ${result.errors.join(', ')}`, 'error');
+                    this.showError(`❌ Validation failed: ${result.errors.join(', ')}`);
                 }
             } else {
-                this.updateStatus(`Error testing validator: ${data.error}`, 'error');
+                this.showError(`Error testing validator: ${data.error}`);
             }
         } catch (error) {
             console.error('Error testing validator:', error);
-            this.updateStatus('Error testing validator', 'error');
+            this.showError('Error testing validator');
         }
     }
 
