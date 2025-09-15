@@ -489,7 +489,7 @@ class JsonFormatter {
     /**
      * Display output with syntax highlighting if markup is enabled
      */
-    displayOutput(text, parsedData = null, isJsonPathResult = false) {
+    displayOutput(text, parsedData = null, isJsonPathResult = false, preformatted = false) {
         // Store the raw text for toggling
         this.lastOutputText = text;
         
@@ -502,7 +502,11 @@ class JsonFormatter {
             this.elements.jsonOutput.style.display = 'none';
             this.elements.jsonOutputFormatted.style.display = 'block';
             this.elements.jsonOutput.value = text; // Keep textarea in sync
-            this.elements.jsonOutputFormatted.innerHTML = this.highlightJson(text);
+            if (preformatted) {
+                this.elements.jsonOutputFormatted.innerHTML = text;
+            } else {
+                this.elements.jsonOutputFormatted.innerHTML = this.highlightJson(text);
+            }
         } else {
             this.elements.jsonOutput.style.display = 'block';
             this.elements.jsonOutputFormatted.style.display = 'none';
@@ -859,31 +863,35 @@ class JsonFormatter {
             const results = [];
             
             jsonObjects.forEach((obj, index) => {
-                const result = this.evaluateJsonPath(obj, path);
-                if (result !== null) {
+                const evalResult = this.evaluateJsonPath(obj, path);
+                console.log(`JSONPath result for object ${index}:`, evalResult);
+                if (evalResult.result && evalResult.result.length > 0) {
                     results.push({
-                        objectIndex: index,
-                        result: result
+                        from_object: index,
+                        value: {
+                            result: evalResult.result
+                        }
                     });
                 }
             });
             
             if (results.length > 0) {
-                // Format results for display
-                let displayText = '';
-                if (results.length === 1) {
-                    // Single result - just show the value
-                    displayText = this.formatJsonWithIndent(results[0].result);
-                } else {
-                    // Multiple results - show as array with object indices
-                    const formattedResults = results.map(item => ({
-                        from_object: item.objectIndex,
-                        value: item.result
-                    }));
-                    displayText = this.formatJsonWithIndent(formattedResults);
-                }
-                
-                this.displayOutput(displayText, results.length === 1 ? results[0].result : results, true);  // Mark as JSONPath result
+                let html = '<span class="deemphasized">[\n</span>';
+                results.forEach((res, index) => {
+                    html += '<span class="deemphasized">  {\n</span>';
+                    html += `    <span class="deemphasized">"from_object": ${res.from_object},</span>\n`;
+                    html += `    <span class="deemphasized">"value": {</span>\n`;
+                    html += `      <span class="deemphasized">"result":</span> ${this.highlightJson(this.formatJsonWithIndent(res.value.result))}\n`;
+                    html += `    <span class="deemphasized">}</span>\n`;
+                    html += '  <span class="deemphasized">}</span>';
+                    if (index < results.length - 1) {
+                        html += '<span class="deemphasized">,</span>';
+                    }
+                    html += '\n';
+                });
+                html += '<span class="deemphasized">]</span>';
+
+                this.displayOutput(html, results, true, true);
                 this.showMessage(`JSONPath found in ${results.length} object${results.length > 1 ? 's' : ''}`, 'success');
             } else {
                 this.showMessage(`JSONPath not found in any JSONL objects: ${path}`, 'warning');
