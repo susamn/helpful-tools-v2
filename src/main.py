@@ -18,6 +18,10 @@ from typing import Dict, Any, List, Tuple
 # Import sources package
 from sources import SourceFactory, SourceConfig, create_source
 
+# Import validation system
+from validators import get_validator_types, create_validator, ValidationError
+from validators.manager import ValidatorManager
+
 # Configure Flask to use the correct static folder with absolute path
 static_dir = Path(__file__).parent.parent / "frontend" / "static"
 app = Flask(__name__, 
@@ -1919,6 +1923,207 @@ def get_source_data(source_id):
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ===== VALIDATION API ENDPOINTS =====
+
+# Initialize validator manager
+validator_manager = ValidatorManager()
+
+@app.route('/api/validators/types', methods=['GET'])
+def get_available_validator_types():
+    """Get list of available validator types."""
+    try:
+        types = get_validator_types()
+        return jsonify({'success': True, 'types': types})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sources/<source_id>/validators', methods=['GET'])
+def list_source_validators(source_id):
+    """List all validators for a source."""
+    try:
+        validators = validator_manager.list_validators(source_id)
+        return jsonify({'success': True, 'validators': validators})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sources/<source_id>/validators', methods=['POST'])
+def create_source_validator(source_id):
+    """Create a new validator for a source."""
+    try:
+        data = request.get_json()
+
+        # Validate required fields
+        required_fields = ['name', 'type', 'schema_content']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
+
+        # Generate validator ID
+        validator_id = validator_manager.create_validator_id()
+
+        # Add metadata to config
+        config = data.get('config', {})
+        config['created_at'] = datetime.now().isoformat()
+        config['updated_at'] = datetime.now().isoformat()
+
+        # Create validator instance
+        validator = create_validator(
+            validator_type=data['type'],
+            validator_id=validator_id,
+            name=data['name'],
+            schema_content=data['schema_content'],
+            config=config
+        )
+
+        # Save validator
+        validator_path = validator_manager.save_validator(source_id, validator)
+
+        return jsonify({
+            'success': True,
+            'validator_id': validator_id,
+            'message': 'Validator created successfully',
+            'path': validator_path
+        }), 201
+
+    except ValidationError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sources/<source_id>/validators/<validator_id>', methods=['GET'])
+def get_source_validator(source_id, validator_id):
+    """Get details of a specific validator."""
+    try:
+        validator = validator_manager.load_validator(source_id, validator_id)
+        validator_info = validator.get_schema_info()
+        validator_info['schema_content'] = validator.schema_content
+
+        return jsonify({'success': True, 'validator': validator_info})
+    except ValidationError as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sources/<source_id>/validators/<validator_id>', methods=['PUT'])
+def update_source_validator(source_id, validator_id):
+    """Update an existing validator."""
+    try:
+        data = request.get_json()
+
+        # Load existing validator
+        existing_validator = validator_manager.load_validator(source_id, validator_id)
+
+        # Update fields
+        name = data.get('name', existing_validator.name)
+        schema_content = data.get('schema_content', existing_validator.schema_content)
+        config = data.get('config', existing_validator.config.copy())
+
+        # Update timestamp
+        config['updated_at'] = datetime.now().isoformat()
+
+        # Create updated validator
+        updated_validator = create_validator(
+            validator_type=existing_validator.get_validator_type(),
+            validator_id=validator_id,
+            name=name,
+            schema_content=schema_content,
+            config=config
+        )
+
+        # Save updated validator
+        validator_path = validator_manager.save_validator(source_id, updated_validator)
+
+        return jsonify({
+            'success': True,
+            'message': 'Validator updated successfully',
+            'path': validator_path
+        })
+
+    except ValidationError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sources/<source_id>/validators/<validator_id>', methods=['DELETE'])
+def delete_source_validator(source_id, validator_id):
+    """Delete a validator."""
+    try:
+        deleted = validator_manager.delete_validator(source_id, validator_id)
+
+        if deleted:
+            return jsonify({'success': True, 'message': 'Validator deleted successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Validator not found'}), 404
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sources/<source_id>/validate', methods=['POST'])
+def validate_source_data(source_id):
+    """Validate data against source validators."""
+    try:
+        data = request.get_json()
+
+        # Get data to validate
+        validate_data = data.get('data')
+        if validate_data is None:
+            return jsonify({'success': False, 'error': 'No data provided for validation'}), 400
+
+        # Optional: specific validator to use
+        validator_id = data.get('validator_id')
+
+        # Perform validation
+        results = validator_manager.validate_source_data(source_id, validate_data, validator_id)
+
+        return jsonify({
+            'success': True,
+            'validation': results
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/sources/<source_id>/validate-file', methods=['POST'])
+def validate_source_file(source_id):
+    """Validate a file against source validators."""
+    try:
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+        # Read file content
+        content = file.read().decode('utf-8')
+
+        # Optional: specific validator to use
+        validator_id = request.form.get('validator_id')
+
+        # Perform validation
+        results = validator_manager.validate_source_data(source_id, content, validator_id)
+
+        return jsonify({
+            'success': True,
+            'validation': results,
+            'filename': file.filename
+        })
+
+    except UnicodeDecodeError:
+        return jsonify({'success': False, 'error': 'File is not valid UTF-8 text'}), 400
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8000, debug=True)

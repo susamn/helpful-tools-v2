@@ -722,3 +722,372 @@
     0%, 50% { opacity: 1; }
     51%, 100% { opacity: 0.5; }
 }
+
+/* ===== VALIDATOR POPUP STYLES ===== */
+
+.validator-popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 1000;
+}
+
+.validator-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border: 2px solid #c0c0c0;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: none;
+    z-index: 1001;
+}
+
+.validator-popup-header {
+    background: linear-gradient(to bottom, #f0f0f0, #d8d8d8);
+    border-bottom: 1px solid #c0c0c0;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+.validator-popup-close {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: #666;
+    padding: 2px 6px;
+    border-radius: 2px;
+}
+
+.validator-popup-close:hover {
+    background: #e0e0e0;
+    color: #000;
+}
+
+.validator-popup-content {
+    padding: 16px;
+    max-height: calc(90vh - 100px);
+    overflow-y: auto;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 8px;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.btn-add-validator,
+.btn-cancel,
+.btn-save,
+.btn-test {
+    background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+    border: 1px solid #a0a0a0;
+    padding: 6px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 2px;
+    color: #333;
+}
+
+.btn-add-validator:hover,
+.btn-cancel:hover,
+.btn-save:hover,
+.btn-test:hover {
+    background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+}
+
+.btn-save {
+    background: linear-gradient(to bottom, #4a90e2, #357abd);
+    color: white;
+    border-color: #2e5f8f;
+}
+
+.btn-save:hover {
+    background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
+}
+
+.validators-list {
+    min-height: 100px;
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    padding: 8px;
+    margin-bottom: 16px;
+}
+
+.no-validators {
+    text-align: center;
+    padding: 24px;
+    color: #666;
+}
+
+.no-validators-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+}
+
+.no-validators-text {
+    font-size: 12px;
+}
+
+.validator-item {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.validator-info {
+    flex: 1;
+}
+
+.validator-name {
+    font-weight: bold;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.validator-type {
+    font-size: 11px;
+    color: #666;
+    margin-bottom: 2px;
+}
+
+.validator-details {
+    font-size: 11px;
+    color: #888;
+}
+
+.validator-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.validator-btn {
+    background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+    border: 1px solid #a0a0a0;
+    padding: 4px 8px;
+    font-size: 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    color: #333;
+}
+
+.validator-btn:hover {
+    background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+}
+
+.validator-btn.delete {
+    background: linear-gradient(to bottom, #ff6b6b, #e74c3c);
+    color: white;
+    border-color: #c0392b;
+}
+
+.validator-btn.delete:hover {
+    background: linear-gradient(to bottom, #ff7979, #ff6b6b);
+}
+
+.validator-form-section {
+    border-top: 1px solid #e0e0e0;
+    padding-top: 16px;
+}
+
+.validator-form-section .form-group {
+    margin-bottom: 12px;
+}
+
+.validator-form-section label {
+    display: block;
+    font-weight: bold;
+    font-size: 11px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.validator-form-section input,
+.validator-form-section select,
+.validator-form-section textarea {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #c0c0c0;
+    border-radius: 2px;
+    font-size: 12px;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.validator-form-section textarea {
+    font-family: 'Courier New', monospace;
+    resize: vertical;
+}
+
+.schema-help {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+    padding: 6px;
+    background: #f8f9fa;
+    border-radius: 2px;
+    border-left: 3px solid #007bff;
+}
+
+.validator-config-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.validator-config-field label {
+    margin: 0;
+    flex: 0 0 auto;
+    min-width: 120px;
+}
+
+.validator-config-field input {
+    flex: 1;
+    margin: 0;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.form-actions-right {
+    display: flex;
+    gap: 8px;
+}
+
+/* Validator button in source actions */
+.source-btn.validator {
+    color: #ff6600;
+    border-color: #ff6600;
+}
+
+.source-btn.validator:hover {
+    background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+}
+
+/* Validator count display */
+.validator-count {
+    font-size: 10px;
+    color: #ff6600;
+    background: #fff3e6;
+    border: 1px solid #ffcc99;
+    border-radius: 2px;
+    padding: 1px 4px;
+    margin-left: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.validator-count:hover {
+    background: #ffe0b3;
+    border-color: #ff6600;
+}
+
+/* Validator details popup */
+.validator-details-popup {
+    position: fixed;
+    z-index: 10000;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 280px;
+    max-width: 400px;
+}
+
+.validator-details-content {
+    padding: 0;
+}
+
+.validator-details-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.validator-details-header h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.validator-details-header button {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #666;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.validator-details-list {
+    padding: 8px 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.validator-detail-item {
+    padding: 6px 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.validator-detail-item:last-child {
+    border-bottom: none;
+}
+
+.validator-name {
+    font-weight: 500;
+    color: #333;
+    font-size: 12px;
+}
+
+.validator-type {
+    font-size: 10px;
+    color: #666;
+    text-transform: uppercase;
+    margin-top: 2px;
+}

@@ -76,12 +76,14 @@ class SourcesManager {
     async loadSources() {
         try {
             this.updateStatus('Loading sources...');
-            
+
             const response = await fetch('/api/sources');
             const result = await response.json();
-            
+
             if (result.success) {
                 this.sources = result.sources;
+                // Load validator counts for each source
+                await this.loadValidatorCounts();
                 this.displaySources();
                 this.updateStatus(`Loaded ${this.sources.length} sources`);
                 this.els.connectionInfo.textContent = `${this.sources.length} sources configured`;
@@ -90,6 +92,23 @@ class SourcesManager {
             }
         } catch (error) {
             this.showError('Error loading sources: ' + error.message);
+        }
+    }
+
+    async loadValidatorCounts() {
+        this.validatorCounts = {};
+        for (const source of this.sources) {
+            try {
+                const response = await fetch(`/api/sources/${source.id}/validators`);
+                const result = await response.json();
+                if (result.success) {
+                    this.validatorCounts[source.id] = result.validators.length;
+                } else {
+                    this.validatorCounts[source.id] = 0;
+                }
+            } catch (error) {
+                this.validatorCounts[source.id] = 0;
+            }
         }
     }
 
@@ -133,6 +152,7 @@ class SourcesManager {
                     <div class="source-id-container">
                         <div class="file-type-icon">${fileTypeIcon}</div>
                         <div class="source-id">${source.id}</div>
+                        ${this.renderValidatorCount(source.id)}
                     </div>
                 </div>
                 <div class="source-type">${source.type.replace('_', ' ').toUpperCase()}${levelInfo}</div>
@@ -149,6 +169,7 @@ class SourcesManager {
                     <div class="source-actions">
                         <button class="source-btn test" onclick="sourcesManager.testSource('${source.id}')">Test</button>
                         <button class="source-btn edit" onclick="sourcesManager.editSource('${source.id}')">Edit</button>
+                        <button class="source-btn validator" onclick="sourcesManager.showValidators('${source.id}')">Add Validator</button>
                         <button class="source-btn duplicate" onclick="sourcesManager.duplicateSource('${source.id}')">Duplicate</button>
                         <button class="source-btn delete" onclick="sourcesManager.deleteSource('${source.id}')">Delete</button>
                     </div>
@@ -177,6 +198,61 @@ class SourcesManager {
         }
 
         return highlightedPath;
+    }
+
+    renderValidatorCount(sourceId) {
+        const count = this.validatorCounts?.[sourceId] || 0;
+        if (count === 0) {
+            return '';
+        }
+        return `<div class="validator-count" onclick="sourcesManager.showValidatorDetails('${sourceId}', event)">
+                    ${count} validator${count !== 1 ? 's' : ''}
+                </div>`;
+    }
+
+    async showValidatorDetails(sourceId, event) {
+        event.stopPropagation();
+        try {
+            const response = await fetch(`/api/sources/${sourceId}/validators`);
+            const result = await response.json();
+
+            if (result.success) {
+                const validators = result.validators;
+                const popup = document.createElement('div');
+                popup.className = 'validator-details-popup';
+                popup.innerHTML = `
+                    <div class="validator-details-content">
+                        <div class="validator-details-header">
+                            <h3>Validators for Source ${sourceId}</h3>
+                            <button onclick="this.parentElement.parentElement.parentElement.remove()">×</button>
+                        </div>
+                        <div class="validator-details-list">
+                            ${validators.map(v => `
+                                <div class="validator-detail-item">
+                                    <div class="validator-name">${this.escapeHtml(v.name)}</div>
+                                    <div class="validator-type">${v.type}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(popup);
+
+                // Position the popup near the click
+                const rect = event.target.getBoundingClientRect();
+                popup.style.left = Math.min(rect.left, window.innerWidth - 300) + 'px';
+                popup.style.top = (rect.bottom + 5) + 'px';
+
+                // Auto-close after 3 seconds
+                setTimeout(() => {
+                    if (popup.parentElement) {
+                        popup.remove();
+                    }
+                }, 3000);
+            }
+        } catch (error) {
+            console.error('Error loading validator details:', error);
+        }
     }
 
     renderExpiryInfo(expiry) {
@@ -977,5 +1053,450 @@ class SourcesManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // ===== VALIDATOR MANAGEMENT METHODS =====
+
+    showValidators(sourceId) {
+        this.currentSourceId = sourceId;
+        this.loadValidatorTypes();
+        this.loadValidators(sourceId);
+        this.showValidatorPopup();
+    }
+
+    showValidatorPopup() {
+        document.getElementById('validatorPopupOverlay').style.display = 'block';
+        document.getElementById('validatorPopup').style.display = 'block';
+        this.hideValidatorForm();
+        this.attachValidatorEvents();
+    }
+
+    hideValidatorPopup() {
+        document.getElementById('validatorPopupOverlay').style.display = 'none';
+        document.getElementById('validatorPopup').style.display = 'none';
+        this.hideValidatorForm();
+    }
+
+    attachValidatorEvents() {
+        // Popup close events
+        document.getElementById('validatorPopupClose').onclick = () => this.hideValidatorPopup();
+        document.getElementById('validatorPopupOverlay').onclick = () => this.hideValidatorPopup();
+
+        // Add validator button
+        document.getElementById('addValidatorBtn').onclick = () => this.showValidatorForm();
+
+        // Cancel buttons
+        document.getElementById('cancelValidatorBtn').onclick = () => this.hideValidatorForm();
+        document.getElementById('cancelValidatorFormBtn').onclick = () => this.hideValidatorForm();
+
+        // Validator form
+        document.getElementById('validatorForm').onsubmit = (e) => this.handleValidatorSubmit(e);
+
+        // Validator type change
+        document.getElementById('validatorType').onchange = () => this.updateSchemaHelp();
+
+        // Test validator button
+        document.getElementById('testValidatorBtn').onclick = () => this.testValidator();
+    }
+
+    async loadValidatorTypes() {
+        try {
+            const response = await fetch('/api/validators/types');
+            const data = await response.json();
+
+            if (data.success) {
+                const typeSelect = document.getElementById('validatorType');
+                typeSelect.innerHTML = '<option value="">Select validator type...</option>';
+
+                data.types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type.type;
+                    option.textContent = `${type.name}${type.available ? '' : ' (dependencies required)'}`;
+                    option.disabled = !type.available;
+                    typeSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading validator types:', error);
+            this.updateStatus('Error loading validator types', 'error');
+        }
+    }
+
+    async loadValidators(sourceId) {
+        try {
+            const response = await fetch(`/api/sources/${sourceId}/validators`);
+            const data = await response.json();
+
+            if (data.success) {
+                this.renderValidatorsList(data.validators);
+                document.getElementById('validatorPopupTitle').textContent =
+                    `Validators for ${this.getSourceName(sourceId)} (${data.validators.length})`;
+            } else {
+                this.updateStatus(`Error loading validators: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error loading validators:', error);
+            this.updateStatus('Error loading validators', 'error');
+        }
+    }
+
+    renderValidatorsList(validators) {
+        const validatorsList = document.getElementById('validatorsList');
+
+        if (validators.length === 0) {
+            validatorsList.innerHTML = `
+                <div class="no-validators">
+                    <div class="no-validators-icon">🔍</div>
+                    <div class="no-validators-text">No validators configured for this source</div>
+                </div>
+            `;
+            return;
+        }
+
+        validatorsList.innerHTML = validators.map(validator => `
+            <div class="validator-item">
+                <div class="validator-info">
+                    <div class="validator-name">${this.escapeHtml(validator.name)}</div>
+                    <div class="validator-type">${this.getValidatorTypeDisplay(validator.type)}</div>
+                    <div class="validator-details">
+                        Created: ${validator.created_at ? new Date(validator.created_at).toLocaleDateString() : 'Unknown'}
+                        ${validator.updated_at ? ` • Updated: ${new Date(validator.updated_at).toLocaleDateString()}` : ''}
+                    </div>
+                </div>
+                <div class="validator-actions">
+                    <button class="validator-btn test" onclick="sourcesManager.testValidatorById('${validator.validator_id}')">Test</button>
+                    <button class="validator-btn edit" onclick="sourcesManager.editValidator('${validator.validator_id}')">Edit</button>
+                    <button class="validator-btn delete" onclick="sourcesManager.deleteValidator('${validator.validator_id}')">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    showValidatorForm(validatorId = null) {
+        this.currentEditingValidatorId = validatorId;
+        document.getElementById('validatorFormSection').style.display = 'block';
+
+        if (validatorId) {
+            this.loadValidatorForEdit(validatorId);
+            document.getElementById('validatorFormTitle').textContent = 'Edit Validator';
+        } else {
+            this.resetValidatorForm();
+            document.getElementById('validatorFormTitle').textContent = 'Add New Validator';
+        }
+    }
+
+    hideValidatorForm() {
+        document.getElementById('validatorFormSection').style.display = 'none';
+        this.currentEditingValidatorId = null;
+        this.resetValidatorForm();
+    }
+
+    resetValidatorForm() {
+        document.getElementById('validatorForm').reset();
+        document.getElementById('validatorConfigSection').style.display = 'none';
+        this.updateSchemaHelp();
+    }
+
+    async loadValidatorForEdit(validatorId) {
+        try {
+            const response = await fetch(`/api/sources/${this.currentSourceId}/validators/${validatorId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                const validator = data.validator;
+                document.getElementById('validatorName').value = validator.name || '';
+                document.getElementById('validatorType').value = validator.type || '';
+                document.getElementById('validatorSchema').value = validator.schema_content || '';
+                this.updateSchemaHelp();
+                this.renderValidatorConfig(validator.config || {});
+            } else {
+                this.updateStatus(`Error loading validator: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error loading validator:', error);
+            this.updateStatus('Error loading validator', 'error');
+        }
+    }
+
+    updateSchemaHelp() {
+        const validatorType = document.getElementById('validatorType').value;
+        const helpDiv = document.getElementById('schemaHelp');
+
+        const helpTexts = {
+            'json_schema': 'Enter a JSON Schema definition. Example: {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}',
+            'xml_schema': 'Enter an XML Schema (XSD) definition. Must be a complete XSD document with proper namespace declarations.',
+            'regex': 'Enter a regular expression pattern. Example: ^[a-zA-Z0-9]+$ (for alphanumeric strings)'
+        };
+
+        helpDiv.textContent = helpTexts[validatorType] || 'Select a validator type to see format help';
+
+        // Show/hide config section based on type
+        const configSection = document.getElementById('validatorConfigSection');
+        if (validatorType === 'regex') {
+            configSection.style.display = 'block';
+            this.renderRegexConfig();
+        } else {
+            configSection.style.display = 'none';
+        }
+    }
+
+    renderRegexConfig() {
+        const configFields = document.getElementById('validatorConfigFields');
+        configFields.innerHTML = `
+            <div class="validator-config-field">
+                <label>
+                    <input type="checkbox" id="configIgnoreCase"> Ignore case
+                </label>
+            </div>
+            <div class="validator-config-field">
+                <label>
+                    <input type="checkbox" id="configMultiline"> Multiline mode
+                </label>
+            </div>
+            <div class="validator-config-field">
+                <label>
+                    <input type="checkbox" id="configDotall"> Dot matches newline
+                </label>
+            </div>
+            <div class="validator-config-field">
+                <label>Match type:</label>
+                <select id="configMatchType">
+                    <option value="search">Search (default)</option>
+                    <option value="match">Match from start</option>
+                    <option value="fullmatch">Full match</option>
+                </select>
+            </div>
+            <div class="validator-config-field">
+                <label>
+                    <input type="checkbox" id="configExpectMatch" checked> Expect match (unchecked = should NOT match)
+                </label>
+            </div>
+        `;
+    }
+
+    renderValidatorConfig(config) {
+        const validatorType = document.getElementById('validatorType').value;
+
+        if (validatorType === 'regex') {
+            document.getElementById('configIgnoreCase').checked = config.ignore_case || false;
+            document.getElementById('configMultiline').checked = config.multiline || false;
+            document.getElementById('configDotall').checked = config.dotall || false;
+            document.getElementById('configMatchType').value = config.match_type || 'search';
+            document.getElementById('configExpectMatch').checked = config.expect_match !== false;
+        }
+    }
+
+    collectValidatorConfig() {
+        const validatorType = document.getElementById('validatorType').value;
+        const config = {};
+
+        if (validatorType === 'regex') {
+            config.ignore_case = document.getElementById('configIgnoreCase').checked;
+            config.multiline = document.getElementById('configMultiline').checked;
+            config.dotall = document.getElementById('configDotall').checked;
+            config.match_type = document.getElementById('configMatchType').value;
+            config.expect_match = document.getElementById('configExpectMatch').checked;
+        }
+
+        return config;
+    }
+
+    async handleValidatorSubmit(event) {
+        event.preventDefault();
+
+        const name = document.getElementById('validatorName').value.trim();
+        const type = document.getElementById('validatorType').value;
+        const schemaContent = document.getElementById('validatorSchema').value.trim();
+
+        if (!name || !type || !schemaContent) {
+            this.updateStatus('Please fill in all required fields', 'error');
+            return;
+        }
+
+        const config = this.collectValidatorConfig();
+
+        const validatorData = {
+            name,
+            type,
+            schema_content: schemaContent,
+            config
+        };
+
+        try {
+            let url, method;
+            if (this.currentEditingValidatorId) {
+                url = `/api/sources/${this.currentSourceId}/validators/${this.currentEditingValidatorId}`;
+                method = 'PUT';
+            } else {
+                url = `/api/sources/${this.currentSourceId}/validators`;
+                method = 'POST';
+            }
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(validatorData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.updateStatus(this.currentEditingValidatorId ? 'Validator updated successfully' : 'Validator created successfully', 'success');
+                this.hideValidatorForm();
+                this.loadValidators(this.currentSourceId);
+            } else {
+                this.updateStatus(`Error: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error saving validator:', error);
+            this.updateStatus('Error saving validator', 'error');
+        }
+    }
+
+    async deleteValidator(validatorId) {
+        if (!confirm('Are you sure you want to delete this validator?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/sources/${this.currentSourceId}/validators/${validatorId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                this.updateStatus('Validator deleted successfully', 'success');
+                this.loadValidators(this.currentSourceId);
+            } else {
+                this.updateStatus(`Error deleting validator: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting validator:', error);
+            this.updateStatus('Error deleting validator', 'error');
+        }
+    }
+
+    editValidator(validatorId) {
+        this.showValidatorForm(validatorId);
+    }
+
+    async testValidator() {
+        const sampleData = prompt('Enter sample data to test the validator against:');
+        if (!sampleData) return;
+
+        const name = document.getElementById('validatorName').value.trim();
+        const type = document.getElementById('validatorType').value;
+        const schemaContent = document.getElementById('validatorSchema').value.trim();
+
+        if (!type || !schemaContent) {
+            this.updateStatus('Please select a validator type and enter schema content', 'error');
+            return;
+        }
+
+        const config = this.collectValidatorConfig();
+
+        try {
+            // Create a temporary validator for testing
+            const tempValidatorData = {
+                name: name || 'Test Validator',
+                type,
+                schema_content: schemaContent,
+                config
+            };
+
+            const createResponse = await fetch(`/api/sources/${this.currentSourceId}/validators`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(tempValidatorData)
+            });
+
+            const createData = await createResponse.json();
+
+            if (!createData.success) {
+                this.updateStatus(`Error creating test validator: ${createData.error}`, 'error');
+                return;
+            }
+
+            const tempValidatorId = createData.validator_id;
+
+            // Test the validator
+            const testResponse = await fetch(`/api/sources/${this.currentSourceId}/validate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    data: sampleData,
+                    validator_id: tempValidatorId
+                })
+            });
+
+            const testData = await testResponse.json();
+
+            // Clean up the temporary validator
+            await fetch(`/api/sources/${this.currentSourceId}/validators/${tempValidatorId}`, {
+                method: 'DELETE'
+            });
+
+            if (testData.success) {
+                const result = testData.validation.validation_results[0];
+                if (result.valid) {
+                    this.updateStatus('✅ Validation passed!', 'success');
+                } else {
+                    this.updateStatus(`❌ Validation failed: ${result.errors.join(', ')}`, 'error');
+                }
+            } else {
+                this.updateStatus(`Error testing validator: ${testData.error}`, 'error');
+            }
+
+        } catch (error) {
+            console.error('Error testing validator:', error);
+            this.updateStatus('Error testing validator', 'error');
+        }
+    }
+
+    async testValidatorById(validatorId) {
+        const sampleData = prompt('Enter sample data to test this validator against:');
+        if (!sampleData) return;
+
+        try {
+            const response = await fetch(`/api/sources/${this.currentSourceId}/validate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    data: sampleData,
+                    validator_id: validatorId
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const result = data.validation.validation_results[0];
+                if (result.valid) {
+                    this.updateStatus('✅ Validation passed!', 'success');
+                } else {
+                    this.updateStatus(`❌ Validation failed: ${result.errors.join(', ')}`, 'error');
+                }
+            } else {
+                this.updateStatus(`Error testing validator: ${data.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error testing validator:', error);
+            this.updateStatus('Error testing validator', 'error');
+        }
+    }
+
+    getValidatorTypeDisplay(type) {
+        const displays = {
+            'json_schema': 'JSON Schema',
+            'xml_schema': 'XML Schema (XSD)',
+            'regex': 'Regular Expression'
+        };
+        return displays[type] || type;
+    }
+
+    getSourceName(sourceId) {
+        const source = this.sources.find(s => s.id === sourceId);
+        return source ? source.name : 'Unknown Source';
     }
 }
