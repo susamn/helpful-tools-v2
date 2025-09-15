@@ -159,6 +159,7 @@ class SourceSelector {
         const modal = document.getElementById(this.options.containerId);
         const overlay = document.getElementById(`${this.options.containerId}-overlay`);
         const closeBtn = modal.querySelector('.close-btn');
+        const listDiv = document.getElementById(`${this.options.containerId}-list`);
         
         const varsModal = document.getElementById(`${this.options.containerId}-vars-modal`);
         const varsOverlay = document.getElementById(`${this.options.containerId}-vars-overlay`);
@@ -190,6 +191,24 @@ class SourceSelector {
         if (searchInput) {
             searchInput.addEventListener('input', (e) => this.filterSources(e.target.value));
         }
+        
+        // Add click event listeners to action buttons
+        listDiv.addEventListener('click', (e) => {
+            if (e.target.classList.contains('source-btn')) {
+                e.stopPropagation();
+                const action = e.target.dataset.action;
+                const sourceId = e.target.dataset.sourceId;
+                const source = this.sources.find(s => s.id === sourceId);
+
+                if (action === 'edit') {
+                    this.showEditVariables(source);
+                } else if (action === 'test') {
+                    this.testSourceConnection(source);
+                } else if (action === 'fetch') {
+                    this.fetchSourceData(source);
+                }
+            }
+        });
     }
 
     /**
@@ -283,24 +302,6 @@ class SourceSelector {
         }).join('');
 
         listDiv.innerHTML = sourcesHTML;
-
-        // Add click event listeners to action buttons
-        listDiv.addEventListener('click', (e) => {
-            if (e.target.classList.contains('source-btn')) {
-                e.stopPropagation();
-                const action = e.target.dataset.action;
-                const sourceId = e.target.dataset.sourceId;
-                const source = this.sources.find(s => s.id === sourceId);
-
-                if (action === 'edit') {
-                    this.showEditVariables(source);
-                } else if (action === 'test') {
-                    this.testSourceConnection(source);
-                } else if (action === 'fetch') {
-                    this.fetchSourceData(source);
-                }
-            }
-        });
     }
 
     /**
