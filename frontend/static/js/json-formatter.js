@@ -559,14 +559,14 @@ class JsonFormatter {
                 case 'openBrace':
                 case 'openBracket':
                     html += `<span class="expand-collapse-btn" onclick="toggleCollapse(this)" data-level="${indent}">-</span>`;
-                    html += `<span class="json-punctuation">${token.value}</span>`;
+                    html += `<span class="json-punctuation">${token.value}</span><span class="collapsible-content">`;
                     indent++;
                     break;
                     
                 case 'closeBrace':
                 case 'closeBracket':
                     indent--;
-                    html += `<span class="json-punctuation">${token.value}</span>`;
+                    html += `</span><span class="json-punctuation">${token.value}</span>`;
                     break;
                     
                 case 'comma':
@@ -864,7 +864,6 @@ class JsonFormatter {
             
             jsonObjects.forEach((obj, index) => {
                 const evalResult = this.evaluateJsonPath(obj, path);
-                console.log(`JSONPath result for object ${index}:`, evalResult);
                 if (evalResult.result && evalResult.result.length > 0) {
                     results.push({
                         from_object: index,
@@ -1610,27 +1609,13 @@ class JsonFormatter {
 
 // Global function for collapsible elements
 function toggleCollapse(element) {
-    const isCollapsed = element.textContent === '+';
-    let nextSibling = element.nextSibling;
-    
-    if (isCollapsed) {
+    const content = element.nextElementSibling.nextElementSibling;
+    if (content.style.display === 'none') {
+        content.style.display = 'inline';
         element.textContent = '-';
-        while (nextSibling && nextSibling.nodeType !== 1) {
-            nextSibling = nextSibling.nextSibling;
-        }
-        if (nextSibling && nextSibling.classList && nextSibling.classList.contains('collapsed-content')) {
-            nextSibling.style.display = 'inline';
-            nextSibling.classList.remove('collapsed-content');
-        }
     } else {
+        content.style.display = 'none';
         element.textContent = '+';
-        while (nextSibling && nextSibling.nodeType !== 1) {
-            nextSibling = nextSibling.nextSibling;
-        }
-        if (nextSibling) {
-            nextSibling.style.display = 'none';
-            nextSibling.classList.add('collapsed-content');
-        }
     }
 }
 
