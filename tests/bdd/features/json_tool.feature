@@ -1,10 +1,10 @@
-Feature: JSON Formatter Tool
+Feature: JSON Tool
   As a developer
   I want to format, validate, and manipulate JSON data
   So that I can work with JSON efficiently
 
   Background:
-    Given I am on the JSON formatter page
+    Given I am on the JSON tool page
     And the page is fully loaded
 
   Scenario: Format valid JSON with pretty formatting

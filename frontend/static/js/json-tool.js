@@ -1,11 +1,11 @@
 /**
- * Enhanced JSON Formatter Tool - JavaScript Logic
+ * Enhanced JSON Tool - JavaScript Logic
  * Features: JSON/JSONL formatting, syntax highlighting, collapsible elements, JSONPath lookup
  */
 
-class JsonFormatter {
+class JsonTool {
     constructor() {
-        this.toolName = 'json-formatter';
+        this.toolName = 'json-tool';
         this.lastInputData = '';  // Track last input to detect changes
         this.lastOutputText = '';  // Track last output for markup toggling
         this.originalOutputData = null;  // Store original data before JSONPath filtering
@@ -1425,7 +1425,7 @@ class JsonFormatter {
     async initializeSourceSelector() {
         try {
             this.sourceSelector = await createSourceSelector({
-                containerId: 'jsonFormatterSourceSelector',
+                containerId: 'jsonToolSourceSelector',
                 onFetch: (data, source) => this.loadSourceData(data, source),
                 onEdit: (source) => this.onSourceEdit(source),
                 showEditButton: true,
@@ -1435,7 +1435,7 @@ class JsonFormatter {
             console.error('Failed to initialize source selector:', error);
             // Fallback to old method if the new loader fails
             this.sourceSelector = new SourceSelector({
-                containerId: 'jsonFormatterSourceSelector',
+                containerId: 'jsonToolSourceSelector',
                 onFetch: (data, source) => this.loadSourceData(data, source),
                 onEdit: (source) => this.onSourceEdit(source),
                 showEditButton: true,
@@ -1701,12 +1701,12 @@ function toggleCollapse(element) {
 
 // Export for testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = JsonFormatter;
+    module.exports = JsonTool;
 }
 
 // Initialize when DOM is loaded (only in browser environment)
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-        window.jsonFormatter = new JsonFormatter();
+        window.jsonTool = new JsonTool();
     });
 }

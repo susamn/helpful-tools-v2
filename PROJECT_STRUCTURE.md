@@ -25,7 +25,7 @@ helpful-tools-v2/
 ├── frontend/                     # 🎨 Frontend Resources
 │   ├── tools/                    # 📄 HTML tool templates
 │   │   ├── cron-parser.html
-│   │   ├── json-formatter.html
+│   │   ├── json-tool.html
 │   │   ├── json-yaml-xml-converter.html
 │   │   ├── jwt-decoder.html
 │   │   ├── regex-tester.html
@@ -37,7 +37,7 @@ helpful-tools-v2/
 │       │   ├── json-yaml-xml-converter.css
 │       │   └── main.css
 │       └── js/                   # ⚡ JavaScript files
-│           ├── json-formatter.js
+│           ├── json-tool.js
 │           ├── json-yaml-xml-converter.js
 │           ├── jwt-decoder.js
 │           └── scientific-calculator.js
@@ -69,8 +69,8 @@ helpful-tools-v2/
 │   ├── scientific-calculator/   # 🧮 Scientific Calculator Tests
 │   │   ├── test_scientific_calculator.py
 │   │   └── validate_scientific_calculator.py
-│   ├── json-formatter/          # 📄 JSON Formatter Tests
-│   │   └── json-formatter.test.js
+│   ├── json-tool/              # 📄 JSON Tool Tests
+│   │   └── json-tool.test.js
 │   └── shared/                  # 🔧 Shared/General Tests
 │       ├── test.py
 │       ├── test_final_history_fix.py

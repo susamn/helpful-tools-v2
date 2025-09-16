@@ -102,9 +102,9 @@ def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
 # Store for tools configuration
 TOOLS = [
     {
-        "name": "JSON Formatter",
+        "name": "JSON Tool",
         "description": "Format, validate, and minify JSON data with history tracking",
-        "path": "/tools/json-formatter",
+        "path": "/tools/json-tool",
         "tags": ["formatter", "json", "validator"],
         "has_history": True,
         "icon": "📄"

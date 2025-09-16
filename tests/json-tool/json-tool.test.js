@@ -1,5 +1,5 @@
 /**
- * Minimal JSON Formatter Test Suite - Essential functionality only
+ * Minimal JSON Tool Test Suite - Essential functionality only
  */
 
 // Simple test framework for Node.js environment
@@ -15,7 +15,7 @@ class TestRunner {
     }
 
     async run() {
-        console.log('🧪 Running JSON Formatter Tests\n');
+        console.log('🧪 Running JSON Tool Tests\n');
         
         for (const test of this.tests) {
             try {

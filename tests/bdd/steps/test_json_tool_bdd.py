@@ -1,5 +1,5 @@
 """
-BDD step definitions for JSON Formatter tool using Selenium WebDriver.
+BDD step definitions for JSON Tool using Selenium WebDriver.
 """
 
 import json
@@ -14,8 +14,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
 
 
-class JSONFormatterPage:
-    """Page Object Model for JSON Formatter tool."""
+class JSONToolPage:
+    """Page Object Model for JSON Tool."""
 
     def __init__(self, driver):
         self.driver = driver
@@ -32,9 +32,9 @@ class JSONFormatterPage:
     SUCCESS_MESSAGE = (By.ID, "success-message")
     LOADING_INDICATOR = (By.CLASS_NAME, "loading")
 
-    def navigate_to_json_formatter(self, base_url):
-        """Navigate to the JSON formatter page."""
-        self.driver.get(f"{base_url}/json-formatter.html")
+    def navigate_to_json_tool(self, base_url):
+        """Navigate to the JSON tool page."""
+        self.driver.get(f"{base_url}/json-tool.html")
 
     def wait_for_page_load(self):
         """Wait for page to fully load."""
@@ -116,9 +116,9 @@ class JSONFormatterPage:
 context_data = {}
 
 
-@given('I am on the JSON formatter page')
-def step_navigate_to_json_formatter(context):
-    """Navigate to the JSON formatter page."""
+@given('I am on the JSON tool page')
+def step_navigate_to_json_tool(context):
+    """Navigate to the JSON tool page."""
     # TODO: Set up WebDriver (Chrome headless for CI)
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -127,13 +127,13 @@ def step_navigate_to_json_formatter(context):
 
     # Initialize WebDriver - this would need to be configured
     # context.driver = webdriver.Chrome(options=chrome_options)
-    # context.page = JSONFormatterPage(context.driver)
-    # context.page.navigate_to_json_formatter("http://localhost:5000")
+    # context.page = JSONToolPage(context.driver)
+    # context.page.navigate_to_json_tool("http://localhost:5000")
 
     # Placeholder for now
     context.driver = None
     context.page = None
-    print("TODO: Initialize WebDriver and navigate to JSON formatter page")
+    print("TODO: Initialize WebDriver and navigate to JSON tool page")
 
 
 @given('the page is fully loaded')

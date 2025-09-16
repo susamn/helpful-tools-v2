@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>JSONPath Tests for JSON Formatter</title>
+    <title>JSONPath Tests for JSON Tool</title>
     <script src="https://cdn.jsdelivr.net/npm/jsonpath@1.1.1/jsonpath.min.js"></script>
     <style>
         body { font-family: sans-serif; }
@@ -12,11 +12,11 @@
     </style>
 </head>
 <body>
-    <h1>JSONPath Tests for JSON Formatter</h1>
+    <h1>JSONPath Tests for JSON Tool</h1>
     <div class="results"></div>
 
     <script>
-        // Mock dependencies for JsonFormatter
+        // Mock dependencies for JsonTool
         window.createHistoryManager = () => ({ addHistoryEntry: () => {} });
         window.createSourceSelector = async () => ({ show: () => {} });
         window.validationUtils = { populateValidatorSelect: () => {}, clearValidationStatus: () => {} };
@@ -58,7 +58,7 @@
             <div id="jsonProperties"></div>
         `;
     </script>
-    <script src="../../frontend/static/js/json-formatter.js"></script>
+    <script src="../../frontend/static/js/json-tool.js"></script>
     <script>
         const resultsDiv = document.querySelector('.results');
         let testsRun = 0;
@@ -82,7 +82,7 @@
             }
         }
 
-        const formatter = new JsonFormatter();
+        const formatter = new JsonTool();
         const data = {
             "store": {
                 "book": [
