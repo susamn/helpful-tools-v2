@@ -1,6 +1,7 @@
 {
   "history_limits": {
     "json-tool": 50,
+    "yaml-tool": 50,
     "json-yaml-xml-converter": 40,
     "text-diff": 25,
     "regex-tester": 30,

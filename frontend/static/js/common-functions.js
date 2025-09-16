@@ -12,6 +12,7 @@ function getToolColor(toolName) {
     const colors = {
         // Core tools with unified color scheme
         'json-tool': '#2196F3',           // Blue
+        'yaml-tool': '#673AB7',           // Deep Purple
         'json-yaml-xml-converter': '#4CAF50',  // Green  
         'regex-tester': '#9C27B0',             // Purple
         'text-diff': '#FF9800',                // Orange

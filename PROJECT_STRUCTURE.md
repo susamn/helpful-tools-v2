@@ -26,6 +26,7 @@ helpful-tools-v2/
 │   ├── tools/                    # 📄 HTML tool templates
 │   │   ├── cron-parser.html
 │   │   ├── json-tool.html
+│   │   ├── yaml-tool.html
 │   │   ├── json-yaml-xml-converter.html
 │   │   ├── jwt-decoder.html
 │   │   ├── regex-tester.html
@@ -38,6 +39,7 @@ helpful-tools-v2/
 │       │   └── main.css
 │       └── js/                   # ⚡ JavaScript files
 │           ├── json-tool.js
+│           ├── yaml-tool.js
 │           ├── json-yaml-xml-converter.js
 │           ├── jwt-decoder.js
 │           └── scientific-calculator.js
@@ -71,6 +73,8 @@ helpful-tools-v2/
 │   │   └── validate_scientific_calculator.py
 │   ├── json-tool/              # 📄 JSON Tool Tests
 │   │   └── json-tool.test.js
+│   ├── yaml-tool/              # 📋 YAML Tool Tests
+│   │   └── yaml-tool.test.js
 │   └── shared/                  # 🔧 Shared/General Tests
 │       ├── test.py
 │       ├── test_final_history_fix.py

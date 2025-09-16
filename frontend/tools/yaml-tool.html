@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAML Tool - Helpful Tools v2</title>
+    <link rel="stylesheet" href="/static/css/common-enhancements.css">
+    <link rel="stylesheet" href="/static/css/history.css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            font-size: 13px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 1000;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header a {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            text-decoration: none;
+        }
+
+        .header a:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+
+        .toolbar {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+            position: relative;
+            z-index: 999;
+        }
+
+        .toolbar button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .toolbar button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+
+        .toolbar button.primary {
+            background: linear-gradient(to bottom, #4CAF50, #45a049);
+            color: white;
+            border-color: #45a049;
+        }
+
+        .toolbar button.primary:hover {
+            background: linear-gradient(to bottom, #5CBF60, #4CAF50);
+        }
+
+        .separator {
+            width: 1px;
+            height: 20px;
+            background: #c0c0c0;
+            margin: 0 4px;
+            flex-shrink: 0;
+        }
+
+        .indent-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .indent-controls label {
+            color: #555;
+        }
+        .indent-controls select {
+            font-size: 11px;
+            padding: 2px 4px;
+            border: 1px solid #a0a0a0;
+            background: white;
+        }
+
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+        }
+        .font-controls label {
+            color: #555;
+        }
+        .font-controls button {
+            font-size: 14px;
+            padding: 2px 6px;
+            border: 1px solid #a0a0a0;
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            width: 24px;
+            height: 24px;
+        }
+        .font-controls button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+
+        .search-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            flex: 1;
+        }
+        .search-controls label {
+            color: #555;
+        }
+        .search-controls input {
+            flex: 1;
+            padding: 3px 6px;
+            font-size: 0.85em;
+            font-weight: bold;
+            border: 1px solid #a0a0a0;
+            background: white;
+            min-width: 100px;
+        }
+
+        .main-container {
+            height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+            background: #f0f0f0;
+        }
+
+        .panels-container {
+            flex: 1;
+            display: flex;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            border: 1px solid #c0c0c0;
+            margin: 0;
+        }
+
+        .panel:first-child {
+            border-right: none;
+        }
+
+        .panel-header {
+            background: linear-gradient(to bottom, #f8f8f8, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-upload-btn, .copy-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 2px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+
+        .file-upload-btn:hover, .copy-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+
+        .file-path-label {
+            font-size: 10px;
+            color: #666;
+            margin-right: 8px;
+        }
+
+        .panel-content {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-textarea {
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            resize: none;
+            background: #ffffff;
+            overflow: auto;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            box-sizing: border-box;
+        }
+
+        .panel-textarea:focus {
+            background: #fffef7;
+        }
+
+        .formatted-output {
+            flex: 1;
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            background: #ffffff;
+            overflow: auto;
+            white-space: pre;
+            border: none;
+            outline: none;
+        }
+
+        .status-bar {
+            background: linear-gradient(to bottom, #e8e8e8, #d8d8d8);
+            border-top: 1px solid #c0c0c0;
+            padding: 4px 12px;
+            font-size: 11px;
+            color: #555;
+            display: flex;
+            gap: 16px;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            gap: 4px;
+        }
+
+        .validation-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+        }
+
+        .validation-status {
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .validation-controls select {
+            font-size: 10px;
+            padding: 1px 3px;
+            border: 1px solid #a0a0a0;
+            background: white;
+        }
+
+        .validation-controls button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 1px 4px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+
+        /* YAML specific syntax highlighting */
+        .yaml-key { color: #1976d2; font-weight: bold; }
+        .yaml-string { color: #388e3c; }
+        .yaml-number { color: #f57c00; }
+        .yaml-boolean { color: #7b1fa2; }
+        .yaml-null { color: #616161; font-style: italic; }
+        .yaml-comment { color: #757575; font-style: italic; }
+        .yaml-anchor { color: #e91e63; }
+        .yaml-alias { color: #e91e63; font-style: italic; }
+        .yaml-multiline { color: #795548; }
+        .yaml-array { color: #ff5722; }
+
+        /* Collapsible elements */
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+        .collapsible:hover {
+            background-color: #f0f0f0;
+        }
+
+        /* Messages */
+        .error-message, .success-message {
+            position: fixed;
+            top: 60px;
+            right: 16px;
+            padding: 12px 20px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 9999;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: none;
+            max-width: 300px;
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #d32f2f;
+            border: 1px solid #ffcdd2;
+        }
+
+        .success-message {
+            background: #e8f5e8;
+            color: #388e3c;
+            border: 1px solid #c8e6c9;
+        }
+
+        /* Autocomplete Styles */
+        .dqs-dropdown {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 1000;
+            min-width: 250px;
+        }
+
+        .dqs-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            position: relative;
+            display: block;
+        }
+
+        .dqs-item:last-child {
+            border-bottom: none;
+        }
+
+        .dqs-item:hover {
+            background: #f0f8ff;
+        }
+
+        .dqs-item.selected {
+            background: #4a90e2;
+            color: white;
+        }
+
+        .dqs-item.selected:hover {
+            background: #357abd;
+        }
+
+        .dqs-suggestion-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .dqs-suggestion-text {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .dqs-item.selected .dqs-suggestion-text {
+            color: white;
+        }
+
+        .dqs-suggestion-description {
+            font-size: 11px;
+            opacity: 0.8;
+            color: #666;
+        }
+
+        .dqs-item.selected .dqs-suggestion-description {
+            color: rgba(255,255,255,0.9);
+        }
+
+        .dqs-suggestion-value {
+            font-size: 10px;
+            font-style: italic;
+            opacity: 0.7;
+            color: #888;
+        }
+
+        .dqs-item.selected .dqs-suggestion-value {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .dqs-suggestion-type {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #666;
+        }
+
+        .dqs-item.selected .dqs-suggestion-type {
+            background: rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.9);
+        }
+
+        /* Type-specific colors */
+        .dqs-type-property .dqs-suggestion-text { color: #0066cc; }
+        .dqs-type-list .dqs-suggestion-text { color: #cc6600; }
+        .dqs-type-document .dqs-suggestion-text { color: #6600cc; }
+        .dqs-type-array_element .dqs-suggestion-text { color: #cc6600; }
+        .dqs-type-array_wildcard .dqs-suggestion-text { color: #cc6600; }
+        .dqs-type-function .dqs-suggestion-text { color: #6600cc; }
+        .dqs-type-filter .dqs-suggestion-text { color: #cc0066; }
+        .dqs-type-null .dqs-suggestion-text { color: #999999; }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 YAML Tool</h1>
+        <div class="header-actions">
+            <div class="font-controls">
+                <label>Font:</label>
+                <button id="fontDecreaseBtn" title="Decrease font size">−</button>
+                <button id="fontIncreaseBtn" title="Increase font size">+</button>
+            </div>
+            <button class="hist-toggle-btn" id="historyToggleBtn">📝 History On</button>
+            <button class="hist-global-btn" id="globalHistoryBtn">📚 Global History</button>
+            <a href="/">← Back to Tools</a>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <button class="primary" id="formatBtn">Format</button>
+        <button id="minifyBtn">Minify</button>
+        <button id="stringifyBtn">Stringify</button>
+        <div class="separator"></div>
+        <button id="clearBtn">Clear</button>
+        <button id="copyFormattedBtn">Copy Formatted</button>
+        <div class="separator"></div>
+        <button id="expandAllBtn">Expand All</button>
+        <button id="collapseAllBtn">Collapse All</button>
+        <div class="separator"></div>
+        <button id="toggleMarkupBtn">Remove Markup</button>
+        <div class="separator"></div>
+        <div class="indent-controls">
+            <label>Indent:</label>
+            <select id="indentType">
+                <option value="spaces">Spaces</option>
+                <option value="tabs">Tabs</option>
+            </select>
+            <select id="indentSize">
+                <option value="2" selected>2</option>
+                <option value="4">4</option>
+                <option value="6">6</option>
+                <option value="8">8</option>
+            </select>
+        </div>
+        <div class="separator"></div>
+        <div class="search-controls">
+            <label>YAMLPath:</label>
+            <input type="text" id="yamlPathInput" placeholder="e.g., .users[0].name or .data.items[1].id">
+            <button id="clearSearchBtn">Clear</button>
+        </div>
+        <div class="separator"></div>
+        <div class="hist-container">
+            <button class="hist-btn" id="historyBtn">📋 History</button>
+            <div class="hist-popup" id="historyPopup">
+                <div class="hist-tabs">
+                    <button class="hist-tab active" data-tab="history">History</button>
+                    <button class="hist-tab" data-tab="copy">Copy</button>
+                </div>
+                <div class="hist-content" id="historyContent">
+                    <div class="hist-tab-content active" id="historyTab">
+                        <div id="historyList">
+                            <div class="hist-item">No history available</div>
+                        </div>
+                    </div>
+                    <div class="hist-tab-content" id="copyTab" style="display: none;">
+                        <div class="hist-item">Copy features coming soon</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="panels-container">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>Input YAML</span>
+                    <div class="header-controls">
+                        <input type="file" id="fileInput" accept=".yaml,.yml,.txt" style="display: none;">
+                        <span class="file-path-label" id="filePathLabel" style="display: none;"></span>
+                        <button class="file-upload-btn" id="uploadFileBtn" onclick="document.getElementById('fileInput').click()">📁 Upload File</button>
+                        <button class="file-upload-btn" id="loadFromSourceBtn">📂 Load from Source</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <textarea
+                        class="panel-textarea"
+                        id="yamlInput"
+                        placeholder='Paste your YAML data here...
+Example:
+name: "John Doe"
+age: 30
+city: "New York"
+skills:
+  - Python
+  - JavaScript'
+                    ></textarea>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    Formatted Output
+                    <div class="header-controls">
+                        <div class="validation-controls" id="validationControls" style="display: none;">
+                            <div class="validation-status" id="validationStatus"></div>
+                            <select id="validatorSelect" disabled>
+                                <option value="">Select validator...</option>
+                            </select>
+                            <button id="validateBtn" disabled>Validate</button>
+                        </div>
+                        <button class="copy-btn" id="copyBtn">📋 Copy</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <textarea
+                        class="panel-textarea"
+                        id="yamlOutput"
+                        readonly
+                        placeholder="Formatted YAML will appear here..."
+                        style="display: block;"
+                    ></textarea>
+                    <div
+                        class="formatted-output"
+                        id="yamlOutputFormatted"
+                        style="display: none;"
+                    ></div>
+                </div>
+            </div>
+        </div>
+        <div class="status-bar">
+            <div class="status-item">
+                <strong>Status:</strong>
+                <span id="yamlStatus">Ready</span>
+            </div>
+            <div class="status-item">
+                <strong>Size:</strong>
+                <span id="yamlSize">0 chars</span>
+            </div>
+            <div class="status-item">
+                <strong>Lines:</strong>
+                <span id="yamlLines">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Objects:</strong>
+                <span id="yamlObjects">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Arrays:</strong>
+                <span id="yamlArrays">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Properties:</strong>
+                <span id="yamlProperties">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error and success messages -->
+    <div class="error-message" id="errorMessage"></div>
+    <div class="success-message" id="successMessage"></div>
+
+    <!-- Global History Popup -->
+    <div class="hist-global-popup" id="globalHistoryPopup">
+        <div class="hist-global-header">
+            <span>Global History - All Tools</span>
+            <button class="hist-close-btn" onclick="window.historyManager?.toggleGlobalHistory()">×</button>
+        </div>
+        <div class="hist-global-content">
+            <div id="globalHistoryList">
+                <div class="hist-global-item">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include common functions -->
+    <script src="/static/js/common-functions.js"></script>
+
+    <!-- Include history management -->
+    <script src="/static/js/history.js"></script>
+
+    <!-- Include validation utilities -->
+    <script src="/static/js/validation-utils.js"></script>
+
+    <!-- Include source selector -->
+    <script src="/static/js/source-selector.js"></script>
+    <script src="/static/js/source-selector-loader.js"></script>
+
+    <!-- Include YAML parsing library -->
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+
+    <!-- Include document query suggestions framework -->
+    <script src="/static/js/document-query-suggestions/core/DocumentParser.js"></script>
+    <script src="/static/js/document-query-suggestions/core/QueryEvaluator.js"></script>
+    <script src="/static/js/document-query-suggestions/core/SuggestionEngine.js"></script>
+    <script src="/static/js/document-query-suggestions/parsers/YAMLDocumentParser.js"></script>
+    <script src="/static/js/document-query-suggestions/evaluators/YQEvaluator.js"></script>
+    <script src="/static/js/document-query-suggestions/adapters/AutocompleteAdapter.js"></script>
+    <script src="/static/js/document-query-suggestions/index.js"></script>
+
+    <script src="/static/js/yaml-tool.js"></script>
+</body>
+</html>

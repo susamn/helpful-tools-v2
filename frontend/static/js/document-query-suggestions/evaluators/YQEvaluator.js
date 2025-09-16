@@ -277,7 +277,7 @@ class YQEvaluator extends QueryEvaluator {
 
             // Handle partial property names
             const lastDotIndex = partialQuery.lastIndexOf('.');
-            if (lastDotIndex > 0) {
+            if (lastDotIndex >= 0) {
                 return this.getPartialPropertySuggestions(document, partialQuery, context, lastDotIndex);
             }
 
@@ -386,6 +386,120 @@ class YQEvaluator extends QueryEvaluator {
         }
 
         return suggestions;
+    }
+
+    /**
+     * Get property suggestions (after .)
+     */
+    getPropertySuggestions(document, partialQuery, context) {
+        const basePath = partialQuery.slice(0, -1); // Remove trailing dot
+
+        try {
+            const result = this.evaluateSingleQuery(document, basePath);
+            if (result.length === 0) return [];
+
+            const target = result[0];
+            const suggestions = [];
+
+            if (Array.isArray(target)) {
+                suggestions.push(
+                    { text: '[]', insertText: '[]', type: 'array_wildcard', description: 'All elements' },
+                    { text: '[0]', insertText: '[0]', type: 'array_element', description: 'First element' }
+                );
+            } else if (typeof target === 'object' && target !== null) {
+                Object.keys(target).forEach(key => {
+                    const value = target[key];
+                    suggestions.push({
+                        text: key,
+                        insertText: key,
+                        type: 'property',
+                        description: `Property: ${key}`,
+                        sampleValue: this.getSampleValue(value)
+                    });
+                });
+            }
+
+            return suggestions;
+        } catch (error) {
+            return [];
+        }
+    }
+
+    /**
+     * Get array access suggestions (after [)
+     */
+    getArraySuggestions(document, partialQuery, context) {
+        const basePath = partialQuery.slice(0, -1); // Remove trailing [
+
+        try {
+            const result = this.evaluateSingleQuery(document, basePath);
+            if (result.length === 0) return [];
+
+            const target = result[0];
+            const suggestions = [];
+
+            if (Array.isArray(target)) {
+                suggestions.push(
+                    { text: ']', insertText: ']', type: 'array_wildcard', description: 'All elements' },
+                    { text: '0]', insertText: '0]', type: 'array_element', description: 'First element' }
+                );
+
+                if (target.length > 1) {
+                    suggestions.push(
+                        { text: '1]', insertText: '1]', type: 'array_element', description: 'Second element' },
+                        { text: '-1]', insertText: '-1]', type: 'array_last', description: 'Last element' }
+                    );
+                }
+
+                // Add slice suggestions
+                if (target.length > 2) {
+                    suggestions.push(
+                        { text: '0:2]', insertText: '0:2]', type: 'slice', description: 'First 2 elements' },
+                        { text: '1:]', insertText: '1:]', type: 'slice', description: 'All except first' }
+                    );
+                }
+            }
+
+            return suggestions;
+        } catch (error) {
+            return [];
+        }
+    }
+
+    /**
+     * Get partial property name suggestions
+     */
+    getPartialPropertySuggestions(document, partialQuery, context, lastDotIndex) {
+        const parentPath = partialQuery.substring(0, lastDotIndex);
+        const partialProperty = partialQuery.substring(lastDotIndex + 1);
+
+        try {
+            const result = this.evaluateSingleQuery(document, parentPath);
+            if (result.length === 0) return [];
+
+            const target = result[0];
+            if (typeof target !== 'object' || target === null) return [];
+
+            const suggestions = [];
+            Object.keys(target).forEach(key => {
+                if (key.toLowerCase().startsWith(partialProperty.toLowerCase())) {
+                    const value = target[key];
+                    suggestions.push({
+                        text: key,
+                        insertText: key,
+                        type: 'property',
+                        description: `Property: ${key}`,
+                        sampleValue: this.getSampleValue(value),
+                        replaceStart: context.expressionStart + lastDotIndex + 1,
+                        replaceEnd: context.cursorPosition
+                    });
+                }
+            });
+
+            return suggestions;
+        } catch (error) {
+            return [];
+        }
     }
 
     /**

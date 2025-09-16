@@ -110,6 +110,14 @@ TOOLS = [
         "icon": "📄"
     },
     {
+        "name": "YAML Tool",
+        "description": "Format, validate, and minify YAML data with syntax highlighting",
+        "path": "/tools/yaml-tool",
+        "tags": ["formatter", "yaml", "validator"],
+        "has_history": True,
+        "icon": "📋"
+    },
+    {
         "name": "JSON-YAML-XML Converter",
         "description": "Bidirectional conversion between JSON, YAML, and XML formats with syntax highlighting",
         "path": "/tools/json-yaml-xml-converter",

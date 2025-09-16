@@ -114,8 +114,8 @@ class DocumentQuerySuggestionEngine {
                 displayText: suggestion.displayText || suggestion.text,
                 type: suggestion.type || 'property',
                 description: suggestion.description,
-                replaceStart: context.replaceStart,
-                replaceEnd: context.replaceEnd,
+                replaceStart: suggestion.replaceStart ?? context.replaceStart,
+                replaceEnd: suggestion.replaceEnd ?? context.replaceEnd,
                 insertText: suggestion.insertText || suggestion.text
             }));
         } catch (error) {
