@@ -132,23 +132,26 @@ class JSONPathEvaluator extends QueryEvaluator {
 
         if (Array.isArray(document)) {
             suggestions.push(
-                { text: '$[0]', type: 'array_element', description: 'First element' },
-                { text: '$[*]', type: 'array_wildcard', description: 'All elements' },
-                { text: '$[(@.length-1)]', type: 'array_last', description: 'Last element' }
+                { text: '$[0]', insertText: '$[0]', type: 'array_element', description: 'First element' },
+                { text: '$[*]', insertText: '$[*]', type: 'array_wildcard', description: 'All elements' },
+                { text: '$[(@.length-1)]', insertText: '$[(@.length-1)]', type: 'array_last', description: 'Last element' }
             );
 
             if (document.length > 1) {
                 suggestions.push(
-                    { text: '$[1]', type: 'array_element', description: 'Second element' }
+                    { text: '$[1]', insertText: '$[1]', type: 'array_element', description: 'Second element' }
                 );
             }
         } else if (typeof document === 'object' && document !== null) {
             Object.keys(document).forEach(key => {
+                const value = document[key];
+                const valueType = this.getValueType(value);
                 suggestions.push({
                     text: `$.${key}`,
-                    type: 'property',
-                    description: `Property: ${key}`,
-                    sampleValue: this.getSampleValue(document[key])
+                    insertText: `$.${key}`,
+                    type: valueType,
+                    description: this.getTypeDescription(valueType, key),
+                    sampleValue: this.getSampleValue(value)
                 });
             });
         }
@@ -156,12 +159,14 @@ class JSONPathEvaluator extends QueryEvaluator {
         // Add recursive descent
         suggestions.push({
             text: '$..*',
+            insertText: '$..*',
             type: 'recursive',
             description: 'Recursive descent (all values)'
         });
 
         return suggestions;
     }
+
 
     /**
      * Get property suggestions (after .)
@@ -178,17 +183,35 @@ class JSONPathEvaluator extends QueryEvaluator {
 
             if (Array.isArray(target)) {
                 suggestions.push(
-                    { text: '[0]', type: 'array_element', description: 'First element' },
-                    { text: '[*]', type: 'array_wildcard', description: 'All elements' },
-                    { text: '[(@.length-1)]', type: 'array_last', description: 'Last element' }
+                    {
+                        text: '[0]',
+                        insertText: partialQuery + '[0]',
+                        type: 'array_element',
+                        description: 'First element'
+                    },
+                    {
+                        text: '[*]',
+                        insertText: partialQuery + '[*]',
+                        type: 'array_wildcard',
+                        description: 'All elements'
+                    },
+                    {
+                        text: '[(@.length-1)]',
+                        insertText: partialQuery + '[(@.length-1)]',
+                        type: 'array_last',
+                        description: 'Last element'
+                    }
                 );
             } else if (typeof target === 'object' && target !== null) {
                 Object.keys(target).forEach(key => {
+                    const value = target[key];
+                    const valueType = this.getValueType(value);
                     suggestions.push({
                         text: key,
-                        type: 'property',
-                        description: `Property: ${key}`,
-                        sampleValue: this.getSampleValue(target[key])
+                        insertText: partialQuery + key,
+                        type: valueType,
+                        description: this.getTypeDescription(valueType, key),
+                        sampleValue: this.getSampleValue(value)
                     });
                 });
             }
@@ -214,14 +237,34 @@ class JSONPathEvaluator extends QueryEvaluator {
 
             if (Array.isArray(target)) {
                 suggestions.push(
-                    { text: '*', type: 'array_wildcard', description: 'All elements' },
-                    { text: '0', type: 'array_element', description: 'First element (index 0)' }
+                    {
+                        text: '*]',
+                        insertText: partialQuery + '*]',
+                        type: 'array_wildcard',
+                        description: 'All elements'
+                    },
+                    {
+                        text: '0]',
+                        insertText: partialQuery + '0]',
+                        type: 'array_element',
+                        description: 'First element (index 0)'
+                    }
                 );
 
                 if (target.length > 1) {
                     suggestions.push(
-                        { text: '1', type: 'array_element', description: 'Second element (index 1)' },
-                        { text: '(@.length-1)', type: 'array_last', description: 'Last element' }
+                        {
+                            text: '1]',
+                            insertText: partialQuery + '1]',
+                            type: 'array_element',
+                            description: 'Second element (index 1)'
+                        },
+                        {
+                            text: '(@.length-1)]',
+                            insertText: partialQuery + '(@.length-1)]',
+                            type: 'array_last',
+                            description: 'Last element'
+                        }
                     );
                 }
 
@@ -230,7 +273,8 @@ class JSONPathEvaluator extends QueryEvaluator {
                     const sampleKeys = Object.keys(target[0]).slice(0, 3);
                     sampleKeys.forEach(key => {
                         suggestions.push({
-                            text: `?(@.${key})`,
+                            text: `?(@.${key})]`,
+                            insertText: partialQuery + `?(@.${key})]`,
                             type: 'filter',
                             description: `Filter by ${key} existence`
                         });
@@ -238,13 +282,15 @@ class JSONPathEvaluator extends QueryEvaluator {
                         const sampleValue = target[0][key];
                         if (typeof sampleValue === 'string') {
                             suggestions.push({
-                                text: `?(@.${key} == '${sampleValue}')`,
+                                text: `?(@.${key} == '${sampleValue}')]`,
+                                insertText: partialQuery + `?(@.${key} == '${sampleValue}')]`,
                                 type: 'filter',
                                 description: `Filter by ${key} equals '${sampleValue}'`
                             });
                         } else if (typeof sampleValue === 'number') {
                             suggestions.push({
-                                text: `?(@.${key} > ${sampleValue - 1})`,
+                                text: `?(@.${key} > ${sampleValue - 1})]`,
+                                insertText: partialQuery + `?(@.${key} > ${sampleValue - 1})]`,
                                 type: 'filter',
                                 description: `Filter by ${key} greater than ${sampleValue - 1}`
                             });
@@ -255,9 +301,24 @@ class JSONPathEvaluator extends QueryEvaluator {
                 // Add slice suggestions
                 if (target.length > 2) {
                     suggestions.push(
-                        { text: '0:2', type: 'slice', description: 'First 2 elements (slice)' },
-                        { text: '1:', type: 'slice', description: 'All except first element' },
-                        { text: ':3', type: 'slice', description: 'First 3 elements' }
+                        {
+                            text: '0:2]',
+                            insertText: partialQuery + '0:2]',
+                            type: 'slice',
+                            description: 'First 2 elements (slice)'
+                        },
+                        {
+                            text: '1:]',
+                            insertText: partialQuery + '1:]',
+                            type: 'slice',
+                            description: 'All except first element'
+                        },
+                        {
+                            text: ':3]',
+                            insertText: partialQuery + ':3]',
+                            type: 'slice',
+                            description: 'First 3 elements'
+                        }
                     );
                 }
             }
@@ -285,11 +346,14 @@ class JSONPathEvaluator extends QueryEvaluator {
             const suggestions = [];
             Object.keys(target).forEach(key => {
                 if (key.toLowerCase().startsWith(partialProperty.toLowerCase())) {
+                    const value = target[key];
+                    const valueType = this.getValueType(value);
                     suggestions.push({
                         text: key,
-                        type: 'property',
-                        description: `Property: ${key}`,
-                        sampleValue: this.getSampleValue(target[key])
+                        insertText: parentPath + '.' + key,
+                        type: valueType,
+                        description: this.getTypeDescription(valueType, key),
+                        sampleValue: this.getSampleValue(value)
                     });
                 }
             });
@@ -346,6 +410,37 @@ class JSONPathEvaluator extends QueryEvaluator {
         });
 
         return structure;
+    }
+
+    /**
+     * Enhanced type detection for suggestions
+     */
+    getValueType(value) {
+        if (value === null || value === undefined) return 'null';
+        if (Array.isArray(value)) return 'list';
+        if (typeof value === 'object') return 'document';
+        if (typeof value === 'string') return 'property';
+        if (typeof value === 'number') return 'property';
+        if (typeof value === 'boolean') return 'property';
+        return 'property';
+    }
+
+    /**
+     * Get type-appropriate description
+     */
+    getTypeDescription(type, key) {
+        switch (type) {
+            case 'list':
+                return `Array: ${key}`;
+            case 'document':
+                return `Object: ${key}`;
+            case 'property':
+                return `Property: ${key}`;
+            case 'null':
+                return `Null: ${key}`;
+            default:
+                return `${type}: ${key}`;
+        }
     }
 
     /**

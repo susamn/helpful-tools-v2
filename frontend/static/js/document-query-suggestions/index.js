@@ -20,14 +20,14 @@ const DocumentQuerySuggestions = {
     DocumentParser,
     QueryEvaluator,
 
-    // Parsers
+    // Parsers (conditionally loaded)
     JSONDocumentParser,
-    YAMLDocumentParser,
+    ...(typeof YAMLDocumentParser !== 'undefined' ? { YAMLDocumentParser } : {}),
     // XMLDocumentParser, // Would be added when implemented
 
-    // Evaluators
+    // Evaluators (conditionally loaded)
     JSONPathEvaluator,
-    YQEvaluator,
+    ...(typeof YQEvaluator !== 'undefined' ? { YQEvaluator } : {}),
     // XPathEvaluator, // Would be added when implemented
 
     // Adapters
@@ -203,7 +203,7 @@ const DocumentQuerySuggestions = {
             name: 'Document Query Suggestions',
             version: VERSION,
             description: 'Generic autocomplete library for structured documents',
-            author: 'Generated with Claude Code',
+            author: '',
             supportedFormats: this.getSupportedFormats(),
             features: [
                 'Multi-format document parsing',
@@ -231,17 +231,25 @@ if (typeof module !== 'undefined' && module.exports) {
     window.DocumentQuerySuggestions = DocumentQuerySuggestions;
 
     // Also export individual classes to global scope for convenience
-    Object.assign(window, {
+    const globalExports = {
         DocumentQuerySuggestionEngine,
         DocumentCache,
         DocumentParser,
         QueryEvaluator,
         JSONDocumentParser,
-        YAMLDocumentParser,
         JSONPathEvaluator,
-        YQEvaluator,
         AutocompleteAdapter
-    });
+    };
+
+    // Conditionally add parsers/evaluators if they exist
+    if (typeof YAMLDocumentParser !== 'undefined') {
+        globalExports.YAMLDocumentParser = YAMLDocumentParser;
+    }
+    if (typeof YQEvaluator !== 'undefined') {
+        globalExports.YQEvaluator = YQEvaluator;
+    }
+
+    Object.assign(window, globalExports);
 }
 
 // Auto-initialize if in browser and DOM is ready
@@ -322,9 +330,12 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
             /* Type-specific colors */
             .dqs-type-property .dqs-suggestion-text { color: #0066cc; }
+            .dqs-type-list .dqs-suggestion-text { color: #cc6600; }
+            .dqs-type-document .dqs-suggestion-text { color: #6600cc; }
             .dqs-type-array_element .dqs-suggestion-text { color: #cc6600; }
             .dqs-type-function .dqs-suggestion-text { color: #6600cc; }
             .dqs-type-filter .dqs-suggestion-text { color: #cc0066; }
+            .dqs-type-null .dqs-suggestion-text { color: #999999; }
         `;
         document.head.appendChild(style);
     }

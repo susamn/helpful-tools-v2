@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSONL Schema Inference Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .test-section {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        .test-section h2 {
+            color: #495057;
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 8px;
+        }
+        textarea {
+            width: 100%;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #ffffff;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        input[type="text"]:focus, textarea:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .test-results {
+            background: #ffffff;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .success { color: #28a745; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+        .test-case {
+            background: #f1f3f4;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .test-case h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .expected-results {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .expected-results h4 {
+            margin: 0 0 10px 0;
+            color: #155724;
+        }
+
+        /* Autocomplete Styles */
+        .dqs-dropdown {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 1000;
+            position: absolute;
+        }
+        .dqs-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            position: relative;
+        }
+        .dqs-item:last-child {
+            border-bottom: none;
+        }
+        .dqs-item:hover {
+            background: #f0f8ff;
+        }
+        .dqs-item.selected {
+            background: #007acc;
+            color: white;
+        }
+        .dqs-suggestion-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .dqs-suggestion-text {
+            font-weight: 600;
+        }
+        .dqs-suggestion-description {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+        .dqs-suggestion-value {
+            font-size: 10px;
+            font-style: italic;
+            opacity: 0.7;
+        }
+        .dqs-suggestion-type {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 2px;
+            font-size: 9px;
+            text-transform: uppercase;
+        }
+        .dqs-item.selected .dqs-suggestion-type {
+            background: rgba(255,255,255,0.2);
+        }
+        .dqs-type-property .dqs-suggestion-text { color: #0066cc; }
+        .dqs-type-array_element .dqs-suggestion-text { color: #cc6600; }
+        .dqs-type-function .dqs-suggestion-text { color: #6600cc; }
+        .dqs-type-filter .dqs-suggestion-text { color: #cc0066; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 JSONL Schema Inference Test</h1>
+        <p class="subtitle">Testing improved schema detection for varying JSONL document structures</p>
+
+        <div class="test-section">
+            <h2>📋 Test Cases</h2>
+
+            <div class="test-case">
+                <h3>Test Case 1: Sparse Fields</h3>
+                <p>Fields that appear only in later documents should be detected</p>
+                <div class="expected-results">
+                    <h4>Expected Suggestions:</h4>
+                    <code>$.name, $.age, $.premium, $.country, $.department</code>
+                </div>
+            </div>
+
+            <div class="test-case">
+                <h3>Test Case 2: Complex Nested Variations</h3>
+                <p>Different nested structures across documents</p>
+                <div class="expected-results">
+                    <h4>Expected Suggestions:</h4>
+                    <code>$.user, $.metadata, $.profile, $.settings, $.analytics</code>
+                </div>
+            </div>
+
+            <div class="test-case">
+                <h3>Test Case 3: Large Dataset Sampling</h3>
+                <p>Efficient sampling from large JSONL files while capturing schema diversity</p>
+                <div class="expected-results">
+                    <h4>Expected Behavior:</h4>
+                    <code>Should sample representative objects, not just first N</code>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔬 Test Data</h2>
+            <textarea id="jsonlData" rows="12">{"name": "Alice Johnson", "age": 25, "email": "alice@example.com"}
+{"name": "Bob Smith", "age": 30, "email": "bob@example.com"}
+{"name": "Carol Wilson", "age": 35, "email": "carol@example.com"}
+{"name": "Dave Brown", "age": 40, "email": "dave@example.com", "premium": true}
+{"name": "Eve Davis", "age": 28, "country": "USA", "email": "eve@example.com"}
+{"name": "Frank Miller", "age": 45, "department": "Engineering", "email": "frank@example.com"}
+{"user": {"id": 7, "name": "Grace Lee"}, "metadata": {"created": "2024-01-07"}}
+{"profile": {"name": "Henry Wilson", "bio": "Developer"}, "settings": {"theme": "dark"}}
+{"analytics": {"views": 1000, "clicks": 50}, "name": "Content A"}
+{"name": "Irene Foster", "age": 32, "premium": true, "country": "Canada"}</textarea>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="loadTestCase1()">Load Sparse Fields Test</button>
+                <button class="btn-primary" onclick="loadTestCase2()">Load Nested Variations Test</button>
+                <button class="btn-primary" onclick="loadTestCase3()">Load Large Dataset Test</button>
+                <button class="btn-secondary" onclick="clearData()">Clear</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Interactive Testing</h2>
+            <p>Type JSONPath queries to test schema inference. Try typing <code>$.</code> to see all detected fields:</p>
+            <input type="text" id="jsonPathQuery" placeholder="Type JSONPath query (e.g., $.)" autocomplete="off">
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="runSchemaAnalysis()">🔍 Analyze Schema</button>
+                <button class="btn-primary" onclick="testRepresentativeObjects()">📊 Test Representative Sampling</button>
+                <button class="btn-secondary" onclick="clearResults()">Clear Results</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Test Results</h2>
+            <div id="testResults" class="test-results">🚀 Ready to test! Load test data and run schema analysis.
+
+Expected workflow:
+1. Load a test case or use the default JSONL data
+2. Run "Analyze Schema" to see detected fields
+3. Type queries in the input field to test autocomplete
+4. Verify that sparse fields (premium, country, department) are detected
+</div>
+        </div>
+    </div>
+
+    <!-- Document Query Suggestions Library -->
+    <script src="/static/js/document-query-suggestions/core/DocumentParser.js"></script>
+    <script src="/static/js/document-query-suggestions/core/QueryEvaluator.js"></script>
+    <script src="/static/js/document-query-suggestions/core/DocumentCache.js"></script>
+    <script src="/static/js/document-query-suggestions/core/SuggestionEngine.js"></script>
+    <script src="/static/js/document-query-suggestions/parsers/JSONDocumentParser.js"></script>
+    <script src="/static/js/document-query-suggestions/evaluators/JSONPathEvaluator.js"></script>
+    <script src="/static/js/document-query-suggestions/adapters/AutocompleteAdapter.js"></script>
+    <script src="/static/js/document-query-suggestions/index.js"></script>
+
+    <script>
+        let engine = null;
+        let autocompleteAdapter = null;
+        const results = document.getElementById('testResults');
+        const jsonlData = document.getElementById('jsonlData');
+        const queryInput = document.getElementById('jsonPathQuery');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'info';
+            results.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            results.innerHTML = '';
+        }
+
+        function clearData() {
+            jsonlData.value = '';
+            clearResults();
+        }
+
+        function loadTestCase1() {
+            jsonlData.value = `{"name": "Alice Johnson", "age": 25, "email": "alice@example.com"}
+{"name": "Bob Smith", "age": 30, "email": "bob@example.com"}
+{"name": "Carol Wilson", "age": 35, "email": "carol@example.com"}
+{"name": "Dave Brown", "age": 40, "email": "dave@example.com", "premium": true}
+{"name": "Eve Davis", "age": 28, "country": "USA", "email": "eve@example.com"}
+{"name": "Frank Miller", "age": 45, "department": "Engineering", "email": "frank@example.com"}
+{"name": "Grace Lee", "age": 29, "premium": true, "country": "Canada", "department": "Marketing"}`;
+            log('✅ Loaded Test Case 1: Sparse Fields', 'success');
+        }
+
+        function loadTestCase2() {
+            jsonlData.value = `{"user": {"id": 1, "name": "Alice", "profile": {"bio": "Engineer"}}, "metadata": {"created": "2024-01-01"}}
+{"profile": {"name": "Bob", "skills": ["JS", "Python"]}, "settings": {"theme": "dark", "notifications": true}}
+{"analytics": {"views": 1000, "clicks": 50}, "user": {"name": "Carol"}}
+{"settings": {"language": "en"}, "metadata": {"version": "1.0"}, "profile": {"name": "Dave"}}
+{"user": {"id": 5, "name": "Eve"}, "analytics": {"impressions": 2000}, "custom": {"tags": ["important"]}}`;
+            log('✅ Loaded Test Case 2: Nested Variations', 'success');
+        }
+
+        function loadTestCase3() {
+            const largeDataset = [];
+            for (let i = 1; i <= 50; i++) {
+                const obj = {
+                    id: i,
+                    name: `User ${i}`,
+                    email: `user${i}@example.com`
+                };
+
+                // Add variations at different intervals
+                if (i % 10 === 0) obj.premium = true;
+                if (i % 15 === 0) obj.country = ['USA', 'Canada', 'UK'][i % 3];
+                if (i % 20 === 0) obj.department = ['Engineering', 'Marketing', 'Sales'][i % 3];
+                if (i % 25 === 0) obj.settings = { theme: 'dark', notifications: true };
+                if (i % 30 === 0) obj.analytics = { views: i * 100, clicks: i * 5 };
+
+                largeDataset.push(JSON.stringify(obj));
+            }
+
+            jsonlData.value = largeDataset.join('\n');
+            log('✅ Loaded Test Case 3: Large Dataset (50 objects)', 'success');
+        }
+
+        async function initializeEngine() {
+            try {
+                if (!jsonlData.value.trim()) {
+                    log('❌ No JSONL data provided', 'error');
+                    return false;
+                }
+
+                engine = new DocumentQuerySuggestionEngine('json', 'jsonpath');
+                await engine.initialize(jsonlData.value);
+
+                // Setup autocomplete
+                if (autocompleteAdapter) {
+                    autocompleteAdapter.destroy?.();
+                }
+
+                autocompleteAdapter = new AutocompleteAdapter(queryInput, {
+                    documentType: 'json',
+                    queryLanguage: 'jsonpath',
+                    maxSuggestions: 20,
+                    debounceMs: 300,
+                    onSelect: (suggestion) => {
+                        log(`🎯 Selected: ${suggestion.text} (${suggestion.type})`, 'success');
+                    },
+                    onError: (error) => {
+                        log(`❌ Error: ${error.message}`, 'error');
+                    }
+                });
+
+                await autocompleteAdapter.setDocument(jsonlData.value);
+                log('🚀 Engine initialized successfully', 'success');
+                return true;
+            } catch (error) {
+                log(`❌ Failed to initialize engine: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function runSchemaAnalysis() {
+            log('🔍 Starting schema analysis...', 'info');
+
+            if (!await initializeEngine()) return;
+
+            try {
+                // Test the parser directly
+                const parser = new JSONDocumentParser();
+                const document = await parser.parse(jsonlData.value);
+
+                if (document._jsonlFormat) {
+                    log(`📄 Detected JSONL format with ${document._lineCount} objects`, 'info');
+
+                    // Test representative object selection
+                    const representative = parser.getRepresentativeObjects(document.objects);
+                    log(`🎯 Selected ${representative.length} representative objects from ${document.objects.length} total`, 'info');
+
+                    // Analyze schema diversity
+                    const schemaSets = new Set();
+                    document.objects.forEach((obj, idx) => {
+                        if (typeof obj === 'object' && obj !== null) {
+                            const keys = Object.keys(obj).sort().join(',');
+                            schemaSets.add(keys);
+                        }
+                    });
+                    log(`🔍 Found ${schemaSets.size} unique schema patterns`, 'info');
+
+                    // Test root suggestions
+                    const rootSuggestions = parser.getRootSuggestions(document);
+                    log(`📋 Generated ${rootSuggestions.length} root suggestions:`, 'success');
+                    rootSuggestions.forEach(suggestion => {
+                        log(`   • ${suggestion.text} (${suggestion.type}) - ${suggestion.description}`, 'info');
+                    });
+
+                    // Test path extraction
+                    const paths = await parser.extractPaths(document, 3);
+                    log(`🛤️  Extracted ${paths.length} unique paths`, 'success');
+
+                    // Verify sparse field detection
+                    const allKeys = new Set();
+                    document.objects.forEach(obj => {
+                        if (typeof obj === 'object' && obj !== null) {
+                            Object.keys(obj).forEach(key => allKeys.add(key));
+                        }
+                    });
+                    log(`🗝️  Total unique keys across all objects: ${Array.from(allKeys).sort().join(', ')}`, 'success');
+
+                } else {
+                    log('📄 Detected regular JSON format', 'info');
+                }
+
+                log('✅ Schema analysis completed successfully', 'success');
+
+            } catch (error) {
+                log(`❌ Schema analysis failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRepresentativeObjects() {
+            log('📊 Testing representative object sampling...', 'info');
+
+            try {
+                const parser = new JSONDocumentParser();
+                const document = await parser.parse(jsonlData.value);
+
+                if (!document._jsonlFormat) {
+                    log('⚠️  Not a JSONL document, skipping representative object test', 'warning');
+                    return;
+                }
+
+                const allObjects = document.objects;
+                const representative = parser.getRepresentativeObjects(allObjects, 10);
+
+                log(`📈 Original dataset: ${allObjects.length} objects`, 'info');
+                log(`🎯 Representative sample: ${representative.length} objects`, 'info');
+
+                // Analyze what schemas were captured
+                const originalSchemas = new Map();
+                const representativeSchemas = new Map();
+
+                allObjects.forEach((obj, idx) => {
+                    if (typeof obj === 'object' && obj !== null) {
+                        const schema = Object.keys(obj).sort().join(',');
+                        if (!originalSchemas.has(schema)) {
+                            originalSchemas.set(schema, []);
+                        }
+                        originalSchemas.get(schema).push(idx);
+                    }
+                });
+
+                representative.forEach((obj, idx) => {
+                    if (typeof obj === 'object' && obj !== null) {
+                        const schema = Object.keys(obj).sort().join(',');
+                        if (!representativeSchemas.has(schema)) {
+                            representativeSchemas.set(schema, []);
+                        }
+                        representativeSchemas.get(schema).push(idx);
+                    }
+                });
+
+                log(`🔍 Original unique schemas: ${originalSchemas.size}`, 'info');
+                log(`✅ Representative schemas captured: ${representativeSchemas.size}`, 'success');
+
+                const coverage = (representativeSchemas.size / originalSchemas.size * 100).toFixed(1);
+                log(`📊 Schema coverage: ${coverage}%`, coverage >= 90 ? 'success' : coverage >= 70 ? 'warning' : 'error');
+
+                // Show schema details
+                log('📋 Schema breakdown:', 'info');
+                originalSchemas.forEach((indices, schema) => {
+                    const captured = representativeSchemas.has(schema);
+                    const status = captured ? '✅' : '❌';
+                    log(`   ${status} [${schema}] (${indices.length} objects)`, captured ? 'success' : 'error');
+                });
+
+            } catch (error) {
+                log(`❌ Representative object test failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Initialize with default test case on load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTestCase1();
+            log('🎉 JSONL Schema Inference Test initialized', 'success');
+            log('💡 Try typing "$." in the query input to see all detected fields', 'info');
+        });
+    </script>
+</body>
+</html>

@@ -186,7 +186,7 @@ class DocumentQuerySuggestionEngine {
     getRootSuggestions() {
         if (!this.currentDocument) return [];
 
-        return this.parser.getRootSuggestions(this.currentDocument);
+        return this.evaluator.getRootSuggestions(this.currentDocument);
     }
 
     /**

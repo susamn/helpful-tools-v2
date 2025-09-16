@@ -146,12 +146,34 @@ class DocumentParser {
     }
 
     /**
-     * Utility methods to be overridden by specific parsers
+     * Enhanced type detection for suggestions
      */
     getValueType(value) {
-        if (value === null) return 'null';
-        if (Array.isArray(value)) return 'array';
-        return typeof value;
+        if (value === null || value === undefined) return 'null';
+        if (Array.isArray(value)) return 'list';
+        if (typeof value === 'object') return 'document';
+        if (typeof value === 'string') return 'property';
+        if (typeof value === 'number') return 'property';
+        if (typeof value === 'boolean') return 'property';
+        return 'property';
+    }
+
+    /**
+     * Get type-appropriate description
+     */
+    getTypeDescription(type, key) {
+        switch (type) {
+            case 'list':
+                return `Array: ${key}`;
+            case 'document':
+                return `Object: ${key}`;
+            case 'property':
+                return `Property: ${key}`;
+            case 'null':
+                return `Null: ${key}`;
+            default:
+                return `${type}: ${key}`;
+        }
     }
 
     hasChildren(value) {

@@ -5,13 +5,16 @@ A lightweight, generic autocomplete library for structured documents (JSON, YAML
 ## 🎯 Features
 
 - **Multi-format Support**: JSON, YAML, XML documents
+- **Advanced JSONL Support**: Intelligent schema inference for varying document structures
 - **Contextual Suggestions**: Smart autocomplete based on document structure
 - **Multiple Query Languages**: JSONPath, yq, XPath
 - **Union Queries**: Support for comma-separated expressions
+- **Comprehensive Schema Detection**: Finds all fields across entire JSONL datasets
 - **IDE-like Experience**: Keyboard navigation, real-time suggestions
 - **Lightweight**: Modular architecture with minimal dependencies
 - **Extensible**: Easy to add new document types and query languages
 - **Caching**: Intelligent caching for performance
+- **Performance Optimized**: Smart sampling for large datasets
 
 ## 🚀 Quick Start
 
@@ -317,7 +320,45 @@ The library is designed to be easily extensible:
 
 ## 📄 License
 
-Generated with [Claude Code](https://claude.ai/code) - feel free to use and modify!
+Proprietary - For licensing information, please contact the author.
+
+## 🧠 Advanced Schema Inference
+
+The library includes intelligent schema inference for JSONL files with varying document structures:
+
+### Key Features
+- **Sparse Field Detection**: Finds fields that exist in only some documents
+- **Representative Sampling**: Efficiently samples large datasets for schema diversity
+- **Schema Variation Detection**: Identifies documents with different field structures
+- **Complete Coverage**: Ensures all possible fields are discovered
+
+### Example
+```jsonl
+{"name": "Alice", "age": 25}
+{"name": "Bob", "age": 30}
+{"name": "Carol", "premium": true}    // sparse field
+{"name": "Dave", "country": "USA"}   // sparse field
+```
+
+**Result**: Autocomplete suggests `$.name`, `$.age`, `$.premium`, `$.country` - all fields detected!
+
+See [Schema Inference Documentation](docs/SCHEMA_INFERENCE.md) for detailed information.
+
+## 🧪 Testing
+
+### Interactive Tests
+- **Schema Inference Test**: `/tests/jsonl-schema-inference-test.html`
+- **Unit Tests**: `/tests/schema-inference.test.js`
+
+### Running Tests
+```html
+<!-- Load test page -->
+<script src="tests/schema-inference.test.js"></script>
+<script>
+const tests = new SchemaInferenceTests();
+tests.runAllTests();
+</script>
+```
 
 ## 🔮 Future Enhancements
 
@@ -328,6 +369,7 @@ Generated with [Claude Code](https://claude.ai/code) - feel free to use and modi
 - **Plugins**: Plugin system for custom extensions
 - **TypeScript**: Full TypeScript definitions
 - **Package Managers**: npm, yarn, CDN distribution
+- **Schema Learning**: Machine learning for schema prediction
 
 ---
 

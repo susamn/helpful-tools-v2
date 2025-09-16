@@ -58,13 +58,45 @@ class JSONDocumentParser extends DocumentParser {
             }
         }
 
-        // Return metadata about JSONL format
-        return {
-            _jsonlFormat: true,
-            _lineCount: objects.length,
-            _sampleObjects: objects.slice(0, this.options.jsonlSampleSize),
-            objects: objects
-        };
+        // For JSONL, return a merged schema object that represents all possible fields
+        return this.createJsonlMergedSchema(objects);
+    }
+
+    /**
+     * Create merged schema object from JSONL objects
+     */
+    createJsonlMergedSchema(objects) {
+        if (objects.length === 0) {
+            return {};
+        }
+
+        // Get representative objects for schema diversity
+        const representativeObjects = this.getRepresentativeObjects(objects, 10);
+
+        // Merge all fields from representative objects
+        const mergedSchema = {};
+
+        for (const obj of representativeObjects) {
+            if (typeof obj === 'object' && obj !== null) {
+                for (const [key, value] of Object.entries(obj)) {
+                    // If we haven't seen this key, or we have a null value, use the new value
+                    if (!(key in mergedSchema) || mergedSchema[key] === null) {
+                        mergedSchema[key] = value;
+                    }
+                    // If we have different types for the same key, prefer non-null/non-undefined
+                    else if (value !== null && value !== undefined) {
+                        // Keep the more complex type (object > array > primitive)
+                        if (typeof value === 'object' && typeof mergedSchema[key] !== 'object') {
+                            mergedSchema[key] = value;
+                        } else if (Array.isArray(value) && !Array.isArray(mergedSchema[key]) && typeof mergedSchema[key] !== 'object') {
+                            mergedSchema[key] = value;
+                        }
+                    }
+                }
+            }
+        }
+
+        return mergedSchema;
     }
 
     /**
@@ -97,72 +129,46 @@ class JSONDocumentParser extends DocumentParser {
      * Extract paths from JSON document
      */
     async extractPaths(document, maxDepth = null) {
-        if (document._jsonlFormat) {
-            return this.extractJsonlPaths(document, maxDepth);
-        }
+        // Now all documents (including JSONL) are regular objects
         return super.extractPaths(document, maxDepth);
     }
 
-    /**
-     * Extract paths from JSONL document
-     */
-    extractJsonlPaths(jsonlDocument, maxDepth = null) {
-        const depth = maxDepth ?? this.options.maxDepth;
-        const allPaths = new Set();
 
-        // Extract paths from sample objects
-        for (const obj of jsonlDocument._sampleObjects) {
-            const paths = new Set();
-            this.traverseDocument(obj, '', paths, 0, depth);
-            paths.forEach(path => allPaths.add(path));
+    /**
+     * Get representative objects that capture schema variations
+     */
+    getRepresentativeObjects(allObjects, maxSample = 10) {
+        if (allObjects.length <= maxSample) {
+            return allObjects;
         }
 
-        return Array.from(allPaths);
-    }
+        const representative = new Set();
+        const seenKeysets = new Set();
 
-    /**
-     * Get root suggestions for JSON
-     */
-    getRootSuggestions(document) {
-        if (document._jsonlFormat) {
-            // For JSONL, use first object structure
-            const firstObj = document._sampleObjects[0];
-            if (!firstObj) return [];
-
-            if (Array.isArray(firstObj)) {
-                return [
-                    { text: '$[0]', type: 'array_element', description: 'First element' },
-                    { text: '$[*]', type: 'array_wildcard', description: 'All elements' },
-                    { text: '$[(@.length-1)]', type: 'array_element', description: 'Last element' }
-                ];
-            } else if (typeof firstObj === 'object' && firstObj !== null) {
-                return Object.keys(firstObj).map(key => ({
-                    text: `$.${key}`,
-                    type: 'property',
-                    description: `Property: ${key}`,
-                    sampleValue: this.getSampleValue(firstObj[key])
-                }));
-            }
-        } else {
-            // Regular JSON
-            if (Array.isArray(document)) {
-                return [
-                    { text: '$[0]', type: 'array_element', description: 'First element' },
-                    { text: '$[*]', type: 'array_wildcard', description: 'All elements' },
-                    { text: '$[(@.length-1)]', type: 'array_element', description: 'Last element' }
-                ];
-            } else if (typeof document === 'object' && document !== null) {
-                return Object.keys(document).map(key => ({
-                    text: `$.${key}`,
-                    type: 'property',
-                    description: `Property: ${key}`,
-                    sampleValue: this.getSampleValue(document[key])
-                }));
+        // Always include first few objects
+        for (let i = 0; i < Math.min(3, allObjects.length); i++) {
+            representative.add(allObjects[i]);
+            if (typeof allObjects[i] === 'object' && allObjects[i] !== null) {
+                seenKeysets.add(JSON.stringify(Object.keys(allObjects[i]).sort()));
             }
         }
 
-        return [];
+        // Sample more objects to find schema variations
+        const sampleStep = Math.max(1, Math.floor(allObjects.length / maxSample));
+        for (let i = 3; i < allObjects.length && representative.size < maxSample; i += sampleStep) {
+            const obj = allObjects[i];
+            if (typeof obj === 'object' && obj !== null) {
+                const keyset = JSON.stringify(Object.keys(obj).sort());
+                if (!seenKeysets.has(keyset)) {
+                    representative.add(obj);
+                    seenKeysets.add(keyset);
+                }
+            }
+        }
+
+        return Array.from(representative);
     }
+
 
     /**
      * Get suggestions for a specific path
