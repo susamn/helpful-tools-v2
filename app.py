@@ -17,16 +17,29 @@ sys.path.insert(0, str(src_path))
 # Now we can import the main Flask application
 from main import app
 
+def get_config_directory():
+    """Get the config directory path."""
+    config_dir = os.environ.get('HELPFUL_TOOLS_CONFIG_DIR')
+    if config_dir:
+        return Path(config_dir)
+
+    # Default to ~/.config/helpful-tools
+    home_dir = Path.home()
+    return home_dir / '.config' / 'helpful-tools'
+
 def write_port_file(port):
     """Write the port number to .port file for other processes to read."""
-    port_file = project_root / ".port"
+    config_dir = get_config_directory()
+    config_dir.mkdir(parents=True, exist_ok=True)  # Ensure config directory exists
+    port_file = config_dir / ".port"
     with open(port_file, 'w') as f:
         f.write(str(port))
     print(f"📝 Port {port} written to {port_file}")
 
 def cleanup_port_file():
     """Remove the .port file on shutdown."""
-    port_file = project_root / ".port"
+    config_dir = get_config_directory()
+    port_file = config_dir / ".port"
     if port_file.exists():
         port_file.unlink()
         print("🗑️  Port file cleaned up")
