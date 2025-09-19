@@ -106,12 +106,7 @@ class YamlTool {
         this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
         this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
 
-        // YAMLPath input handling
-        this.elements.yamlPathInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') {
-                this.performYamlPathLookup();
-            }
-        });
+        // Only clear search button - let autocomplete handle the input
         this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
 
         // Input change detection for real-time stats
@@ -191,16 +186,105 @@ class YamlTool {
     initializeYamlPathAutocomplete() {
         try {
             if (typeof AutocompleteAdapter !== 'undefined' && this.elements.yamlPathInput) {
+                // Create autocomplete adapter with hybrid approach
                 this.autocompleteAdapter = new AutocompleteAdapter(this.elements.yamlPathInput, {
-                    documentType: 'yaml',
-                    queryLanguage: 'yq',
+                    documentType: 'json',
+                    queryLanguage: 'jsonpath',
                     maxSuggestions: 10,
-                    debounceMs: 300,
+                    debounceMs: 500, // Increase debounce to 500ms
                     minQueryLength: 1,
                     showDescriptions: true,
                     showSampleValues: true,
                     onSelect: (suggestion) => {
-                        this.elements.yamlPathInput.value = suggestion.query || suggestion.text;
+                        // Get current input value and cursor position
+                        const input = this.elements.yamlPathInput;
+                        const currentValue = input.value;
+                        const cursorPos = input.selectionStart;
+
+                        // Special handling for array suggestions when user types '['
+                        if (currentValue.endsWith('[') && suggestion.text && suggestion.text.includes(']')) {
+                            // For array suggestions, just append the suggestion to current input
+                            const newValue = currentValue + suggestion.text;
+                            input.value = newValue;
+                            input.setSelectionRange(newValue.length, newValue.length);
+                            // Don't auto-execute, let user press Enter when ready
+                            return;
+                        }
+
+                        // Find the start of the current path segment being typed
+                        let segmentStart = 0;
+                        for (let i = cursorPos - 1; i >= 0; i--) {
+                            const char = currentValue[i];
+                            if (char === '.' || char === '[' || char === ' ') {
+                                segmentStart = i + 1;
+                                break;
+                            }
+                        }
+
+                        // Find the end of the current segment
+                        let segmentEnd = currentValue.length;
+                        for (let i = cursorPos; i < currentValue.length; i++) {
+                            const char = currentValue[i];
+                            if (char === '.' || char === '[' || char === ']' || char === ' ') {
+                                segmentEnd = i;
+                                break;
+                            }
+                        }
+
+                        // Get the suggestion text (use query if available, otherwise text)
+                        const suggestionText = suggestion.query || suggestion.text;
+
+                        // Replace only the current segment with the suggestion
+                        const beforeSegment = currentValue.substring(0, segmentStart);
+                        const afterSegment = currentValue.substring(segmentEnd);
+                        const newValue = beforeSegment + suggestionText + afterSegment;
+
+                        // Update input value and cursor position
+                        input.value = newValue;
+                        const newCursorPos = segmentStart + suggestionText.length;
+                        input.setSelectionRange(newCursorPos, newCursorPos);
+
+                        // Don't automatically trigger lookup - let user press Enter when ready
+                        // This prevents the "path is not defined" error on selection
+                    }
+                });
+
+                // Override the autocomplete engine's getSuggestions to handle dot notation
+                if (this.autocompleteAdapter.engine && this.autocompleteAdapter.engine.getSuggestions) {
+                    const originalGetSuggestions = this.autocompleteAdapter.engine.getSuggestions.bind(this.autocompleteAdapter.engine);
+
+                    this.autocompleteAdapter.engine.getSuggestions = async (query, cursorPos) => {
+                        // Transform dot notation to JSONPath for internal processing
+                        let transformedQuery = query;
+                        if (query && !query.startsWith('$')) {
+                            if (query.startsWith('.')) {
+                                transformedQuery = '$' + query;
+                            } else {
+                                transformedQuery = '$.' + query;
+                            }
+                        }
+
+                        // Get suggestions using transformed query
+                        const suggestions = await originalGetSuggestions(transformedQuery, cursorPos);
+
+                        // Transform suggestions back to user-friendly format
+                        return suggestions.map(suggestion => {
+                            if (suggestion.text && suggestion.text.startsWith('$.')) {
+                                return {
+                                    ...suggestion,
+                                    text: suggestion.text.substring(1), // Remove $ prefix
+                                    insertText: suggestion.insertText ? suggestion.insertText.substring(1) : suggestion.text.substring(1),
+                                    displayText: suggestion.text.substring(1)
+                                };
+                            }
+                            return suggestion;
+                        });
+                    };
+                }
+
+                // Add Enter key listener for manual execution
+                this.elements.yamlPathInput.addEventListener('keyup', (e) => {
+                    if (e.key === 'Enter') {
                         this.performYamlPathLookup();
                     }
                 });
@@ -360,7 +444,11 @@ class YamlTool {
                 return;
             }
 
-            this.autocompleteAdapter.setDocument(inputText);
+            // Parse YAML and convert to JSON string for JSONPath engine
+            const parsed = jsyaml.load(inputText);
+            const jsonString = JSON.stringify(parsed, null, 2);
+
+            this.autocompleteAdapter.setDocument(jsonString);
         } catch (error) {
             console.error('Failed to update autocomplete document:', error);
         }
@@ -542,8 +630,8 @@ class YamlTool {
     }
 
     async performYamlPathLookup() {
-        const path = this.elements.yamlPathInput.value.trim();
-        if (!path) {
+        const userPath = this.elements.yamlPathInput.value.trim();
+        if (!userPath) {
             this.clearSearch();
             return;
         }
@@ -553,30 +641,49 @@ class YamlTool {
             return;
         }
 
+        // Transform user input to proper JSONPath syntax
+        let jsonPath = userPath;
+        if (userPath.startsWith('.') && !userPath.startsWith('.$')) {
+            jsonPath = '$' + userPath;
+        } else if (!userPath.startsWith('$') && !userPath.startsWith('.')) {
+            jsonPath = '$.' + userPath;
+        }
+
         try {
-            // Use the YQ evaluator if available
-            if (this.autocompleteAdapter && this.autocompleteAdapter.getEngine) {
-                const result = await this.autocompleteAdapter.getEngine().evaluator.evaluate(this.originalOutputData.parsedData, path);
+            // Use JSONPath evaluation
+            let result;
 
-                if (result !== undefined && result.length > 0) {
-                    const resultYaml = jsyaml.dump(result.length === 1 ? result[0] : result, {
-                        indent: this.indentPrefs.type === 'tabs' ? 1 : parseInt(this.indentPrefs.size),
-                        lineWidth: -1,
-                        noRefs: true,
-                        sortKeys: false
-                    });
 
-                    this.displayOutput(resultYaml, result, true);
-                    this.updateStats(resultYaml, result);
-                    this.showMessage(`YAML path query executed: ${path}`, 'success');
-                } else {
-                    this.showMessage('Path not found or returned no results', 'error');
-                }
+            if (this.autocompleteAdapter && this.autocompleteAdapter.engine) {
+                // Use the autocomplete engine (JSONPath)
+                result = await this.autocompleteAdapter.engine.evaluator.evaluate(this.originalOutputData.parsedData, jsonPath);
+            } else if (window.jsonpath && window.jsonpath.query) {
+                // Fallback to direct JSONPath library
+                result = window.jsonpath.query(this.originalOutputData.parsedData, jsonPath);
             } else {
-                this.showMessage('YAML path evaluation not available', 'error');
+                this.showMessage('JSONPath evaluation not available', 'error');
+                return;
+            }
+
+            if (result !== undefined && result.length > 0) {
+                const resultYaml = jsyaml.dump(result.length === 1 ? result[0] : result, {
+                    indent: this.indentPrefs.type === 'tabs' ? 1 : parseInt(this.indentPrefs.size),
+                    lineWidth: -1,
+                    noRefs: true,
+                    sortKeys: false
+                });
+
+                this.displayOutput(resultYaml, result, true);
+                this.updateStats(resultYaml, result);
+                this.showMessage(`YAML path query executed: ${jsonPath}`, 'success');
+            } else {
+                // Don't show error for paths that return no results (common while typing)
+                console.log('Path returned no results:', jsonPath);
             }
         } catch (error) {
-            this.showMessage(`Invalid path expression: ${error.message}`, 'error');
+            // Don't show error messages for incomplete paths during typing
+            // Only log to console for debugging
+            console.log(`Path evaluation error: ${error.message}`);
         }
     }
 
