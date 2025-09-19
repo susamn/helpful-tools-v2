@@ -15,6 +15,7 @@ class JsonTool {
         this.currentSource = null;  // Track current source for validation
         this.autocompleteAdapter = null;  // Generic autocomplete adapter
         this.initializeElements();
+        this.overrideGlobalNotifications(); // Override big notifications with small ones
         this.attachEventListeners();
         this.initializeHistoryManager();
         this.initializeSourceSelector(); // This is now async but we don't need to wait
@@ -71,6 +72,19 @@ class JsonTool {
             jsonObjects: document.getElementById('jsonObjects'),
             jsonArrays: document.getElementById('jsonArrays'),
             jsonProperties: document.getElementById('jsonProperties')
+        };
+    }
+
+    /**
+     * Override global notification system to use small notifications
+     */
+    overrideGlobalNotifications() {
+        // Store reference to this instance for the global override
+        const jsonTool = this;
+
+        // Override the global showStatusMessage function
+        window.showStatusMessage = function(message, type = 'info', duration = 3000) {
+            jsonTool.showMessage(message, type);
         };
     }
 
@@ -988,7 +1002,7 @@ class JsonTool {
                 documentType: 'json',
                 queryLanguage: 'jsonpath',
                 maxSuggestions: 10,
-                debounceMs: 1000,
+                debounceMs: 500,
                 showDescriptions: true,
                 showSampleValues: true,
                 onSelect: (suggestion) => {
@@ -1268,18 +1282,30 @@ class JsonTool {
      */
     showMessage(message, type = 'info') {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `status-message status-${type}`;
+        messageDiv.className = `status-message status-${type} output-notification`;
         messageDiv.textContent = message;
-        
-        this.elements.statusMessages.innerHTML = '';
-        this.elements.statusMessages.appendChild(messageDiv);
-        
-        // Auto-remove after 5 seconds
+
+        // Find the output panel content area
+        const outputPanel = document.querySelector('.panel:nth-child(2) .panel-content');
+        if (outputPanel) {
+            // Remove any existing notifications
+            const existingNotifications = outputPanel.querySelectorAll('.output-notification');
+            existingNotifications.forEach(notification => notification.remove());
+
+            // Add the new notification
+            outputPanel.appendChild(messageDiv);
+        } else {
+            // Fallback to global status messages if panel not found
+            this.elements.statusMessages.innerHTML = '';
+            this.elements.statusMessages.appendChild(messageDiv);
+        }
+
+        // Auto-remove after 2.5 seconds (same as YAML tool)
         setTimeout(() => {
             if (messageDiv.parentNode) {
                 messageDiv.parentNode.removeChild(messageDiv);
             }
-        }, 5000);
+        }, 2500);
     }
 
 

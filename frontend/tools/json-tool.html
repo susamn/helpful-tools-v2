@@ -688,6 +688,62 @@
             z-index: 10000 !important;
         }
 
+        /* Output panel notifications */
+        .output-notification {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 11px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+            max-width: 250px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .output-notification.status-success {
+            border-color: #4CAF50;
+            color: #2E7D32;
+            background: #E8F5E8;
+        }
+
+        .output-notification.status-error {
+            border-color: #F44336;
+            color: #C62828;
+            background: #FFEBEE;
+        }
+
+        .output-notification.status-warning {
+            border-color: #FF9800;
+            color: #F57C00;
+            background: #FFF8E1;
+        }
+
+        .output-notification.status-info {
+            border-color: #2196F3;
+            color: #1565C0;
+            background: #E3F2FD;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Ensure output panel has relative positioning for absolute notifications */
+        .panel-content {
+            position: relative;
+        }
+
     </style>
 </head>
 <body>

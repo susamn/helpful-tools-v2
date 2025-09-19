@@ -915,10 +915,8 @@ class SourceSelector {
         }
     }
 
-    /**
-     * Show explorer panel with directory browser
-     */
-    showExplorerPanel(source, directoryData) {
+showExplorerPanel(source, directoryData) {
+        this.currentExplorerSource = source;
         const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
         const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
         
@@ -959,6 +957,9 @@ class SourceSelector {
                 <div class="file-explorer-header">
                     <span class="explorer-icon">📁</span>
                     <span class="explorer-title">Browse Files & Folders</span>
+                    <div class="panel-header-actions">
+                        <button class="refresh-btn" onclick="window.sourceSelectors?.['${this.options.containerId}']?.refreshExplorer(this)" title="Refresh Explorer">🔄</button>
+                    </div>
                 </div>
                 <div class="file-explorer-details">
                     <strong>Source:</strong> ${this.escapeHtml(source.name)}<br>
@@ -976,6 +977,19 @@ class SourceSelector {
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * Refresh the explorer view
+     */
+    async refreshExplorer(button) {
+        if (this.currentExplorerSource) {
+            // Add spinning animation
+            button.classList.add('spinning');
+            await this.fetchSourceData(this.currentExplorerSource);
+            // Remove spinning animation
+            button.classList.remove('spinning');
+        }
     }
 
     /**
@@ -1099,7 +1113,7 @@ class SourceSelector {
             }
         }
         
-        // Clear current editing source
+        this.currentExplorerSource = null;
         this.currentEditingSource = null;
     }
 

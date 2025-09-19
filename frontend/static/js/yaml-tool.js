@@ -15,6 +15,7 @@ class YamlTool {
         this.currentSource = null;  // Track current source for validation
         this.autocompleteAdapter = null;  // Generic autocomplete adapter
         this.initializeElements();
+        this.overrideGlobalNotifications(); // Override big notifications with small ones
         this.attachEventListeners();
         this.initializeHistoryManager();
         this.initializeSourceSelector(); // This is now async but we don't need to wait
@@ -71,6 +72,19 @@ class YamlTool {
             yamlObjects: document.getElementById('yamlObjects'),
             yamlArrays: document.getElementById('yamlArrays'),
             yamlProperties: document.getElementById('yamlProperties')
+        };
+    }
+
+    /**
+     * Override global notification system to use small notifications
+     */
+    overrideGlobalNotifications() {
+        // Store reference to this instance for the global override
+        const yamlTool = this;
+
+        // Override the global showStatusMessage function
+        window.showStatusMessage = function(message, type = 'info', duration = 3000) {
+            yamlTool.showMessage(message, type);
         };
     }
 
@@ -675,7 +689,7 @@ class YamlTool {
 
                 this.displayOutput(resultYaml, result, true);
                 this.updateStats(resultYaml, result);
-                this.showMessage(`YAML path query executed: ${jsonPath}`, 'success');
+                this.showMessage(`Path query executed: ${userPath}`, 'success');
             } else {
                 // Don't show error for paths that return no results (common while typing)
                 console.log('Path returned no results:', jsonPath);
@@ -989,12 +1003,31 @@ class YamlTool {
     }
 
     showMessage(message, type = 'info') {
-        // Try to use the common showStatusMessage function
-        if (typeof showStatusMessage === 'function') {
-            showStatusMessage(message, type, 3000);
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `status-message status-${type} output-notification`;
+        messageDiv.textContent = message;
+
+        // Find the output panel content area
+        const outputPanel = document.querySelector('.panel:nth-child(2) .panel-content');
+        if (outputPanel) {
+            // Remove any existing notifications
+            const existingNotifications = outputPanel.querySelectorAll('.output-notification');
+            existingNotifications.forEach(notification => notification.remove());
+
+            // Add the new notification
+            outputPanel.appendChild(messageDiv);
         } else {
-            console.log(`[${type.toUpperCase()}] ${message}`);
+            // Fallback to global status messages if panel not found
+            this.elements.statusMessages.innerHTML = '';
+            this.elements.statusMessages.appendChild(messageDiv);
         }
+
+        // Auto-remove after 2.5 seconds (50% less time)
+        setTimeout(() => {
+            if (messageDiv.parentNode) {
+                messageDiv.parentNode.removeChild(messageDiv);
+            }
+        }, 2500);
     }
 }
 

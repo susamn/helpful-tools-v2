@@ -321,6 +321,11 @@
     font-weight: 600;
 }
 
+.refresh-btn:hover {
+    background: #f5f5f5;
+    color: #333;
+}
+
 .explorer-content {
     flex: 1;
     overflow-y: auto;
@@ -742,6 +747,27 @@
     margin-bottom: 12px;
 }
 
+.panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.refresh-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    color: #666;
+    border-radius: 4px;
+}
+
+.refresh-btn:hover {
+    background: #f5f5f5;
+    color: #333;
+}
+
 .explorer-icon {
     font-size: 20px;
     margin-right: 8px;
@@ -752,6 +778,7 @@
     font-weight: 600;
     font-size: 16px;
     color: #28a745;
+    flex: 1;
 }
 
 .file-explorer-details {
@@ -878,7 +905,12 @@
     display: inline-block;
 }
 
-.tree-children.collapsed {
-    display: none;
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinning {
+    animation: spin 1s linear infinite;
 }
 </style>
