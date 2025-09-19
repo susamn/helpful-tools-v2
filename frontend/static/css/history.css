@@ -211,7 +211,7 @@
 }
 
 .hist-global-popup.show {
-    display: block;
+    display: block !important;
 }
 
 .hist-global-header {

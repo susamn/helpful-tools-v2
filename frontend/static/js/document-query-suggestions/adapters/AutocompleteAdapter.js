@@ -127,6 +127,14 @@ class AutocompleteAdapter {
 
         // Handle clicks outside to close
         document.addEventListener('click', (e) => {
+            // Don't close if clicking on history buttons or popups
+            if (e.target.closest('.hist-global-btn') ||
+                e.target.closest('.hist-global-popup') ||
+                e.target.closest('.hist-btn') ||
+                e.target.closest('.hist-popup')) {
+                return;
+            }
+
             if (!this.container.contains(e.target) && !this.dropdown.contains(e.target)) {
                 this.hide();
             }

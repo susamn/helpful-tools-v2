@@ -79,8 +79,8 @@
             gap: 6px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             flex-shrink: 0;
-            overflow-x: auto;
-            white-space: nowrap;
+            flex-wrap: wrap;
+            position: relative;
         }
 
         .toolbar button {
@@ -518,6 +518,7 @@
 
         .hist-container {
             position: relative;
+            z-index: 10000;
         }
 
         .modal-overlay {
@@ -608,13 +609,6 @@
             min-width: 250px;
         }
 
-        /* Override history popup z-index to be above autocomplete */
-        .hist-popup {
-            z-index: 2000 !important;
-        }
-        .hist-global-popup {
-            z-index: 2000 !important;
-        }
 
         .dqs-item {
             padding: 8px 12px;
@@ -703,6 +697,14 @@
         .dqs-type-function .dqs-suggestion-text { color: #6600cc; }
         .dqs-type-filter .dqs-suggestion-text { color: #cc0066; }
         .dqs-type-null .dqs-suggestion-text { color: #999999; }
+
+        /* CRITICAL: Override history popup z-index - must be at the end */
+        .hist-popup {
+            z-index: 10000 !important;
+        }
+        .hist-global-popup {
+            z-index: 10000 !important;
+        }
 
     </style>
 </head>
@@ -863,7 +865,10 @@ skills:
         </div>
     </div>
 
-    <div class="status-messages" id="statusMessages"></div>
+    <div class="status-messages" id="statusMessages">
+        <div id="errorMessage" class="status-message status-error" style="display: none;"></div>
+        <div id="successMessage" class="status-message status-success" style="display: none;"></div>
+    </div>
 
     <!-- Global History Popup -->
     <div class="hist-global-popup" id="globalHistoryPopup">
@@ -892,7 +897,9 @@ skills:
     <script src="/static/js/document-query-suggestions/core/QueryEvaluator.js"></script>
     <script src="/static/js/document-query-suggestions/core/SuggestionEngine.js"></script>
     <script src="/static/js/document-query-suggestions/parsers/YAMLDocumentParser.js"></script>
+    <script src="/static/js/document-query-suggestions/parsers/JSONDocumentParser.js"></script>
     <script src="/static/js/document-query-suggestions/evaluators/YQEvaluator.js"></script>
+    <script src="/static/js/document-query-suggestions/evaluators/JSONPathEvaluator.js"></script>
     <script src="/static/js/document-query-suggestions/adapters/AutocompleteAdapter.js"></script>
     <script src="/static/js/document-query-suggestions/index.js"></script>
 

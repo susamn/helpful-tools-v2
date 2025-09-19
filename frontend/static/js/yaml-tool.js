@@ -95,8 +95,26 @@ class YamlTool {
         };
     }
 
+    initializeHistoryManager() {
+        console.log('Initializing history manager for:', this.toolName);
+        console.log('window.createHistoryManager available:', typeof window.createHistoryManager);
+
+        // Create history manager with callback to load data into input
+        this.historyManager = window.createHistoryManager(this.toolName, (data) => {
+            this.elements.yamlInput.value = data;
+            this.lastInputData = data;
+            this.updateStats();
+        });
+
+        console.log('History manager created:', this.historyManager);
+
+        // Make it globally accessible for HTML onclick handlers
+        window.historyManager = this.historyManager;
+        console.log('window.historyManager set to:', window.historyManager);
+    }
+
     attachEventListeners() {
-        // Action buttons
+        // Main action buttons
         this.elements.formatBtn.addEventListener('click', () => this.formatYaml());
         this.elements.minifyBtn.addEventListener('click', () => this.minifyYaml());
         this.elements.stringifyBtn.addEventListener('click', () => this.stringifyYaml());
@@ -157,10 +175,17 @@ class YamlTool {
 
         // Header history buttons
         if (this.elements.historyToggleBtn) {
+            console.log('Attaching event listener to historyToggleBtn');
             this.elements.historyToggleBtn.addEventListener('click', () => this.toggleHistory());
         }
         if (this.elements.globalHistoryBtn) {
-            this.elements.globalHistoryBtn.addEventListener('click', () => this.toggleGlobalHistory());
+            console.log('Attaching event listener to globalHistoryBtn:', this.elements.globalHistoryBtn);
+            this.elements.globalHistoryBtn.addEventListener('click', () => {
+                console.log('Global history button clicked!');
+                this.toggleGlobalHistory();
+            });
+        } else {
+            console.error('globalHistoryBtn element not found!');
         }
 
         // Input changes
@@ -172,20 +197,6 @@ class YamlTool {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
-    }
-
-    async initializeHistoryManager() {
-        try {
-            if (typeof createHistoryManager === 'function') {
-                this.historyManager = await createHistoryManager(this.toolName);
-                // Make it globally accessible for HTML onclick handlers
-                window.historyManager = this.historyManager;
-            } else {
-                console.warn('History manager not available');
-            }
-        } catch (error) {
-            console.error('Failed to initialize history manager:', error);
-        }
     }
 
     /**
@@ -806,8 +817,12 @@ class YamlTool {
     }
 
     toggleGlobalHistory() {
+        console.log('toggleGlobalHistory called, historyManager:', this.historyManager);
         if (this.historyManager) {
+            console.log('Calling historyManager.toggleGlobalHistory()');
             this.historyManager.toggleGlobalHistory();
+        } else {
+            console.error('historyManager not available');
         }
     }
 
