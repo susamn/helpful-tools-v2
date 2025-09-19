@@ -37,31 +37,12 @@ class HistoryManager {
             globalHistoryList: document.getElementById('globalHistoryList')
         };
 
-        // Debug: Log all elements
-        console.log('HistoryManager elements found:', {
-            historyBtn: !!this.elements.historyBtn,
-            historyToggleBtn: !!this.elements.historyToggleBtn,
-            historyPopup: !!this.elements.historyPopup,
-            historyList: !!this.elements.historyList,
-            globalHistoryBtn: !!this.elements.globalHistoryBtn,
-            globalHistoryPopup: !!this.elements.globalHistoryPopup,
-            globalHistoryList: !!this.elements.globalHistoryList
-        });
-
         // Verify required elements exist
         const requiredElements = ['historyBtn', 'historyToggleBtn', 'historyPopup', 'historyList'];
         for (const elementKey of requiredElements) {
             if (!this.elements[elementKey]) {
                 console.warn(`HistoryManager: Required element '${elementKey}' not found`);
             }
-        }
-
-        // Check global history elements specifically
-        if (!this.elements.globalHistoryPopup) {
-            console.error('HistoryManager: globalHistoryPopup element not found!');
-        }
-        if (!this.elements.globalHistoryList) {
-            console.error('HistoryManager: globalHistoryList element not found!');
         }
     }
 
@@ -345,35 +326,12 @@ class HistoryManager {
      * Toggle global history popup visibility
      */
     toggleGlobalHistory() {
-        console.log('toggleGlobalHistory called in HistoryManager');
-        console.log('globalHistoryPopup element:', this.elements.globalHistoryPopup);
+        if (!this.elements.globalHistoryPopup) return;
 
-        if (!this.elements.globalHistoryPopup) {
-            console.error('No globalHistoryPopup element found, returning early');
-            return;
-        }
-
-        const isCurrentlyShown = this.elements.globalHistoryPopup.classList.contains('show');
-        console.log('Current popup state - isShown:', isCurrentlyShown);
-
-        if (isCurrentlyShown) {
-            console.log('Hiding global history popup');
+        if (this.elements.globalHistoryPopup.classList.contains('show')) {
             this.elements.globalHistoryPopup.classList.remove('show');
         } else {
-            console.log('Showing global history popup');
             this.elements.globalHistoryPopup.classList.add('show');
-
-            // Debug: Check computed styles after adding show class
-            setTimeout(() => {
-                const computedStyle = window.getComputedStyle(this.elements.globalHistoryPopup);
-                console.log('After adding show class - computed display:', computedStyle.display);
-                console.log('After adding show class - computed visibility:', computedStyle.visibility);
-                console.log('After adding show class - computed opacity:', computedStyle.opacity);
-                console.log('After adding show class - computed z-index:', computedStyle.zIndex);
-                console.log('Element classes:', this.elements.globalHistoryPopup.className);
-                console.log('Element position on screen:', this.elements.globalHistoryPopup.getBoundingClientRect());
-            }, 10);
-
             this.loadGlobalHistory(); // Refresh when opening
         }
     }

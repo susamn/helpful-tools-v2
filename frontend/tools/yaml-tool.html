@@ -24,7 +24,6 @@
             display: flex;
             flex-direction: column;
         }
-
         .header {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
             border-bottom: 1px solid #c0c0c0;
@@ -36,19 +35,11 @@
             flex-shrink: 0;
             height: 40px;
         }
-
         .header h1 {
             font-size: 16px;
             color: #333;
             font-weight: 600;
         }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
         .header a {
             background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
             border: 1px solid #a0a0a0;
@@ -59,17 +50,9 @@
             color: #333;
             text-decoration: none;
         }
-
         .header a:hover {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
         }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
         .toolbar {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
             border-bottom: 1px solid #c0c0c0;
@@ -82,7 +65,6 @@
             flex-wrap: wrap;
             position: relative;
         }
-
         .toolbar button {
             background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
             border: 1px solid #a0a0a0;
@@ -91,10 +73,7 @@
             cursor: pointer;
             border-radius: 2px;
             color: #333;
-            white-space: nowrap;
-            flex-shrink: 0;
         }
-
         .toolbar button:hover {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
         }
@@ -102,7 +81,6 @@
             background: linear-gradient(to bottom, #e0e0e0, #f0f0f0);
             box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
         }
-
         .toolbar button.primary {
             background: linear-gradient(to bottom, #4a90e2, #357abd);
             color: white;
@@ -111,14 +89,175 @@
         .toolbar button.primary:hover {
             background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
         }
-
+        .file-upload-btn {
+            background: linear-gradient(to bottom, #e8f4fd, #d1e7ff);
+            border: 1px solid #4a90e2;
+            color: #1565c0;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-upload-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        }
+        .file-path-label {
+            font-size: 10px;
+            font-style: italic;
+            margin-right: 6px;
+            opacity: 0.8;
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #1976d2;
+        }
         .separator {
             width: 1px;
             height: 16px;
             background: #c0c0c0;
             margin: 0 2px;
         }
+        .hist-container {
+            position: relative;
+        }
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .panels-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #c0c0c0;
+            min-width: 0;
+            min-height: 0;
+        }
+        .panel:last-child {
+            border-right: none;
+        }
+        .panel-header {
+            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .panel-content {
+            flex: 1;
+            position: relative;
+            background: #ffffff;
+            overflow: hidden;
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-textarea {
+            width: 100%;
+            border: none;
+            outline: none;
+            padding: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            resize: none;
+            background: white;
+            overflow-y: auto;
+            overflow-x: auto;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            box-sizing: border-box;
+            flex: 1;
+            min-height: 0;
+        }
+        .panel-textarea::placeholder {
+            color: #999;
+            font-style: italic;
+        }
+        .status-bar {
+            background: linear-gradient(to bottom, #f5f5f5, #e8e8e8);
+            border-top: 1px solid #b0b0b0;
+            padding: 6px 12px;
+            font-size: 11px;
+            color: #333;
+            display: flex;
+            gap: 16px;
+            box-shadow: 0 -1px 3px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+            height: 32px;
+            align-items: center;
+        }
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .status-messages {
+            position: fixed;
+            top: 60px;
+            right: 16px;
+            z-index: 2000;
+            max-width: 300px;
+        }
+        .status-message {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            font-size: 11px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-success {
+            border-color: #4CAF50;
+            color: #2E7D32;
+            background: #E8F5E8;
+        }
+        .status-error {
+            border-color: #F44336;
+            color: #C62828;
+            background: #FFEBEE;
+        }
+        .status-warning {
+            border-color: #FF9800;
+            color: #F57C00;
+            background: #FFF8E1;
+        }
+        .copy-btn {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            font-size: 11px;
+            padding: 2px 4px;
+        }
+        .copy-btn:hover {
+            color: #333;
+            background: rgba(0,0,0,0.05);
+        }
+
+        /* Enhanced styling for new controls */
         .indent-controls {
             display: flex;
             align-items: center;
@@ -164,140 +303,84 @@
             align-items: center;
             gap: 4px;
             font-size: 11px;
-            flex: 1;
+            flex: 1; /* Allow this to grow */
         }
         .search-controls label {
             color: #555;
         }
         .search-controls input {
-            flex: 1;
+            flex: 1; /* Allow input to grow */
             padding: 3px 6px;
             font-size: 0.85em;
             font-weight: bold;
             border: 1px solid #a0a0a0;
             background: white;
-            min-width: 100px;
+            min-width: 100px; /* Minimum width */
         }
 
-        .main-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #f0f0f0;
-            min-height: 0;
-            overflow: hidden;
-        }
+        /* YAML syntax highlighting */
+        .yaml-key { color: #1976d2; font-weight: bold; }
+        .yaml-string { color: #388e3c; }
+        .yaml-number { color: #f57c00; }
+        .yaml-boolean { color: #7b1fa2; }
+        .yaml-null { color: #616161; font-style: italic; }
+        .yaml-comment { color: #757575; font-style: italic; }
+        .yaml-anchor { color: #e91e63; }
+        .yaml-alias { color: #e91e63; font-style: italic; }
+        .yaml-multiline { color: #795548; }
+        .yaml-array { color: #ff5722; }
 
-        .panels-container {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-            min-height: 0;
-        }
-
-        .panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #c0c0c0;
-            min-width: 0;
-            min-height: 0;
-        }
-        .panel:last-child {
-            border-right: none;
-        }
-
-        .panel-header {
-            background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
-            border-bottom: 1px solid #c0c0c0;
-            padding: 4px 8px;
-            font-size: 11px;
-            font-weight: bold;
-            color: #555;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .file-upload-btn {
-            background: linear-gradient(to bottom, #e8f4fd, #d1e7ff);
-            border: 1px solid #4a90e2;
-            color: #1565c0;
-            padding: 4px 8px;
-            font-size: 11px;
-            border-radius: 2px;
+        /* Collapsible elements */
+        .collapsible {
             cursor: pointer;
-            transition: background 0.2s;
+            user-select: none;
         }
-        .file-upload-btn:hover {
-            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        .collapsible:hover {
+            background-color: #f0f0f0;
         }
-        .copy-btn {
-            background: none;
-            border: none;
-            color: #666;
-            cursor: pointer;
-            font-size: 11px;
-            padding: 2px 4px;
-        }
-        .copy-btn:hover {
-            color: #333;
-            background: rgba(0,0,0,0.05);
-        }
-
-        .file-path-label {
+        .expand-collapse-btn {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            line-height: 10px;
+            text-align: center;
+            background: #e8e8e8;
+            border: 1px solid #c0c0c0;
             font-size: 10px;
-            font-style: italic;
-            margin-right: 6px;
-            opacity: 0.8;
-            max-width: 150px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            color: #1976d2;
+            font-weight: bold;
+            margin-right: 4px;
+            cursor: pointer;
+            color: #666;
         }
-
-        .panel-content {
-            flex: 1;
-            position: relative;
-            background: #ffffff;
-            min-width: 0;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+        .expand-collapse-btn:hover {
+            background: #d0d0d0;
         }
-
-        .panel-textarea {
-            width: 100%;
-            border: none;
-            outline: none;
-            padding: 8px;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.4;
-            resize: none;
-            background: white;
-            overflow-y: auto;
-            overflow-x: auto;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-            box-sizing: border-box;
-            flex: 1;
-            min-height: 0;
+        .collapsed-content {
+            display: none;
         }
-
-        .panel-textarea::placeholder {
-            color: #999;
+        .collapsed-indicator {
+            color: #888;
             font-style: italic;
         }
 
+        /* YAMLPath search highlighting */
+        .search-match {
+            background-color: #ffff00 !important;
+            border: 1px solid #ff8800;
+            padding: 1px 2px;
+            margin: -1px -2px;
+        }
+        .search-path {
+            background-color: #e6f3ff !important;
+            border-left: 3px solid #0066cc;
+            padding-left: 8px;
+        }
+
+        .deemphasized {
+            opacity: 0.5;
+        }
+
+        /* Enhanced panel content for markup */
         .formatted-output {
             width: 100%;
             padding: 8px;
@@ -316,31 +399,99 @@
             min-height: 0;
         }
 
-        .status-bar {
-            background: linear-gradient(to bottom, #f5f5f5, #e8e8e8);
-            border-top: 1px solid #b0b0b0;
-            padding: 6px 12px;
+        .error-display {
+            background: #fff0f0;
+            color: #cc0000;
+            padding: 8px;
+            border-left: 4px solid #cc0000;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 11px;
-            color: #333;
-            display: flex;
-            gap: 16px;
-            box-shadow: 0 -1px 3px rgba(0,0,0,0.1);
-            flex-shrink: 0;
-            height: 32px;
-            align-items: center;
-        }
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .status-hint {
-            color: #888;
-            font-style: italic;
-            font-size: 10px;
-            margin-left: 4px;
+            white-space: pre-wrap;
         }
 
+
+        /* Header actions styling */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1001;
+            width: 500px;
+            max-width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h2 {
+            font-size: 16px;
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #888;
+        }
+
+        .modal-content {
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        #sourceList .source-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+
+        #sourceList .source-item:hover {
+            background: #f0f0f0;
+        }
+
+        #sourceList .source-item:last-child {
+            border-bottom: none;
+        }
+
+        #sourceList .source-name {
+            font-weight: bold;
+        }
+
+        #sourceList .source-type {
+            font-size: 12px;
+            color: #888;
+            margin-left: 10px;
+        }
+
+        /* Validation controls styling */
         .validation-controls {
             display: flex;
             align-items: center;
@@ -419,183 +570,7 @@
             color: #721c24;
         }
 
-        /* YAML specific syntax highlighting */
-        .yaml-key { color: #1976d2; font-weight: bold; }
-        .yaml-string { color: #388e3c; }
-        .yaml-number { color: #f57c00; }
-        .yaml-boolean { color: #7b1fa2; }
-        .yaml-null { color: #616161; font-style: italic; }
-        .yaml-comment { color: #757575; font-style: italic; }
-        .yaml-anchor { color: #e91e63; }
-        .yaml-alias { color: #e91e63; font-style: italic; }
-        .yaml-multiline { color: #795548; }
-        .yaml-array { color: #ff5722; }
-
-        /* Inline hint text for object/array counts */
-        .yaml-hint {
-            color: #999;
-            font-style: italic;
-            font-size: 11px;
-            margin-left: 8px;
-            opacity: 0.7;
-        }
-
-        .yaml-hint:before {
-            content: '...';
-        }
-
-        /* Collapsible section styling */
-        .yaml-section {
-            position: relative;
-        }
-
-        .yaml-section.collapsed .yaml-content {
-            display: none;
-        }
-
-        .yaml-section.collapsed .yaml-hint {
-            display: inline;
-        }
-
-        .yaml-section.expanded .yaml-hint {
-            display: none;
-        }
-
-        .deemphasized {
-            opacity: 0.5;
-        }
-
-        /* Collapsible elements */
-        .collapsible {
-            cursor: pointer;
-            user-select: none;
-        }
-        .collapsible:hover {
-            background-color: #f0f0f0;
-        }
-
-        .status-messages {
-            position: fixed;
-            top: 60px;
-            right: 16px;
-            z-index: 2000;
-            max-width: 300px;
-        }
-        .status-message {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 8px 12px;
-            margin-bottom: 4px;
-            font-size: 11px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .status-success {
-            border-color: #4CAF50;
-            color: #2E7D32;
-            background: #E8F5E8;
-        }
-        .status-error {
-            border-color: #F44336;
-            color: #C62828;
-            background: #FFEBEE;
-        }
-        .status-warning {
-            border-color: #FF9800;
-            color: #F57C00;
-            background: #FFF8E1;
-        }
-
-        .error-display {
-            background: #fff0f0;
-            color: #cc0000;
-            padding: 8px;
-            border-left: 4px solid #cc0000;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 11px;
-            white-space: pre-wrap;
-        }
-
-        .hist-container {
-            position: relative;
-            z-index: 10000;
-        }
-
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
-
-        .modal {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            z-index: 1001;
-            width: 500px;
-            max-width: 90%;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .modal-header h2 {
-            font-size: 16px;
-        }
-
-        .modal-close-btn {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #888;
-        }
-
-        .modal-content {
-            padding: 15px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        #sourceList .source-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-        }
-
-        #sourceList .source-item:hover {
-            background: #f0f0f0;
-        }
-
-        #sourceList .source-item:last-child {
-            border-bottom: none;
-        }
-
-        #sourceList .source-name {
-            font-weight: bold;
-        }
-
-        #sourceList .source-type {
-            font-size: 12px;
-            color: #888;
-            margin-left: 10px;
-        }
-
-        /* Autocomplete Styles */
+        /* Document Query Suggestions - Generic Library Styles */
         .dqs-dropdown {
             background: white;
             border: 1px solid #ccc;
@@ -697,6 +672,17 @@
         .dqs-type-function .dqs-suggestion-text { color: #6600cc; }
         .dqs-type-filter .dqs-suggestion-text { color: #cc0066; }
         .dqs-type-null .dqs-suggestion-text { color: #999999; }
+
+        .dqs-item.selected .dqs-type-property .dqs-suggestion-text,
+        .dqs-item.selected .dqs-type-list .dqs-suggestion-text,
+        .dqs-item.selected .dqs-type-document .dqs-suggestion-text,
+        .dqs-item.selected .dqs-type-array_element .dqs-suggestion-text,
+        .dqs-item.selected .dqs-type-array_wildcard .dqs-suggestion-text,
+        .dqs-item.selected .dqs-type-function .dqs-suggestion-text,
+        .dqs-item.selected .dqs-type-filter .dqs-suggestion-text,
+        .dqs-item.selected .dqs-type-null .dqs-suggestion-text {
+            color: white;
+        }
 
         /* CRITICAL: Override history popup z-index - must be at the end */
         .hist-popup {
@@ -835,7 +821,7 @@ skills:
                 </div>
             </div>
         </div>
-        </div>
+
         <div class="status-bar">
             <div class="status-item">
                 <strong>Status:</strong>
@@ -856,7 +842,6 @@ skills:
             <div class="status-item">
                 <strong>Arrays:</strong>
                 <span id="yamlArrays">0</span>
-                <span class="status-hint" id="yamlArraysHint"></span>
             </div>
             <div class="status-item">
                 <strong>Properties:</strong>
@@ -865,10 +850,7 @@ skills:
         </div>
     </div>
 
-    <div class="status-messages" id="statusMessages">
-        <div id="errorMessage" class="status-message status-error" style="display: none;"></div>
-        <div id="successMessage" class="status-message status-success" style="display: none;"></div>
-    </div>
+    <div class="status-messages" id="statusMessages"></div>
 
     <!-- Global History Popup -->
     <div class="hist-global-popup" id="globalHistoryPopup">
@@ -883,7 +865,6 @@ skills:
         </div>
     </div>
 
-    <!-- Include common functions -->
     <script src="/static/js/common-functions.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
     <script src="/static/js/history.js"></script>
@@ -892,7 +873,7 @@ skills:
     <script src="/static/js/validation.js"></script>
     <script src="/static/js/validation-utils.js"></script>
 
-    <!-- Include document query suggestions framework -->
+    <!-- Document Query Suggestions Library -->
     <script src="/static/js/document-query-suggestions/core/DocumentParser.js"></script>
     <script src="/static/js/document-query-suggestions/core/QueryEvaluator.js"></script>
     <script src="/static/js/document-query-suggestions/core/SuggestionEngine.js"></script>

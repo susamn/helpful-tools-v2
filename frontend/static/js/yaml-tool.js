@@ -49,32 +49,13 @@ class YamlTool {
             collapseAllBtn: document.getElementById('collapseAllBtn'),
             toggleMarkupBtn: document.getElementById('toggleMarkupBtn'),
 
-            // Settings
+            // Controls
             indentType: document.getElementById('indentType'),
             indentSize: document.getElementById('indentSize'),
-
-            // Font controls
             fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
             fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
-
-            // YAML path search (now in toolbar)
             yamlPathInput: document.getElementById('yamlPathInput'),
             clearSearchBtn: document.getElementById('clearSearchBtn'),
-            yamlPathExecuteBtn: document.getElementById('yamlPathExecuteBtn'),
-            yamlPathClearBtn: document.getElementById('yamlPathClearBtn'),
-
-            // History controls
-            historyDropdown: document.getElementById('historyDropdown'),
-            historyLocalBtn: document.getElementById('historyLocalBtn'),
-            historyGlobalBtn: document.getElementById('historyGlobalBtn'),
-            historyList: document.getElementById('historyList'),
-            historyClearBtn: document.getElementById('historyClearBtn'),
-            historyCloseBtn: document.getElementById('historyCloseBtn'),
-
-            // Header history buttons
-            historyToggleBtn: document.getElementById('historyToggleBtn'),
-            globalHistoryBtn: document.getElementById('globalHistoryBtn'),
-            globalHistoryPopup: document.getElementById('globalHistoryPopup'),
 
             // Validation elements
             validationControls: document.getElementById('validationControls'),
@@ -82,10 +63,8 @@ class YamlTool {
             validatorSelect: document.getElementById('validatorSelect'),
             validateBtn: document.getElementById('validateBtn'),
 
-            // Status and messages
+            // Status
             statusMessages: document.getElementById('statusMessages'),
-            errorMessage: document.getElementById('errorMessage'),
-            successMessage: document.getElementById('successMessage'),
             yamlStatus: document.getElementById('yamlStatus'),
             yamlSize: document.getElementById('yamlSize'),
             yamlLines: document.getElementById('yamlLines'),
@@ -96,9 +75,6 @@ class YamlTool {
     }
 
     initializeHistoryManager() {
-        console.log('Initializing history manager for:', this.toolName);
-        console.log('window.createHistoryManager available:', typeof window.createHistoryManager);
-
         // Create history manager with callback to load data into input
         this.historyManager = window.createHistoryManager(this.toolName, (data) => {
             this.elements.yamlInput.value = data;
@@ -106,11 +82,8 @@ class YamlTool {
             this.updateStats();
         });
 
-        console.log('History manager created:', this.historyManager);
-
         // Make it globally accessible for HTML onclick handlers
         window.historyManager = this.historyManager;
-        console.log('window.historyManager set to:', window.historyManager);
     }
 
     attachEventListeners() {
@@ -118,85 +91,56 @@ class YamlTool {
         this.elements.formatBtn.addEventListener('click', () => this.formatYaml());
         this.elements.minifyBtn.addEventListener('click', () => this.minifyYaml());
         this.elements.stringifyBtn.addEventListener('click', () => this.stringifyYaml());
-        this.elements.clearBtn.addEventListener('click', () => this.clearAll());
-
-        // Copy buttons
-        this.elements.copyBtn.addEventListener('click', () => this.copyToClipboard());
-        this.elements.copyFormattedBtn.addEventListener('click', () => this.copyFormattedToClipboard());
-
-        // File operations
-        this.elements.loadFromSourceBtn.addEventListener('click', () => this.loadFromSource());
-        this.elements.uploadFileBtn.addEventListener('click', () => this.elements.fileInput.click());
-        this.elements.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        this.elements.clearBtn.addEventListener('click', () => this.clearInputs());
+        this.elements.copyBtn.addEventListener('click', () => this.copyOutput());
+        this.elements.copyFormattedBtn.addEventListener('click', () => this.copyFormatted());
 
         // Collapsible controls
         this.elements.expandAllBtn.addEventListener('click', () => this.expandAll());
         this.elements.collapseAllBtn.addEventListener('click', () => this.collapseAll());
         this.elements.toggleMarkupBtn.addEventListener('click', () => this.toggleMarkup());
 
-        // Settings
-        this.elements.indentType.addEventListener('change', (e) => this.updateIndentPrefs());
-        this.elements.indentSize.addEventListener('change', (e) => this.updateIndentPrefs());
-
-        // Font controls
+        // Controls
+        this.elements.indentType.addEventListener('change', () => this.updateIndentPreference());
+        this.elements.indentSize.addEventListener('change', () => this.updateIndentPreference());
         this.elements.fontIncreaseBtn.addEventListener('click', () => this.increaseFontSize());
         this.elements.fontDecreaseBtn.addEventListener('click', () => this.decreaseFontSize());
 
-        // YAML path input handling is now managed by AutocompleteAdapter
-        // Only trigger evaluation on Enter key for explicit execution
+        // YAMLPath input handling
         this.elements.yamlPathInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') {
                 this.performYamlPathLookup();
             }
         });
-        if (this.elements.yamlPathExecuteBtn) {
-            this.elements.yamlPathExecuteBtn.addEventListener('click', () => this.performYamlPathLookup());
-        }
-        if (this.elements.yamlPathClearBtn) {
-            this.elements.yamlPathClearBtn.addEventListener('click', () => this.clearYamlPath());
-        }
-        if (this.elements.clearSearchBtn) {
-            this.elements.clearSearchBtn.addEventListener('click', () => this.clearYamlPath());
-        }
+        this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
 
-        // History controls
-        if (this.elements.historyLocalBtn) {
-            this.elements.historyLocalBtn.addEventListener('click', () => this.showLocalHistory());
-        }
-        if (this.elements.historyGlobalBtn) {
-            this.elements.historyGlobalBtn.addEventListener('click', () => this.showGlobalHistory());
-        }
-        if (this.elements.historyClearBtn) {
-            this.elements.historyClearBtn.addEventListener('click', () => this.clearHistory());
-        }
-        if (this.elements.historyCloseBtn) {
-            this.elements.historyCloseBtn.addEventListener('click', () => this.closeHistory());
-        }
+        // Input change detection for real-time stats
+        this.elements.yamlInput.addEventListener('input', () => this.updateYamlStats());
 
-        // Header history buttons
-        if (this.elements.historyToggleBtn) {
-            console.log('Attaching event listener to historyToggleBtn');
-            this.elements.historyToggleBtn.addEventListener('click', () => this.toggleHistory());
-        }
-        if (this.elements.globalHistoryBtn) {
-            console.log('Attaching event listener to globalHistoryBtn:', this.elements.globalHistoryBtn);
-            this.elements.globalHistoryBtn.addEventListener('click', () => {
-                console.log('Global history button clicked!');
-                this.toggleGlobalHistory();
-            });
-        } else {
-            console.error('globalHistoryBtn element not found!');
-        }
-
-        // Input changes
-        this.elements.yamlInput.addEventListener('input', () => this.debounceFormatting());
-        this.elements.yamlInput.addEventListener('paste', () => this.handlePaste());
-
-        // Validation
-        this.elements.validateBtn.addEventListener('click', () => this.validateYaml());
+        let formatTimeout;
+        this.elements.yamlInput.addEventListener('keyup', () => {
+            clearTimeout(formatTimeout);
+            formatTimeout = setTimeout(() => {
+                this.formatYaml();
+            }, 1000);
+        });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+
+        // Source selector
+        this.elements.loadFromSourceBtn.addEventListener('click', () => this.openSourceSelector());
+
+        // File upload
+        this.elements.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+        // Validation controls
+        if (this.elements.validateBtn) {
+            this.elements.validateBtn.addEventListener('click', () => this.validateData());
+        }
+        if (this.elements.validatorSelect) {
+            this.elements.validatorSelect.addEventListener('change', () => this.onValidatorChanged());
+        }
     }
 
     /**
@@ -246,49 +190,36 @@ class YamlTool {
      */
     initializeYamlPathAutocomplete() {
         try {
-            console.log('Initializing YAML autocomplete...');
-            console.log('AutocompleteAdapter available:', typeof AutocompleteAdapter !== 'undefined');
-            console.log('yamlPathInput element:', this.elements.yamlPathInput);
-
             if (typeof AutocompleteAdapter !== 'undefined' && this.elements.yamlPathInput) {
                 this.autocompleteAdapter = new AutocompleteAdapter(this.elements.yamlPathInput, {
                     documentType: 'yaml',
                     queryLanguage: 'yq',
                     maxSuggestions: 10,
-                    debounceMs: 300, // Reduced for better responsiveness
+                    debounceMs: 300,
                     minQueryLength: 1,
                     showDescriptions: true,
                     showSampleValues: true,
                     onSelect: (suggestion) => {
-                        console.log('YAML suggestion selected:', suggestion);
-                        // Apply the selected suggestion and trigger path query
                         this.elements.yamlPathInput.value = suggestion.query || suggestion.text;
                         this.performYamlPathLookup();
-                    },
-                    onShow: () => {
-                        console.log('YAML autocomplete dropdown shown');
-                    },
-                    onHide: () => {
-                        console.log('YAML autocomplete dropdown hidden');
-                    },
-                    onError: (error) => {
-                        console.warn('YAML autocomplete error:', error);
                     }
                 });
-                console.log('YAML autocomplete adapter initialized successfully:', this.autocompleteAdapter);
-            } else {
-                console.warn('AutocompleteAdapter not available or yamlPathInput not found');
-                console.log('Available classes:', Object.keys(window).filter(k => k.includes('Autocomplete')));
             }
         } catch (error) {
             console.error('Failed to initialize YAML path autocomplete:', error);
         }
     }
 
+    /**
+     * Format YAML with proper indentation and validation
+     */
     formatYaml() {
         const input = this.elements.yamlInput.value.trim();
+
         if (!input) {
-            this.showError('Please enter YAML data to format');
+            this.showMessage('Please enter YAML data to format.', 'warning');
+            this.updateStats('', null);
+            this.clearOutput();
             return;
         }
 
@@ -298,7 +229,6 @@ class YamlTool {
 
             // Format with current indent preferences
             const indentSize = this.indentPrefs.type === 'tabs' ? 1 : parseInt(this.indentPrefs.size);
-            const indentChar = this.indentPrefs.type === 'tabs' ? '\t' : ' ';
 
             const formatted = jsyaml.dump(parsed, {
                 indent: indentSize,
@@ -309,22 +239,26 @@ class YamlTool {
 
             this.displayOutput(formatted, parsed);
             this.updateStats(formatted, parsed);
-            this.hideError();
-            this.showSuccess('YAML formatted successfully');
+            this.showMessage('YAML formatted successfully', 'success');
 
             // Add to history
             this.saveToHistory(input, 'format');
 
         } catch (error) {
-            this.showError(`Invalid YAML: ${error.message}`);
+            this.showMessage(`Invalid YAML: ${error.message}`, 'error');
             this.elements.yamlStatus.textContent = 'Invalid';
+            this.clearOutput();
         }
     }
 
+    /**
+     * Minify YAML
+     */
     minifyYaml() {
         const input = this.elements.yamlInput.value.trim();
+
         if (!input) {
-            this.showError('Please enter YAML data to minify');
+            this.showMessage('Please enter YAML data to minify.', 'warning');
             return;
         }
 
@@ -343,22 +277,25 @@ class YamlTool {
 
             this.displayOutput(minified, parsed);
             this.updateStats(minified, parsed);
-            this.hideError();
-            this.showSuccess('YAML minified successfully');
+            this.showMessage('YAML minified successfully', 'success');
 
             // Add to history
             this.saveToHistory(input, 'minify');
 
         } catch (error) {
-            this.showError(`Invalid YAML: ${error.message}`);
+            this.showMessage(`Invalid YAML: ${error.message}`, 'error');
             this.elements.yamlStatus.textContent = 'Invalid';
         }
     }
 
+    /**
+     * Convert YAML to JSON string
+     */
     stringifyYaml() {
         const input = this.elements.yamlInput.value.trim();
+
         if (!input) {
-            this.showError('Please enter YAML data to stringify');
+            this.showMessage('Please enter YAML data to stringify.', 'warning');
             return;
         }
 
@@ -371,35 +308,15 @@ class YamlTool {
 
             this.displayOutput(jsonString, parsed);
             this.updateStats(jsonString, parsed);
-            this.hideError();
-            this.showSuccess('YAML converted to JSON string successfully');
+            this.showMessage('YAML converted to JSON string successfully', 'success');
 
             // Add to history
             this.saveToHistory(input, 'stringify');
 
         } catch (error) {
-            this.showError(`Invalid YAML: ${error.message}`);
+            this.showMessage(`Invalid YAML: ${error.message}`, 'error');
             this.elements.yamlStatus.textContent = 'Invalid';
         }
-    }
-
-    clearAll() {
-        this.elements.yamlInput.value = '';
-        this.elements.yamlOutput.value = '';
-        this.elements.yamlOutputFormatted.innerHTML = '';
-        this.elements.yamlPathInput.value = '';
-        this.elements.filePathLabel.textContent = '';
-        this.hideError();
-        this.hideSuccess();
-        this.updateStats('', null);
-        this.originalOutputData = null;
-        this.currentSource = null;
-
-        if (typeof validationUtils !== 'undefined') {
-            validationUtils.clearValidationStatus(this.elements.validationStatus);
-        }
-
-        this.showSuccess('All fields cleared');
     }
 
     displayOutput(yamlText, parsedData = null, isYamlPathResult = false) {
@@ -423,8 +340,8 @@ class YamlTool {
             this.elements.yamlOutput.value = yamlText;
         }
 
-        if (parsedData) {
-            // Update autocomplete with input data, not output
+        if (parsedData && this.autocompleteAdapter) {
+            // Update autocomplete with input data
             this.updateAutocompleteDocument();
         }
     }
@@ -433,25 +350,17 @@ class YamlTool {
      * Update autocomplete when YAML data changes
      */
     updateAutocompleteDocument() {
-        console.log('updateAutocompleteDocument called, adapter available:', !!this.autocompleteAdapter);
         if (!this.autocompleteAdapter) {
-            console.warn('No autocomplete adapter available');
             return;
         }
 
         try {
-            // For autocomplete, we need the original input data, not the formatted output
             const inputText = this.elements.yamlInput.value.trim();
-            console.log('Updating autocomplete with input text length:', inputText.length);
             if (!inputText) {
-                console.log('No input text, skipping autocomplete update');
                 return;
             }
 
-            // Pass original input to autocomplete for proper parsing
-            console.log('Setting document on autocomplete adapter');
             this.autocompleteAdapter.setDocument(inputText);
-            console.log('Autocomplete document updated successfully');
         } catch (error) {
             console.error('Failed to update autocomplete document:', error);
         }
@@ -482,17 +391,13 @@ class YamlTool {
                 const hasComment = highlightedLine.includes('yaml-comment');
 
                 if (!hasComment) {
-                    // Key-value pairs with potential hint text
+                    // Key-value pairs
                     highlightedLine = highlightedLine.replace(/^(\s*)([^:\s][^:]*?)(\s*:\s*)(.*)$/,
                         (match, indent, key, colon, value) => {
                             const escapedKey = escapeHtml(key);
                             const escapedValue = value;
 
-                            // Check if this key has children (objects or arrays) to add hint
-                            const hint = this.generateHintText(lines, index, indent.length);
-                            const hintHtml = hint ? `<span class="yaml-hint">${hint}</span>` : '';
-
-                            return `${indent}<span class="yaml-key">${escapedKey}</span>${colon}${this.highlightYamlValue(escapedValue)}${hintHtml}`;
+                            return `${indent}<span class="yaml-key">${escapedKey}</span>${colon}${this.highlightYamlValue(escapedValue)}`;
                         });
 
                     // Array items
@@ -551,57 +456,9 @@ class YamlTool {
         return escapeHtml(value);
     }
 
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    generateHintText(lines, currentIndex, currentIndent) {
-        // Look ahead to see if this key has children
-        let childObjects = 0;
-        let childArrays = 0;
-        let childProperties = 0;
-
-        for (let i = currentIndex + 1; i < lines.length; i++) {
-            const line = lines[i];
-            const lineIndent = line.search(/\S/);
-
-            // If we've reached the same or lesser indentation, stop
-            if (lineIndent <= currentIndent && line.trim() !== '') {
-                break;
-            }
-
-            // Skip empty lines
-            if (line.trim() === '') continue;
-
-            // Count direct children only (one level deeper)
-            if (lineIndent === currentIndent + 2) {
-                if (line.trim().startsWith('-')) {
-                    childArrays++;
-                } else if (line.includes(':')) {
-                    childObjects++;
-                    childProperties++;
-                }
-            }
-        }
-
-        // Generate hint text based on what we found
-        if (childObjects > 0 && childArrays > 0) {
-            return `${childObjects} objects, ${childArrays} items`;
-        } else if (childObjects > 0) {
-            return `${childObjects} objects`;
-        } else if (childArrays > 0) {
-            return `${childArrays} items`;
-        }
-
-        return null;
-    }
-
     addCollapsibleBehavior() {
         // Add collapsible behavior for nested structures
         const lines = this.elements.yamlOutputFormatted.querySelectorAll('.line');
-        const indentLevels = new Map();
 
         lines.forEach((line, index) => {
             const text = line.textContent;
@@ -681,10 +538,81 @@ class YamlTool {
             }
         }
 
-        this.elements.toggleMarkupBtn.textContent = this.markupEnabled ? 'Disable Markup' : 'Enable Markup';
+        this.elements.toggleMarkupBtn.textContent = this.markupEnabled ? 'Remove Markup' : 'Enable Markup';
     }
 
-    updateIndentPrefs() {
+    async performYamlPathLookup() {
+        const path = this.elements.yamlPathInput.value.trim();
+        if (!path) {
+            this.clearSearch();
+            return;
+        }
+
+        if (!this.originalOutputData) {
+            this.showMessage('Please format some YAML first', 'error');
+            return;
+        }
+
+        try {
+            // Use the YQ evaluator if available
+            if (this.autocompleteAdapter && this.autocompleteAdapter.getEngine) {
+                const result = await this.autocompleteAdapter.getEngine().evaluator.evaluate(this.originalOutputData.parsedData, path);
+
+                if (result !== undefined && result.length > 0) {
+                    const resultYaml = jsyaml.dump(result.length === 1 ? result[0] : result, {
+                        indent: this.indentPrefs.type === 'tabs' ? 1 : parseInt(this.indentPrefs.size),
+                        lineWidth: -1,
+                        noRefs: true,
+                        sortKeys: false
+                    });
+
+                    this.displayOutput(resultYaml, result, true);
+                    this.updateStats(resultYaml, result);
+                    this.showMessage(`YAML path query executed: ${path}`, 'success');
+                } else {
+                    this.showMessage('Path not found or returned no results', 'error');
+                }
+            } else {
+                this.showMessage('YAML path evaluation not available', 'error');
+            }
+        } catch (error) {
+            this.showMessage(`Invalid path expression: ${error.message}`, 'error');
+        }
+    }
+
+    clearSearch() {
+        this.elements.yamlPathInput.value = '';
+
+        // Restore original data if available
+        if (this.originalOutputData) {
+            this.displayOutput(this.originalOutputData.text, this.originalOutputData.parsedData, false);
+            this.updateStats(this.originalOutputData.text, this.originalOutputData.parsedData);
+            this.showMessage('Original data restored', 'success');
+        }
+    }
+
+    clearInputs() {
+        this.elements.yamlInput.value = '';
+        this.clearOutput();
+        this.elements.yamlPathInput.value = '';
+        this.elements.filePathLabel.textContent = '';
+        this.originalOutputData = null;
+        this.currentSource = null;
+        this.updateStats('', null);
+        this.showMessage('All inputs cleared', 'success');
+
+        if (typeof validationUtils !== 'undefined') {
+            validationUtils.clearValidationStatus(this.elements.validationStatus);
+        }
+    }
+
+    clearOutput() {
+        this.elements.yamlOutput.value = '';
+        this.elements.yamlOutputFormatted.innerHTML = '';
+        this.lastOutputText = '';
+    }
+
+    updateIndentPreference() {
         this.indentPrefs.type = this.elements.indentType.value;
         this.indentPrefs.size = parseInt(this.elements.indentSize.value);
 
@@ -718,54 +646,6 @@ class YamlTool {
         localStorage.setItem(`${this.toolName}-fontSize`, this.fontSize.toString());
     }
 
-
-    async performYamlPathLookup() {
-        const path = this.elements.yamlPathInput.value.trim();
-        if (!path) {
-            this.clearYamlPath();
-            return;
-        }
-
-        if (!this.originalOutputData) {
-            this.showError('Please format some YAML first');
-            return;
-        }
-
-        try {
-            // Evaluate YAML path using the YQEvaluator from the autocomplete adapter
-            const result = await this.autocompleteAdapter.getEngine().evaluator.evaluate(this.originalOutputData.parsedData, path);
-
-            if (result !== undefined && result.length > 0) {
-                const resultYaml = jsyaml.dump(result.length === 1 ? result[0] : result, {
-                    indent: this.indentPrefs.type === 'tabs' ? 1 : parseInt(this.indentPrefs.size),
-                    lineWidth: -1,
-                    noRefs: true,
-                    sortKeys: false
-                });
-
-                this.displayOutput(resultYaml, result, true); // true = isYamlPathResult
-                this.updateStats(resultYaml, result);
-                this.hideError();
-                this.showSuccess(`YAML path query executed: ${path}`);
-            } else {
-                this.showError('Path not found or returned no results');
-            }
-        } catch (error) {
-            this.showError(`Invalid path expression: ${error.message}`);
-        }
-    }
-
-    clearYamlPath() {
-        this.elements.yamlPathInput.value = '';
-
-        // Restore original data if available
-        if (this.originalOutputData) {
-            this.displayOutput(this.originalOutputData.text, this.originalOutputData.parsedData, false);
-            this.updateStats(this.originalOutputData.text, this.originalOutputData.parsedData);
-            this.showSuccess('Original data restored');
-        }
-    }
-
     /**
      * Save input to history
      */
@@ -779,74 +659,27 @@ class YamlTool {
         }
     }
 
-    showLocalHistory() {
-        if (this.historyManager) {
-            this.historyManager.showHistory('local');
-            if (this.elements.historyDropdown) {
-                this.elements.historyDropdown.style.display = 'block';
-            }
-        }
-    }
-
-    showGlobalHistory() {
-        if (this.historyManager) {
-            this.historyManager.showHistory('global');
-            if (this.elements.historyDropdown) {
-                this.elements.historyDropdown.style.display = 'block';
-            }
-        }
-    }
-
-    clearHistory() {
-        if (this.historyManager) {
-            this.historyManager.clearHistory();
-            this.showSuccess('History cleared');
-        }
-    }
-
-    closeHistory() {
-        if (this.elements.historyDropdown) {
-            this.elements.historyDropdown.style.display = 'none';
-        }
-    }
-
-    toggleHistory() {
-        if (this.historyManager) {
-            this.historyManager.toggleHistory();
-        }
-    }
-
-    toggleGlobalHistory() {
-        console.log('toggleGlobalHistory called, historyManager:', this.historyManager);
-        if (this.historyManager) {
-            console.log('Calling historyManager.toggleGlobalHistory()');
-            this.historyManager.toggleGlobalHistory();
-        } else {
-            console.error('historyManager not available');
-        }
-    }
-
-    async copyToClipboard() {
+    async copyOutput() {
         const text = this.markupEnabled ? this.lastOutputText : this.elements.yamlOutput.value;
 
         if (!text) {
-            this.showError('No output to copy');
+            this.showMessage('No output to copy', 'error');
             return;
         }
 
         try {
             await navigator.clipboard.writeText(text);
-            this.showSuccess('Copied to clipboard');
+            this.showMessage('Copied to clipboard', 'success');
         } catch (error) {
-            this.showError('Failed to copy to clipboard');
+            this.showMessage('Failed to copy to clipboard', 'error');
         }
     }
 
-    async copyFormattedToClipboard() {
+    async copyFormatted() {
         const formattedHtml = this.elements.yamlOutputFormatted.innerHTML;
 
         if (!formattedHtml) {
-            this.showError('No formatted output to copy');
+            this.showMessage('No formatted output to copy', 'error');
             return;
         }
 
@@ -861,23 +694,23 @@ class YamlTool {
                 })
             ]);
 
-            this.showSuccess('Formatted output copied to clipboard');
+            this.showMessage('Formatted output copied to clipboard', 'success');
         } catch (error) {
             // Fallback to plain text
             try {
                 await navigator.clipboard.writeText(this.elements.yamlOutputFormatted.textContent);
-                this.showSuccess('Plain text copied to clipboard');
+                this.showMessage('Plain text copied to clipboard', 'success');
             } catch (fallbackError) {
-                this.showError('Failed to copy to clipboard');
+                this.showMessage('Failed to copy to clipboard', 'error');
             }
         }
     }
 
-    loadFromSource() {
+    openSourceSelector() {
         if (this.sourceSelector) {
             this.sourceSelector.show();
         } else {
-            this.showError('Source selector not available');
+            this.showMessage('Source selector not available', 'error');
         }
     }
 
@@ -896,7 +729,7 @@ class YamlTool {
 
         // Auto-format the loaded data
         this.formatYaml();
-        this.showSuccess(`Data loaded from source: ${source.name}`);
+        this.showMessage(`Data loaded from source: ${source.name}`, 'success');
     }
 
     onSourceEdit(source) {
@@ -916,20 +749,20 @@ class YamlTool {
             this.elements.yamlInput.value = e.target.result;
             this.elements.filePathLabel.textContent = `File: ${file.name}`;
             this.formatYaml();
-            this.showSuccess(`File "${file.name}" loaded successfully`);
+            this.showMessage(`File "${file.name}" loaded successfully`, 'success');
         };
 
         reader.onerror = () => {
-            this.showError('Failed to read file');
+            this.showMessage('Failed to read file', 'error');
         };
 
         reader.readAsText(file);
     }
 
-    validateYaml() {
+    validateData() {
         const input = this.elements.yamlInput.value.trim();
         if (!input) {
-            this.showError('Please enter YAML data to validate');
+            this.showMessage('Please enter YAML data to validate', 'error');
             return;
         }
 
@@ -949,7 +782,7 @@ class YamlTool {
                     );
                 }
             } else {
-                this.showSuccess('YAML is syntactically valid');
+                this.showMessage('YAML is syntactically valid', 'success');
             }
         } catch (error) {
             if (typeof validationUtils !== 'undefined') {
@@ -959,60 +792,31 @@ class YamlTool {
                     `Invalid YAML: ${error.message}`
                 );
             } else {
-                this.showError(`Invalid YAML: ${error.message}`);
+                this.showMessage(`Invalid YAML: ${error.message}`, 'error');
             }
         }
     }
 
-    debounceFormatting() {
-        clearTimeout(this.formatTimeout);
-        this.formatTimeout = setTimeout(() => {
-            const currentInput = this.elements.yamlInput.value;
-            if (currentInput !== this.lastInputData && currentInput.trim()) {
-                this.lastInputData = currentInput;
-                this.formatYaml();
-            }
-        }, 1000);
+    onValidatorChanged() {
+        // Clear previous validation status when validator changes
+        if (typeof validationUtils !== 'undefined') {
+            validationUtils.clearValidationStatus(this.elements.validationStatus);
+        }
     }
 
-    handlePaste() {
-        // Small delay to let paste complete
-        setTimeout(() => {
-            const input = this.elements.yamlInput.value.trim();
-            if (input) {
-                this.formatYaml();
-            }
-        }, 100);
-    }
-
-    handleKeyboardShortcuts(event) {
-        // Ctrl/Cmd + Enter: Format
-        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-            event.preventDefault();
-            this.formatYaml();
-        }
-
-        // Ctrl/Cmd + Shift + C: Copy
-        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'C') {
-            event.preventDefault();
-            this.copyToClipboard();
-        }
-
-        // Ctrl/Cmd + Shift + L: Clear
-        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'L') {
-            event.preventDefault();
-            this.clearAll();
-        }
+    updateYamlStats() {
+        const input = this.elements.yamlInput.value;
+        this.updateStats(input, null);
     }
 
     updateStats(yamlText, parsedData) {
         if (!yamlText && !parsedData) {
             this.elements.yamlStatus.textContent = 'Ready';
             this.elements.yamlSize.textContent = '0 chars';
-            this.elements.yamlLines.textContent = '0 lines';
-            this.elements.yamlObjects.textContent = '0 objects';
-            this.elements.yamlArrays.textContent = '0 arrays';
-            this.elements.yamlProperties.textContent = '0 properties';
+            this.elements.yamlLines.textContent = '0';
+            this.elements.yamlObjects.textContent = '0';
+            this.elements.yamlArrays.textContent = '0';
+            this.elements.yamlProperties.textContent = '0';
             return;
         }
 
@@ -1027,13 +831,13 @@ class YamlTool {
         // Analyze structure if we have parsed data
         if (parsedData) {
             const stats = this.analyzeYamlStructure(parsedData);
-            this.elements.yamlObjects.textContent = `${stats.objects} objects`;
-            this.elements.yamlArrays.textContent = `${stats.arrays} arrays`;
-            this.elements.yamlProperties.textContent = `${stats.properties} properties`;
+            this.elements.yamlObjects.textContent = `${stats.objects}`;
+            this.elements.yamlArrays.textContent = `${stats.arrays}`;
+            this.elements.yamlProperties.textContent = `${stats.properties}`;
         } else {
-            this.elements.yamlObjects.textContent = '0 objects';
-            this.elements.yamlArrays.textContent = '0 arrays';
-            this.elements.yamlProperties.textContent = '0 properties';
+            this.elements.yamlObjects.textContent = '0';
+            this.elements.yamlArrays.textContent = '0';
+            this.elements.yamlProperties.textContent = '0';
         }
     }
 
@@ -1057,28 +861,33 @@ class YamlTool {
         return { objects, arrays, properties };
     }
 
-    showError(message) {
-        this.elements.errorMessage.textContent = message;
-        this.elements.errorMessage.style.display = 'block';
-        this.elements.successMessage.style.display = 'none';
+    handleKeyboardShortcuts(event) {
+        // Ctrl/Cmd + Enter: Format
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            this.formatYaml();
+        }
 
-        setTimeout(() => this.hideError(), 5000);
+        // Ctrl/Cmd + Shift + C: Copy
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'C') {
+            event.preventDefault();
+            this.copyOutput();
+        }
+
+        // Ctrl/Cmd + Shift + L: Clear
+        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'L') {
+            event.preventDefault();
+            this.clearInputs();
+        }
     }
 
-    showSuccess(message) {
-        this.elements.successMessage.textContent = message;
-        this.elements.successMessage.style.display = 'block';
-        this.elements.errorMessage.style.display = 'none';
-
-        setTimeout(() => this.hideSuccess(), 3000);
-    }
-
-    hideError() {
-        this.elements.errorMessage.style.display = 'none';
-    }
-
-    hideSuccess() {
-        this.elements.successMessage.style.display = 'none';
+    showMessage(message, type = 'info') {
+        // Try to use the common showStatusMessage function
+        if (typeof showStatusMessage === 'function') {
+            showStatusMessage(message, type, 3000);
+        } else {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
     }
 }
 
@@ -1090,12 +899,6 @@ if (typeof module !== 'undefined' && module.exports) {
 // Initialize when DOM is loaded (only in browser environment)
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-        console.log('DOM loaded, checking available classes:');
-        console.log('DocumentQuerySuggestionEngine:', typeof DocumentQuerySuggestionEngine);
-        console.log('AutocompleteAdapter:', typeof AutocompleteAdapter);
-        console.log('YAMLDocumentParser:', typeof YAMLDocumentParser);
-        console.log('YQEvaluator:', typeof YQEvaluator);
-
         window.yamlTool = new YamlTool();
     });
 }
