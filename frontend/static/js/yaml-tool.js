@@ -447,8 +447,9 @@ class YamlTool {
     }
 
     highlightYaml(yamlText) {
-        return yamlText
-            .split('\n')
+        const lines = yamlText.split('\n');
+
+        return lines
             .map((line, index) => {
                 let highlightedLine = line;
 
@@ -470,12 +471,17 @@ class YamlTool {
                 const hasComment = highlightedLine.includes('yaml-comment');
 
                 if (!hasComment) {
-                    // Key-value pairs
+                    // Key-value pairs with potential hint text
                     highlightedLine = highlightedLine.replace(/^(\s*)([^:\s][^:]*?)(\s*:\s*)(.*)$/,
                         (match, indent, key, colon, value) => {
                             const escapedKey = escapeHtml(key);
                             const escapedValue = value;
-                            return `${indent}<span class="yaml-key">${escapedKey}</span>${colon}${this.highlightYamlValue(escapedValue)}`;
+
+                            // Check if this key has children (objects or arrays) to add hint
+                            const hint = this.generateHintText(lines, index, indent.length);
+                            const hintHtml = hint ? `<span class="yaml-hint">${hint}</span>` : '';
+
+                            return `${indent}<span class="yaml-key">${escapedKey}</span>${colon}${this.highlightYamlValue(escapedValue)}${hintHtml}`;
                         });
 
                     // Array items
@@ -538,6 +544,47 @@ class YamlTool {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    generateHintText(lines, currentIndex, currentIndent) {
+        // Look ahead to see if this key has children
+        let childObjects = 0;
+        let childArrays = 0;
+        let childProperties = 0;
+
+        for (let i = currentIndex + 1; i < lines.length; i++) {
+            const line = lines[i];
+            const lineIndent = line.search(/\S/);
+
+            // If we've reached the same or lesser indentation, stop
+            if (lineIndent <= currentIndent && line.trim() !== '') {
+                break;
+            }
+
+            // Skip empty lines
+            if (line.trim() === '') continue;
+
+            // Count direct children only (one level deeper)
+            if (lineIndent === currentIndent + 2) {
+                if (line.trim().startsWith('-')) {
+                    childArrays++;
+                } else if (line.includes(':')) {
+                    childObjects++;
+                    childProperties++;
+                }
+            }
+        }
+
+        // Generate hint text based on what we found
+        if (childObjects > 0 && childArrays > 0) {
+            return `${childObjects} objects, ${childArrays} items`;
+        } else if (childObjects > 0) {
+            return `${childObjects} objects`;
+        } else if (childArrays > 0) {
+            return `${childArrays} items`;
+        }
+
+        return null;
     }
 
     addCollapsibleBehavior() {
