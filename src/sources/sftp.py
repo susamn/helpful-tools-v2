@@ -9,9 +9,9 @@ from urllib.parse import urlparse
 import stat
 import socket
 
-from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult, PaginationOptions, PaginatedResult
 from .exceptions import (
-    SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
+    SourceNotFoundError, SourceConnectionError, SourcePermissionError,
     SourceDataError, SourceTimeoutError, SourceAuthenticationError, SourceConfigurationError
 )
 
@@ -375,6 +375,13 @@ class SftpSource(BaseDataSource):
             raise SourcePermissionError(f"Access denied to SFTP directory: {target_path}")
         except Exception as e:
             raise SourceConnectionError(f"Failed to list SFTP directory: {str(e)}")
+
+    def list_contents_paginated(self, path: Optional[str] = None,
+                              pagination: Optional[PaginationOptions] = None) -> PaginatedResult:
+        """List contents of SFTP directory with pagination (in-memory implementation)."""
+        # SFTP doesn't have built-in pagination, so use the base class implementation
+        # which leverages caching and implements pagination in memory
+        return super().list_contents_paginated(path, pagination)
     
     def is_writable(self) -> bool:
         """SFTP sources support writing."""

@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Tuple
 
 # Import sources package
 from sources import SourceFactory, SourceConfig, create_source
+from sources.base import PaginationOptions, PaginatedResult
 
 # Import validation system
 from validators import get_validator_types, create_validator, ValidationError
@@ -1724,6 +1725,94 @@ def browse_source_directory(source_id):
             error_message = 'Failed to connect to the source'
         elif 'credentials' in error_message.lower() or 'unauthorized' in error_message.lower():
             error_message = 'Invalid or expired credentials'
+        return jsonify({'success': False, 'error': error_message}), 500
+
+@app.route('/api/sources/<source_id>/browse-paginated', methods=['GET'])
+def browse_source_directory_paginated(source_id):
+    """Browse directory structure with pagination and lazy loading support."""
+    try:
+        sources = get_stored_sources()
+        if source_id not in sources:
+            return jsonify({'success': False, 'error': 'Source not found'}), 404
+
+        source = sources[source_id]
+
+        # Convert to SourceConfig and create source instance
+        source_config = convert_to_source_config(source)
+        source_instance = SourceFactory.create_source(source_config)
+
+        # Extract pagination parameters from query string
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
+        sort_by = request.args.get('sort_by', 'name')
+        sort_order = request.args.get('sort_order', 'asc')
+        filter_type = request.args.get('filter_type')  # 'files', 'directories', or None
+        path = request.args.get('path', '')
+        refresh = request.args.get('refresh')  # Cache-busting parameter
+
+        # Validate pagination parameters
+        page = max(1, page)
+        limit = max(1, min(limit, 500))  # Limit max items per page
+        if sort_by not in ['name', 'size', 'modified']:
+            sort_by = 'name'
+        if sort_order not in ['asc', 'desc']:
+            sort_order = 'asc'
+        if filter_type not in ['files', 'directories', None]:
+            filter_type = None
+
+        # Create pagination options
+        pagination = PaginationOptions(
+            page=page,
+            limit=limit,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            filter_type=filter_type
+        )
+
+        # Check if source supports listing
+        if not source_instance.is_listable():
+            return jsonify({'success': False, 'error': 'Source does not support directory listing'}), 400
+
+        # If refresh parameter is present, clear all cache to ensure fresh data
+        if refresh:
+            source_instance._cache.clear()  # Clear all cache for reliable refresh
+
+        # Get paginated results using lazy loading
+        paginated_result = source_instance.explore_directory_lazy(path if path else None, pagination)
+
+        # Convert result to JSON-serializable format
+        result_data = {
+            'success': True,
+            'items': paginated_result.items,
+            'pagination': {
+                'page': paginated_result.page,
+                'limit': paginated_result.limit,
+                'total_count': paginated_result.total_count,
+                'total_pages': paginated_result.total_pages,
+                'has_next': paginated_result.has_next,
+                'has_previous': paginated_result.has_previous,
+                'sort_by': paginated_result.sort_by,
+                'sort_order': paginated_result.sort_order
+            },
+            'path': path,
+            'source_id': source_id,
+            'source_type': source_config.source_type
+        }
+
+        return jsonify(result_data)
+
+    except Exception as e:
+        # Provide user-friendly error messages
+        error_message = str(e)
+        if 'permission denied' in error_message.lower():
+            error_message = 'Permission denied accessing the directory'
+        elif 'not found' in error_message.lower():
+            error_message = 'Directory path not found'
+        elif 'connection' in error_message.lower() or 'timeout' in error_message.lower():
+            error_message = 'Failed to connect to the source'
+        elif 'credentials' in error_message.lower() or 'unauthorized' in error_message.lower():
+            error_message = 'Invalid or expired credentials'
+
         return jsonify({'success': False, 'error': error_message}), 500
 
 # NOTE: Directory tree functions removed - now handled by sources package

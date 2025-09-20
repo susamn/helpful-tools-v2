@@ -1,9 +1,239 @@
 /**
  * Reusable SourceSelector Component
- * 
+ *
  * A modal-based source selector with Edit and Fetch functionality.
  * Supports dynamic variables editing and data fetching from various source types.
  */
+
+/**
+ * Explorer state for a specific source
+ */
+class ExplorerState {
+    constructor(sourceId) {
+        this.sourceId = sourceId;
+        this.expandedPaths = new Set(); // Set of expanded folder paths
+        this.loadedData = new Map(); // path -> {data, timestamp, page}
+        this.scrollPosition = 0;
+        this.selectedFile = null;
+        this.lastAccessed = Date.now();
+        this.currentPage = 1;
+        this.totalPages = 1;
+        this.hasMoreData = false;
+    }
+
+    addExpandedPath(path) {
+        this.expandedPaths.add(path);
+        this.lastAccessed = Date.now();
+    }
+
+    removeExpandedPath(path) {
+        this.expandedPaths.delete(path);
+        this.lastAccessed = Date.now();
+    }
+
+    isExpanded(path) {
+        return this.expandedPaths.has(path);
+    }
+
+    setLoadedData(path, data, page = 1) {
+        this.loadedData.set(path, {
+            data: data,
+            timestamp: Date.now(),
+            page: page
+        });
+        this.lastAccessed = Date.now();
+    }
+
+    getLoadedData(path) {
+        const cached = this.loadedData.get(path);
+        if (cached && Date.now() - cached.timestamp < 300000) { // 5 minute cache
+            return cached;
+        }
+        return null;
+    }
+
+    toJSON() {
+        return {
+            sourceId: this.sourceId,
+            expandedPaths: Array.from(this.expandedPaths),
+            scrollPosition: this.scrollPosition,
+            selectedFile: this.selectedFile,
+            lastAccessed: this.lastAccessed,
+            currentPage: this.currentPage,
+            totalPages: this.totalPages,
+            hasMoreData: this.hasMoreData
+        };
+    }
+
+    static fromJSON(data) {
+        const state = new ExplorerState(data.sourceId);
+        state.expandedPaths = new Set(data.expandedPaths || []);
+        state.scrollPosition = data.scrollPosition || 0;
+        state.selectedFile = data.selectedFile || null;
+        state.lastAccessed = data.lastAccessed || Date.now();
+        state.currentPage = data.currentPage || 1;
+        state.totalPages = data.totalPages || 1;
+        state.hasMoreData = data.hasMoreData || false;
+        return state;
+    }
+}
+
+/**
+ * Source selector state manager
+ */
+class SourceSelectorState {
+    constructor(containerId) {
+        this.containerId = containerId;
+        this.explorerStates = new Map(); // sourceId -> ExplorerState
+        this.currentExplorerSourceId = null;
+    }
+
+    getExplorerState(sourceId) {
+        if (!this.explorerStates.has(sourceId)) {
+            this.explorerStates.set(sourceId, new ExplorerState(sourceId));
+        }
+        return this.explorerStates.get(sourceId);
+    }
+
+    setCurrentExplorerSource(sourceId) {
+        this.currentExplorerSourceId = sourceId;
+    }
+
+    getCurrentExplorerState() {
+        if (this.currentExplorerSourceId) {
+            return this.getExplorerState(this.currentExplorerSourceId);
+        }
+        return null;
+    }
+
+    clearExplorerState(sourceId) {
+        this.explorerStates.delete(sourceId);
+    }
+
+    clearAllStates() {
+        this.explorerStates.clear();
+        this.currentExplorerSourceId = null;
+    }
+
+    toJSON() {
+        const statesObj = {};
+        for (const [sourceId, state] of this.explorerStates) {
+            statesObj[sourceId] = state.toJSON();
+        }
+
+        return {
+            containerId: this.containerId,
+            explorerStates: statesObj,
+            currentExplorerSourceId: this.currentExplorerSourceId
+        };
+    }
+
+    static fromJSON(data) {
+        const state = new SourceSelectorState(data.containerId);
+        state.currentExplorerSourceId = data.currentExplorerSourceId;
+
+        if (data.explorerStates) {
+            for (const [sourceId, stateData] of Object.entries(data.explorerStates)) {
+                state.explorerStates.set(sourceId, ExplorerState.fromJSON(stateData));
+            }
+        }
+
+        return state;
+    }
+}
+
+/**
+ * Persistent cache using localStorage
+ */
+class PersistentCache {
+    constructor(containerId) {
+        this.containerId = containerId;
+        this.storageKey = `sourceSelector_${containerId}_state`;
+        this.maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    }
+
+    saveState(state) {
+        try {
+            const stateData = {
+                ...state.toJSON(),
+                timestamp: Date.now()
+            };
+
+            localStorage.setItem(this.storageKey, JSON.stringify(stateData));
+        } catch (error) {
+            console.warn('Failed to save state to localStorage:', error);
+        }
+    }
+
+    loadState() {
+        try {
+            const stored = localStorage.getItem(this.storageKey);
+            if (!stored) return null;
+
+            const stateData = JSON.parse(stored);
+
+            // Check if data is not too old
+            if (Date.now() - stateData.timestamp > this.maxAge) {
+                this.clearState();
+                return null;
+            }
+
+            // Remove timestamp before reconstructing state
+            delete stateData.timestamp;
+            return SourceSelectorState.fromJSON(stateData);
+        } catch (error) {
+            console.warn('Failed to load state from localStorage:', error);
+            return null;
+        }
+    }
+
+    clearState() {
+        try {
+            localStorage.removeItem(this.storageKey);
+        } catch (error) {
+            console.warn('Failed to clear state from localStorage:', error);
+        }
+    }
+
+    // Cache folder contents temporarily
+    cacheFolderData(sourceId, path, data, pagination) {
+        try {
+            const cacheKey = `folder_${sourceId}_${path || 'root'}_${pagination.page}_${pagination.limit}`;
+            const cacheData = {
+                data: data,
+                timestamp: Date.now(),
+                pagination: pagination
+            };
+
+            // Use sessionStorage for temporary cache (cleared when tab closes)
+            sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        } catch (error) {
+            console.warn('Failed to cache folder data:', error);
+        }
+    }
+
+    getCachedFolderData(sourceId, path, pagination) {
+        try {
+            const cacheKey = `folder_${sourceId}_${path || 'root'}_${pagination.page}_${pagination.limit}`;
+            const stored = sessionStorage.getItem(cacheKey);
+
+            if (!stored) return null;
+
+            const cacheData = JSON.parse(stored);
+
+            // Check if cache is still valid (5 minutes)
+            if (Date.now() - cacheData.timestamp > 5 * 60 * 1000) {
+                sessionStorage.removeItem(cacheKey);
+                return null;
+            }
+
+            return cacheData;
+        } catch (error) {
+            console.warn('Failed to get cached folder data:', error);
+            return null;
+        }
+    }
+}
 
 class SourceSelector {
     constructor(options = {}) {
@@ -22,7 +252,15 @@ class SourceSelector {
         this.selectedSources = [];
         this.templateHTML = null;
         this.initialized = false;
-        
+
+        // Initialize state management and persistent cache
+        this.persistentCache = new PersistentCache(this.options.containerId);
+        this.state = this.persistentCache.loadState() || new SourceSelectorState(this.options.containerId);
+
+        // Legacy properties for backward compatibility
+        this.currentExplorerSource = null;
+        this.currentEditingSource = null;
+
         // Initialize asynchronously
         this.initializeComponent().then(() => {
             this.initialized = true;
@@ -681,7 +919,7 @@ class SourceSelector {
     /**
      * Render file tree
      */
-    renderFileTree(items, container, source, level) {
+    renderFileTree(items, container, source, level = 0) {
         if (!items || items.length === 0) {
             container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Empty directory</div>';
             return;
@@ -693,11 +931,13 @@ class SourceSelector {
             const levelClass = level > 0 ? `tree-level-${Math.min(level, 3)}` : '';
             const itemClass = isDirectory ? 'directory' : 'file';
             const nonExplorable = isDirectory && item.explorable === false;
-            const hasChildren = isDirectory && item.children && item.children.length > 0;
+
+            // For lazy loading, directories should show + if they might have children
+            const hasChildren = isDirectory && (item.has_children !== false);
 
             // Format file size
             const sizeText = !isDirectory && item.size !== null ? this.formatFileSize(item.size) : '';
-            
+
             // Format last modified date
             let dateText = '';
             if (item.last_modified) {
@@ -712,10 +952,11 @@ class SourceSelector {
 
             let itemHtml = `
                 <div class="tree-item-container">
-                    <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''}" 
-                         data-path="${item.path}" 
+                    <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''}"
+                         data-path="${item.path}"
                          data-is-directory="${isDirectory}"
-                         data-source-id="${source.id}">
+                         data-source-id="${source.id}"
+                         data-has-children="${hasChildren}">
                         ${isDirectory ? `<span class="tree-toggle">${hasChildren ? '+' : ''}</span>` : '<span class="tree-toggle-placeholder"></span>'}
                         <span class="tree-icon">${icon}</span>
                         <span class="tree-name">${this.escapeHtml(item.name)}</span>
@@ -725,21 +966,19 @@ class SourceSelector {
                         </div>
                     </div>
             `;
-            
-            if (hasChildren) {
-                const childContainer = document.createElement('div');
-                childContainer.className = 'tree-children collapsed';
-                this.renderFileTree(item.children, childContainer, source, level + 1);
-                itemHtml += childContainer.outerHTML;
+
+            // For lazy loading, always add empty children container for directories
+            if (isDirectory && hasChildren) {
+                itemHtml += '<div class="tree-children collapsed" data-loaded="false"></div>';
             }
-            
+
             itemHtml += '</div>';
             return itemHtml;
         }).join('');
-        
+
         container.innerHTML = html;
-        
-        // Add click handlers
+
+        // Add click handlers for files
         container.querySelectorAll('.tree-item.file').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -747,16 +986,135 @@ class SourceSelector {
             });
         });
 
+        // Add lazy loading toggle handlers
         container.querySelectorAll('.tree-toggle').forEach(toggle => {
-            toggle.addEventListener('click', (e) => {
+            toggle.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                const children = e.target.parentElement.nextElementSibling;
-                if (children && children.classList.contains('tree-children')) {
-                    children.classList.toggle('collapsed');
-                    e.target.textContent = children.classList.contains('collapsed') ? '+' : '-';
-                }
+                await this.handleTreeToggle(toggle, source);
             });
         });
+    }
+
+    /**
+     * Handle tree toggle with lazy loading
+     */
+    async handleTreeToggle(toggle, source) {
+        const treeItem = toggle.closest('.tree-item');
+        const treeContainer = toggle.closest('.tree-item-container');
+        const children = treeContainer.querySelector('.tree-children');
+
+        if (!children || treeItem.dataset.isDirectory !== 'true') return;
+
+        const isCollapsed = children.classList.contains('collapsed');
+        const folderPath = treeItem.dataset.path;
+        const explorerState = this.state.getExplorerState(source.id);
+
+        if (isCollapsed) {
+            // Expanding - load content if not already loaded
+            if (children.dataset.loaded !== 'true') {
+                toggle.innerHTML = '⟳'; // Loading spinner
+
+                try {
+                    // Use new paginated API to load folder contents
+                    const result = await this.loadFolderContents(folderPath, source);
+
+                    if (result.success && result.items.length > 0) {
+                        // Render children with lazy loading
+                        this.renderFileTree(result.items, children, source, 1);
+                        children.dataset.loaded = 'true';
+
+                        // Cache the data
+                        this.persistentCache.cacheFolderData(source.id, folderPath, result, {
+                            page: 1,
+                            limit: 50
+                        });
+                    } else {
+                        children.innerHTML = '<div style="padding: 10px; color: #666;">Empty folder</div>';
+                    }
+                } catch (error) {
+                    console.error('Failed to load folder contents:', error);
+                    children.innerHTML = '<div style="padding: 10px; color: #e74c3c;">Failed to load contents</div>';
+                }
+            }
+
+            // Expand
+            children.classList.remove('collapsed');
+            toggle.textContent = '-';
+            explorerState.addExpandedPath(folderPath);
+        } else {
+            // Collapse
+            children.classList.add('collapsed');
+            toggle.textContent = '+';
+            explorerState.removeExpandedPath(folderPath);
+        }
+
+        // Save state after toggle
+        this.persistentCache.saveState(this.state);
+    }
+
+    /**
+     * Convert full path to relative path for API calls
+     */
+    getRelativePathForAPI(fullPath, source) {
+        if (!fullPath) return '';
+
+        if (source.type === 's3') {
+            // For S3: convert s3://bucket/path/ to path
+            const s3Match = fullPath.match(/^s3:\/\/[^\/]+\/(.*)$/);
+            if (s3Match) {
+                let relativePath = s3Match[1];
+                // Remove trailing slash for consistency
+                if (relativePath.endsWith('/')) {
+                    relativePath = relativePath.slice(0, -1);
+                }
+                return relativePath;
+            }
+        } else if (source.type === 'local_file') {
+            // For local files: extract relative path from full path
+            const config = source.config;
+            if (config && config.path && fullPath.startsWith(config.path)) {
+                let relativePath = fullPath.substring(config.path.length);
+                if (relativePath.startsWith('/')) {
+                    relativePath = relativePath.substring(1);
+                }
+                return relativePath;
+            }
+        }
+
+        // Fallback: return the path as-is
+        return fullPath;
+    }
+
+    /**
+     * Load folder contents using new paginated API
+     */
+    async loadFolderContents(folderPath, source, page = 1, limit = 50) {
+        // Check cache first
+        const cachedData = this.persistentCache.getCachedFolderData(source.id, folderPath, { page, limit });
+        if (cachedData) {
+            return cachedData.data;
+        }
+
+        // Convert full path to relative path for API
+        const relativePath = this.getRelativePathForAPI(folderPath, source);
+
+        // Build API URL
+        const params = new URLSearchParams({
+            path: relativePath || '',
+            page: page.toString(),
+            limit: limit.toString(),
+            sort_by: 'name',
+            sort_order: 'asc'
+        });
+
+        const response = await fetch(`/api/sources/${source.id}/browse-paginated?${params}`);
+
+        if (!response.ok) {
+            const errorResult = await response.json();
+            throw new Error(errorResult.error || `HTTP ${response.status}`);
+        }
+
+        return await response.json();
     }
 
     /**
@@ -866,33 +1224,28 @@ class SourceSelector {
                 fetchBtn.textContent = 'Loading...';
             }
 
-            const response = await fetch(`/api/sources/${source.id}/fetch`);
-            
+            // Use new paginated endpoint for directory sources
+            const response = await fetch(`/api/sources/${source.id}/browse-paginated?page=1&limit=50&sort_by=name&sort_order=asc`);
+
             if (response.ok) {
-                const contentType = response.headers.get('content-type');
-                
-                if (contentType && contentType.includes('application/json')) {
-                    // Directory response
-                    const result = await response.json();
-                    
-                    if (result.type === 'directory') {
-                        // Show directory browser in explorer panel
-                        this.showExplorerPanel(source, result);
-                    } else if (result.type === 'file') {
-                        // Show file info in explorer panel
-                        this.showFileInfo(source, result);
-                    } else {
-                        throw new Error('Unknown response type');
-                    }
+                const result = await response.json();
+
+                if (result.success && result.items) {
+                    // Directory response from paginated endpoint
+                    // Convert to old format for compatibility
+                    const directoryData = {
+                        type: 'directory',
+                        tree: result.items,
+                        items: result.items,
+                        pagination: result.pagination,
+                        base_path: result.source_type === 's3' ? `s3://${result.items[0]?.path?.split('/')[2] || ''}` : '',
+                        current_path: result.path || ''
+                    };
+
+                    // Show directory browser in explorer panel
+                    this.showExplorerPanel(source, directoryData);
                 } else {
-                    // File content response
-                    const data = await response.text();
-                    this.hide();
-                    
-                    // Trigger fetch callback
-                    if (this.options.onFetch) {
-                        this.options.onFetch(data, source);
-                    }
+                    throw new Error(result.error || 'Failed to fetch directory data');
                 }
             } else {
                 const errorResult = await response.json();
@@ -915,11 +1268,18 @@ class SourceSelector {
         }
     }
 
-showExplorerPanel(source, directoryData) {
+showExplorerPanel(source, directoryData, isUserInitiated = true) {
+        // Update both legacy and new state management
         this.currentExplorerSource = source;
+
+        // Only set current explorer source if this was user-initiated (not restoration)
+        if (isUserInitiated) {
+            this.state.setCurrentExplorerSource(source.id);
+        }
+
         const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
         const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
-        
+
         if (!explorerPanel || !explorerContent) {
             console.error(`Explorer panel not found for ${this.options.containerId}`);
             return;
@@ -936,11 +1296,25 @@ showExplorerPanel(source, directoryData) {
 
         // Create file explorer card and render the tree
         explorerContent.innerHTML = this.createFileExplorerCard(source, directoryData);
-        
-        // Render the tree inside the card
+
+        // Render the tree inside the card with lazy loading
         const treeContainer = explorerContent.querySelector('.file-tree-container');
         if (treeContainer) {
-            this.renderFileTree(directoryData.tree, treeContainer, source, 0);
+            // Use the new lazy loading approach - only render top level initially
+            this.renderFileTree(directoryData.tree || directoryData.items, treeContainer, source, 0);
+
+            // After rendering, restore expanded state (but don't save state immediately)
+            if (!isUserInitiated) {
+                setTimeout(() => {
+                    const explorerState = this.state.getExplorerState(source.id);
+                    this.restoreTreeExpandedState(explorerState);
+                }, 50);
+            }
+        }
+
+        // Only save state if this was user-initiated
+        if (isUserInitiated) {
+            this.persistentCache.saveState(this.state);
         }
     }
 
@@ -980,15 +1354,97 @@ showExplorerPanel(source, directoryData) {
     }
 
     /**
-     * Refresh the explorer view
+     * Clear cache for a specific source
+     */
+    clearSourceCache(sourceId) {
+        // Clear frontend sessionStorage cache for this source
+        const keysToRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && key.startsWith(`folder_${sourceId}_`)) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(key => sessionStorage.removeItem(key));
+
+        // Clear the explorer state loaded data for this source
+        const explorerState = this.state.getExplorerState(sourceId);
+        explorerState.loadedData.clear();
+    }
+
+    /**
+     * Refresh the explorer view with cache invalidation
      */
     async refreshExplorer(button) {
         if (this.currentExplorerSource) {
+            const sourceId = this.currentExplorerSource.id;
+
             // Add spinning animation
             button.classList.add('spinning');
-            await this.fetchSourceData(this.currentExplorerSource);
-            // Remove spinning animation
-            button.classList.remove('spinning');
+
+            try {
+                // Clear frontend cache for this source
+                this.clearSourceCache(sourceId);
+
+                // Force refresh with cache-busting parameter
+                await this.fetchSourceDataWithCacheBust(this.currentExplorerSource);
+
+                // Clear expanded state and reload from fresh data
+                const explorerState = this.state.getExplorerState(sourceId);
+                explorerState.expandedPaths.clear();
+                explorerState.loadedData.clear();
+
+                // Save cleared state to prevent auto-restoration
+                this.persistentCache.saveState(this.state);
+
+                // Don't auto-restore expansion to avoid prefetching nested folders
+                // User can manually expand folders if needed
+
+            } catch (error) {
+                console.error('Error refreshing explorer:', error);
+            } finally {
+                // Remove spinning animation
+                button.classList.remove('spinning');
+            }
+        }
+    }
+
+    /**
+     * Fetch source data with cache busting for refresh
+     */
+    async fetchSourceDataWithCacheBust(source) {
+        try {
+            // Use new paginated endpoint with cache-busting parameter
+            const cacheBuster = Date.now();
+            const response = await fetch(`/api/sources/${source.id}/browse-paginated?page=1&limit=50&sort_by=name&sort_order=asc&refresh=${cacheBuster}`);
+
+            if (response.ok) {
+                const result = await response.json();
+
+                if (result.success && result.items) {
+                    // Directory response from paginated endpoint
+                    // Convert to old format for compatibility
+                    const directoryData = {
+                        type: 'directory',
+                        tree: result.items,
+                        items: result.items,
+                        pagination: result.pagination,
+                        base_path: result.source_type === 's3' ? `s3://${result.items[0]?.path?.split('/')[2] || ''}` : '',
+                        current_path: result.path || ''
+                    };
+
+                    // Show directory browser in explorer panel
+                    this.showExplorerPanel(source, directoryData);
+                } else {
+                    throw new Error(result.error || 'Failed to fetch directory data');
+                }
+            } else {
+                const errorResult = await response.json();
+                throw new Error(errorResult.error || `HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error fetching source data with cache bust:', error);
+            throw error;
         }
     }
 
@@ -1105,12 +1561,28 @@ showExplorerPanel(source, directoryData) {
         const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
         if (explorerPanel) {
             explorerPanel.style.display = 'none';
-            
+
             // Reset panel header
             const panelHeader = explorerPanel.querySelector('.panel-header h3');
             if (panelHeader) {
                 panelHeader.textContent = 'Explorer';
             }
+        }
+
+        // Clear the current explorer state to prevent auto-restoration
+        if (this.currentExplorerSource) {
+            const explorerState = this.state.getExplorerState(this.currentExplorerSource.id);
+            explorerState.expandedPaths.clear();
+            explorerState.loadedData.clear();
+            explorerState.selectedFile = null;
+            explorerState.scrollPosition = 0;
+
+            // Clear the current explorer source
+            this.currentExplorerSource = null;
+            this.state.currentExplorerSourceId = null;
+
+            // Save the cleared state
+            this.persistentCache.saveState(this.state);
         }
         
         this.currentExplorerSource = null;
@@ -1212,34 +1684,211 @@ showExplorerPanel(source, directoryData) {
             await this.initializeComponent();
             this.initialized = true;
         }
-        
+
         const modal = document.getElementById(this.options.containerId);
         const overlay = document.getElementById(`${this.options.containerId}-overlay`);
-        
+
         overlay.style.display = 'block';
         modal.style.display = 'flex';
         this.isVisible = true;
-        
+
         // Clear search when showing
         const searchInput = document.getElementById(`${this.options.containerId}-search`);
         if (searchInput) {
             searchInput.value = '';
         }
-        
-        // Reload sources when showing
-        this.loadSources();
+
+        // Load sources only if we don't have them yet
+        if (this.sources.length === 0) {
+            this.loadSources();
+        }
+
+        // Only restore explorer state if there's meaningful interaction to restore
+        // Don't auto-expand just because we have a currentExplorerSourceId
+        if (this.state.currentExplorerSourceId) {
+            const explorerState = this.state.getExplorerState(this.state.currentExplorerSourceId);
+            const hasExpandedPaths = explorerState.expandedPaths.size > 0;
+            const hasSelectedFile = explorerState.selectedFile !== null;
+            const hasScrollPosition = explorerState.scrollPosition > 0;
+
+            if (hasExpandedPaths || hasSelectedFile || hasScrollPosition) {
+                await this.restoreExplorerState(this.state.currentExplorerSourceId);
+            }
+        }
     }
 
     /**
      * Hide the source selector
      */
     hide() {
+        // Save current state before hiding
+        this.saveCurrentExplorerState();
+
         const modal = document.getElementById(this.options.containerId);
         const overlay = document.getElementById(`${this.options.containerId}-overlay`);
-        
+
         overlay.style.display = 'none';
         modal.style.display = 'none';
         this.isVisible = false;
+
+        // Don't clear explorer content - keep it for restoration
+    }
+
+    /**
+     * Save current explorer state
+     */
+    saveCurrentExplorerState() {
+        if (!this.currentExplorerSource) return;
+
+        const sourceId = this.currentExplorerSource.id;
+        const explorerState = this.state.getExplorerState(sourceId);
+
+        // Save expanded paths
+        const expandedElements = document.querySelectorAll('.tree-children:not(.collapsed)');
+        expandedElements.forEach(element => {
+            const treeItem = element.previousElementSibling;
+            if (treeItem && treeItem.dataset && treeItem.dataset.path) {
+                explorerState.addExpandedPath(treeItem.dataset.path);
+            }
+        });
+
+        // Save scroll position
+        const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
+        if (explorerContent) {
+            explorerState.scrollPosition = explorerContent.scrollTop;
+        }
+
+        // Save selected file
+        const selectedElement = document.querySelector('.tree-item.selected');
+        if (selectedElement && selectedElement.dataset.path) {
+            explorerState.selectedFile = selectedElement.dataset.path;
+        }
+
+        // Update current explorer source in state
+        this.state.setCurrentExplorerSource(sourceId);
+
+        // Persist to localStorage
+        this.persistentCache.saveState(this.state);
+    }
+
+    /**
+     * Fetch source data for restoration purposes (doesn't update state)
+     */
+    async fetchSourceDataForRestoration(source) {
+        try {
+            // Use new paginated endpoint for directory sources
+            const response = await fetch(`/api/sources/${source.id}/browse-paginated?page=1&limit=50&sort_by=name&sort_order=asc`);
+
+            if (response.ok) {
+                const result = await response.json();
+
+                if (result.success && result.items) {
+                    // Directory response from paginated endpoint
+                    const directoryData = {
+                        type: 'directory',
+                        tree: result.items,
+                        items: result.items,
+                        pagination: result.pagination,
+                        base_path: result.source_type === 's3' ? `s3://${result.items[0]?.path?.split('/')[2] || ''}` : '',
+                        current_path: result.path || ''
+                    };
+
+                    // Show directory browser in explorer panel (mark as not user-initiated)
+                    this.showExplorerPanel(source, directoryData, false);
+                } else {
+                    throw new Error(result.error || 'Failed to fetch directory data');
+                }
+            } else {
+                const errorResult = await response.json();
+                throw new Error(errorResult.error || `HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error fetching source data for restoration:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Restore explorer state for a source
+     */
+    async restoreExplorerState(sourceId) {
+        const source = this.sources.find(s => s.id === sourceId);
+        if (!source) return;
+
+        const explorerPanel = document.getElementById(`${this.options.containerId}-explorer`);
+        const explorerState = this.state.getExplorerState(sourceId);
+
+        // Only restore if the explorer was actually used before
+        // Check if there are expanded paths, selected files, or scroll position
+        const hasExpandedPaths = explorerState.expandedPaths.size > 0;
+        const hasSelectedFile = explorerState.selectedFile !== null;
+        const hasScrollPosition = explorerState.scrollPosition > 0;
+
+        const shouldRestore = hasExpandedPaths || hasSelectedFile || hasScrollPosition;
+
+        if (!shouldRestore) {
+            // No meaningful state to restore, don't auto-open explorer
+            return;
+        }
+
+        // If explorer panel is hidden, we need to re-fetch and show it
+        if (!explorerPanel || explorerPanel.style.display === 'none') {
+            try {
+                // Re-fetch source data to show explorer (mark as restoration, not user-initiated)
+                await this.fetchSourceDataForRestoration(source);
+
+                // Wait for DOM to be ready, then restore state
+                setTimeout(() => {
+                    this.restoreTreeExpandedState(explorerState);
+                }, 100);
+            } catch (error) {
+                console.error('Failed to restore explorer state:', error);
+            }
+        } else {
+            // Explorer is already visible, just restore expanded state
+            this.restoreTreeExpandedState(explorerState);
+        }
+    }
+
+    /**
+     * Restore tree expanded state and scroll position
+     */
+    restoreTreeExpandedState(explorerState) {
+        // Restore expanded paths
+        explorerState.expandedPaths.forEach(path => {
+            const treeItem = document.querySelector(`[data-path="${path}"]`);
+            if (treeItem) {
+                const toggle = treeItem.querySelector('.tree-toggle');
+                const treeItemContainer = treeItem.closest('.tree-item-container');
+                if (treeItemContainer) {
+                    const children = treeItemContainer.querySelector('.tree-children');
+
+                    if (toggle && children && children.classList.contains('collapsed')) {
+                        children.classList.remove('collapsed');
+                        toggle.textContent = '-';
+                    }
+                }
+            }
+        });
+
+        // Restore scroll position
+        const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
+        if (explorerContent && explorerState.scrollPosition > 0) {
+            explorerContent.scrollTop = explorerState.scrollPosition;
+        }
+
+        // Restore selected file
+        if (explorerState.selectedFile) {
+            const selectedElement = document.querySelector(`[data-path="${explorerState.selectedFile}"]`);
+            if (selectedElement) {
+                // Remove previous selection
+                document.querySelectorAll('.tree-item.selected').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                // Add selection to restored item
+                selectedElement.classList.add('selected');
+            }
+        }
     }
 
     /**

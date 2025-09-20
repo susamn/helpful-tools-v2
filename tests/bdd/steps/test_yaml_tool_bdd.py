@@ -193,12 +193,9 @@ def step_navigate_to_yaml_tool(context):
     print("TODO: Initialize WebDriver and navigate to YAML tool page")
 
 
-@given('the page is fully loaded')
-def step_wait_for_page_load(context):
-    """Wait for the page to fully load."""
-    if context.page:
-        context.page.wait_for_page_load()
-    print("TODO: Wait for page to fully load")
+# Page loading step moved to common_steps.py
+# Button click steps moved to common_steps.py
+# Common validation steps moved to common_steps.py
 
 
 @given('I have valid YAML input')
@@ -325,31 +322,7 @@ def step_paste_yaml_input(context):
     print(f"TODO: Paste YAML into input field")
 
 
-@when('I click the "{button_name}" button')
-def step_click_button(context, button_name):
-    """Click the specified button."""
-    if context.page:
-        if button_name.lower() == "format":
-            context.page.click_format_button()
-        elif button_name.lower() == "minify":
-            context.page.click_minify_button()
-        elif button_name.lower() == "stringify":
-            context.page.click_stringify_button()
-        elif button_name.lower() == "clear":
-            context.page.click_clear_button()
-        elif button_name.lower() == "copy":
-            context.page.click_copy_button()
-        elif button_name.lower() == "toggle markup":
-            context.page.click_toggle_markup_button()
-        elif button_name.lower() == "expand all":
-            context.page.click_expand_all_button()
-        elif button_name.lower() == "collapse all":
-            context.page.click_collapse_all_button()
-
-        # Wait for processing to complete
-        context.page.wait_for_processing()
-
-    print(f"TODO: Click the {button_name} button")
+# Button click step moved to common_steps.py
 
 
 @when('I enter the path "{path}" in the search field')
@@ -399,10 +372,7 @@ def step_verify_valid_yaml_output(context):
     print("TODO: Verify output is valid YAML")
 
 
-@then('the output should contain proper line breaks and spacing')
-def step_verify_formatting_details(context):
-    """Verify proper line breaks and spacing."""
-    print("TODO: Verify proper line breaks and spacing in output")
+# @then('the output should contain proper line breaks and spacing') - duplicate, exists in test_json_tool_bdd.py
 
 
 @then('I should see a YAML validation error message')
@@ -415,16 +385,10 @@ def step_verify_error_message(context):
     print("TODO: Verify YAML validation error message")
 
 
-@then('the error should indicate the location of the syntax error')
-def step_verify_error_location(context):
-    """Verify error message includes location information."""
-    print("TODO: Verify error indicates syntax error location")
+# @then('the error should indicate the location of the syntax error') - duplicate, exists in test_json_tool_bdd.py
 
 
-@then('the output field should not be updated with invalid content')
-def step_verify_output_unchanged(context):
-    """Verify output field is not updated with invalid content."""
-    print("TODO: Verify output field remains unchanged for invalid input")
+# @then('the output field should not be updated with invalid content') - duplicate, exists in test_json_tool_bdd.py
 
 
 @then('the YAML should be compressed to a more compact format')
@@ -454,17 +418,7 @@ def step_verify_yaml_to_json(context):
     print("TODO: Verify YAML converted to JSON string")
 
 
-@then('the output should be valid JSON')
-def step_verify_valid_json_output(context):
-    """Verify the output is valid JSON."""
-    if context.page:
-        output = context.page.get_output_text()
-        try:
-            import json
-            json.loads(output)
-        except json.JSONDecodeError as e:
-            assert False, f"Output is not valid JSON: {e}"
-    print("TODO: Verify output is valid JSON")
+# @then('the output should be valid JSON') - duplicate, exists in test_json_tool_bdd.py
 
 
 @then('all YAML data should be preserved')
@@ -474,28 +428,13 @@ def step_verify_data_preserved(context):
 
 
 # Common step implementations (similar to JSON tool)
-@then('the input field should be empty')
-def step_verify_input_empty(context):
-    """Verify input field is empty."""
-    if context.page:
-        input_text = context.page.get_input_text()
-        assert input_text.strip() == "", "Input field should be empty"
-    print("TODO: Verify input field is empty")
+# @then('the input field should be empty') - duplicate, exists in test_json_tool_bdd.py
 
 
-@then('the output field should be empty')
-def step_verify_output_empty(context):
-    """Verify output field is empty."""
-    if context.page:
-        output_text = context.page.get_output_text()
-        assert output_text.strip() == "", "Output field should be empty"
-    print("TODO: Verify output field is empty")
+# @then('the output field should be empty') - duplicate, exists in test_json_tool_bdd.py
 
 
-@then('any error messages should be cleared')
-def step_verify_errors_cleared(context):
-    """Verify error messages are cleared."""
-    print("TODO: Verify error messages are cleared")
+# @then('any error messages should be cleared') - moved to common_steps.py
 
 
 @then('the formatted YAML should be copied to clipboard')
@@ -504,13 +443,7 @@ def step_verify_clipboard_content(context):
     print("TODO: Verify formatted YAML copy action was triggered")
 
 
-@then('I should see a success message confirming the copy action')
-def step_verify_copy_success_message(context):
-    """Verify copy success message is displayed."""
-    if context.page:
-        success_msg = context.page.get_success_message()
-        assert success_msg is not None, "Expected success message to be displayed"
-    print("TODO: Verify copy success message")
+# @then('I should see a success message confirming the copy action') - moved to common_steps.py
 
 
 @then('the YAML should be processed without performance issues')
@@ -525,46 +458,25 @@ def step_verify_operation_time(context, seconds):
     print(f"TODO: Verify operation completes within {seconds} seconds")
 
 
-@then('all data types should be preserved in the output')
-def step_verify_datatypes_preserved(context):
-    """Verify all YAML data types are preserved."""
-    print("TODO: Verify all data types are preserved")
+# @then('all data types should be preserved in the output') - moved to common_steps.py
 
 
-@then('strings should remain as strings')
-def step_verify_strings_preserved(context):
-    """Verify strings remain as strings."""
-    print("TODO: Verify strings remain as strings")
+# @then('strings should remain as strings') - moved to common_steps.py
 
 
-@then('numbers should remain as numbers')
-def step_verify_numbers_preserved(context):
-    """Verify numbers remain as numbers."""
-    print("TODO: Verify numbers remain as numbers")
+# @then('numbers should remain as numbers') - moved to common_steps.py
 
 
-@then('booleans should remain as booleans')
-def step_verify_booleans_preserved(context):
-    """Verify booleans remain as booleans."""
-    print("TODO: Verify booleans remain as booleans")
+# @then('booleans should remain as booleans') - moved to common_steps.py
 
 
-@then('null values should remain as null')
-def step_verify_nulls_preserved(context):
-    """Verify null values remain as null."""
-    print("TODO: Verify null values remain as null")
+# @then('null values should remain as null') - moved to common_steps.py
 
 
-@then('each nesting level should be properly indented')
-def step_verify_nested_indentation(context):
-    """Verify nested YAML indentation."""
-    print("TODO: Verify each nesting level is properly indented")
+# @then('each nesting level should be properly indented') - moved to common_steps.py
 
 
-@then('the structure should be clearly visible')
-def step_verify_structure_visibility(context):
-    """Verify YAML structure is clearly visible."""
-    print("TODO: Verify structure is clearly visible")
+# @then('the structure should be clearly visible') - duplicate, exists in test_json_tool_bdd.py
 
 
 @then('all elements should be properly aligned')
@@ -573,37 +485,19 @@ def step_verify_element_alignment(context):
     print("TODO: Verify all elements are properly aligned")
 
 
-@then('I should see a message indicating empty input')
-def step_verify_empty_input_message(context):
-    """Verify empty input message."""
-    print("TODO: Verify empty input message is displayed")
+# @then('I should see a message indicating empty input') - moved to common_steps.py
 
 
-@then('the output field should remain empty')
-def step_verify_output_remains_empty(context):
-    """Verify output field remains empty."""
-    print("TODO: Verify output field remains empty")
+# @then('the output field should remain empty') - duplicate, exists in test_json_tool_bdd.py
 
 
-@then('no error should be thrown')
-def step_verify_no_error(context):
-    """Verify no error is thrown."""
-    if context.page:
-        error_msg = context.page.get_error_message()
-        assert error_msg is None, "Expected no error message"
-    print("TODO: Verify no error is thrown")
+# @then('no error should be thrown') - moved to common_steps.py
 
 
-@then('the special characters should be preserved')
-def step_verify_special_chars_preserved(context):
-    """Verify special characters are preserved."""
-    print("TODO: Verify special characters are preserved")
+# @then('the special characters should be preserved') - duplicate, exists in test_json_tool_bdd.py
 
 
-@then('the unicode characters should be properly displayed')
-def step_verify_unicode_displayed(context):
-    """Verify unicode characters are displayed properly."""
-    print("TODO: Verify unicode characters are properly displayed")
+# @then('the unicode characters should be properly displayed') - duplicate, exists in test_json_tool_bdd.py
 
 
 @then('the YAML should be valid after formatting')

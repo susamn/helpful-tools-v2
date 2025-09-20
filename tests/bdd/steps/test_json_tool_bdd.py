@@ -136,12 +136,7 @@ def step_navigate_to_json_tool(context):
     print("TODO: Initialize WebDriver and navigate to JSON tool page")
 
 
-@given('the page is fully loaded')
-def step_wait_for_page_load(context):
-    """Wait for the page to fully load."""
-    if context.page:
-        context.page.wait_for_page_load()
-    print("TODO: Wait for page to fully load")
+# @given('the page is fully loaded') - moved to common_steps.py
 
 
 @given('I have valid JSON input')
@@ -226,23 +221,7 @@ def step_paste_json_input(context):
     print(f"TODO: Paste JSON into input field")
 
 
-@when('I click the "{button_name}" button')
-def step_click_button(context, button_name):
-    """Click the specified button."""
-    if context.page:
-        if button_name.lower() == "format":
-            context.page.click_format_button()
-        elif button_name.lower() == "minify":
-            context.page.click_minify_button()
-        elif button_name.lower() == "clear":
-            context.page.click_clear_button()
-        elif button_name.lower() == "copy":
-            context.page.click_copy_button()
-
-        # Wait for processing to complete
-        context.page.wait_for_processing()
-
-    print(f"TODO: Click the {button_name} button")
+# @when('I click the "{button_name}" button') - moved to common_steps.py
 
 
 @then('the JSON should be formatted with proper indentation')
@@ -329,10 +308,7 @@ def step_verify_output_empty(context):
     print("TODO: Verify output field is empty")
 
 
-@then('any error messages should be cleared')
-def step_verify_errors_cleared(context):
-    """Verify error messages are cleared."""
-    print("TODO: Verify error messages are cleared")
+# @then('any error messages should be cleared') - moved to common_steps.py
 
 
 @then('the formatted JSON should be copied to clipboard')
@@ -343,13 +319,7 @@ def step_verify_clipboard_content(context):
     print("TODO: Verify formatted JSON copy action was triggered (clipboard verification via DOM/JS events)")
 
 
-@then('I should see a success message confirming the copy action')
-def step_verify_copy_success_message(context):
-    """Verify copy success message is displayed."""
-    if context.page:
-        success_msg = context.page.get_success_message()
-        assert success_msg is not None, "Expected success message to be displayed"
-    print("TODO: Verify copy success message")
+# @then('I should see a success message confirming the copy action') - moved to common_steps.py
 
 
 @then('the JSON should be processed without performance issues')
@@ -364,40 +334,14 @@ def step_verify_operation_time(context, seconds):
     print(f"TODO: Verify operation completes within {seconds} seconds")
 
 
-@then('all data types should be preserved in the output')
-def step_verify_datatypes_preserved(context):
-    """Verify all JSON data types are preserved."""
-    print("TODO: Verify all data types are preserved")
+# @then('all data types should be preserved in the output') - moved to common_steps.py
 
 
-@then('strings should remain as strings')
-def step_verify_strings_preserved(context):
-    """Verify strings remain as strings."""
-    print("TODO: Verify strings remain as strings")
-
-
-@then('numbers should remain as numbers')
-def step_verify_numbers_preserved(context):
-    """Verify numbers remain as numbers."""
-    print("TODO: Verify numbers remain as numbers")
-
-
-@then('booleans should remain as booleans')
-def step_verify_booleans_preserved(context):
-    """Verify booleans remain as booleans."""
-    print("TODO: Verify booleans remain as booleans")
-
-
-@then('null values should remain as null')
-def step_verify_nulls_preserved(context):
-    """Verify null values remain as null."""
-    print("TODO: Verify null values remain as null")
-
-
-@then('each nesting level should be properly indented')
-def step_verify_nested_indentation(context):
-    """Verify nested JSON indentation."""
-    print("TODO: Verify each nesting level is properly indented")
+# @then('strings should remain as strings') - moved to common_steps.py
+# @then('numbers should remain as numbers') - moved to common_steps.py
+# @then('booleans should remain as booleans') - moved to common_steps.py
+# @then('null values should remain as null') - moved to common_steps.py
+# @then('each nesting level should be properly indented') - moved to common_steps.py
 
 
 @then('the structure should be clearly visible')
@@ -412,10 +356,7 @@ def step_verify_bracket_alignment(context):
     print("TODO: Verify brackets and braces are properly aligned")
 
 
-@then('I should see a message indicating empty input')
-def step_verify_empty_input_message(context):
-    """Verify empty input message."""
-    print("TODO: Verify empty input message is displayed")
+# @then('I should see a message indicating empty input') - moved to common_steps.py
 
 
 @then('the output field should remain empty')
@@ -424,13 +365,7 @@ def step_verify_output_remains_empty(context):
     print("TODO: Verify output field remains empty")
 
 
-@then('no error should be thrown')
-def step_verify_no_error(context):
-    """Verify no error is thrown."""
-    if context.page:
-        error_msg = context.page.get_error_message()
-        assert error_msg is None, "Expected no error message"
-    print("TODO: Verify no error is thrown")
+# @then('no error should be thrown') - moved to common_steps.py
 
 
 @then('the special characters should be preserved')

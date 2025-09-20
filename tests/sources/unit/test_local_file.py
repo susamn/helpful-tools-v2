@@ -40,8 +40,9 @@ class TestLocalFileSource:
     
     def create_config(self, path=None, **kwargs):
         """Helper to create SourceConfig."""
+        import uuid
         return SourceConfig(
-            source_id='test-123',
+            source_id=f'test-local-{uuid.uuid4().hex[:8]}',
             name='Test Local File',
             source_type='local_file',
             static_config=kwargs.get('static_config', {}),
@@ -524,8 +525,9 @@ class TestLocalFileDirectoryDetection:
     
     def create_config(self, path, **kwargs):
         """Helper to create SourceConfig."""
+        import uuid
         return SourceConfig(
-            source_id='test-123',
+            source_id=f'test-local-dir-{uuid.uuid4().hex[:8]}',
             name='Test Local Source',
             source_type='local_file',
             static_config=kwargs.get('static_config', {}),

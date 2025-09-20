@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Union, Iterator, List, Dict, Any, Optional
 import stat
 
-from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult, PaginationOptions, PaginatedResult
 from .exceptions import (
-    SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
+    SourceNotFoundError, SourceConnectionError, SourcePermissionError,
     SourceDataError, SourceTimeoutError
 )
 
@@ -252,7 +252,10 @@ class LocalFileSource(BaseDataSource):
     
     def list_contents(self, path: Optional[str] = None) -> List[Dict[str, Any]]:
         """List contents of a local directory."""
-        target_path = Path(path) if path else Path(self._resolved_path)
+        if path:
+            target_path = Path(self._resolved_path) / path
+        else:
+            target_path = Path(self._resolved_path)
         
         if not target_path.exists():
             raise SourceNotFoundError(f"Directory does not exist: {target_path}")
@@ -295,9 +298,129 @@ class LocalFileSource(BaseDataSource):
                     })
             
             return contents
-            
+
         except Exception as e:
             raise SourceConnectionError(f"Failed to list directory: {str(e)}")
+
+    def list_contents_paginated(self, path: Optional[str] = None,
+                              pagination: Optional[PaginationOptions] = None) -> PaginatedResult:
+        """List contents of a local directory with pagination and efficient scanning."""
+        if pagination is None:
+            pagination = PaginationOptions()
+
+        # Normalize path
+        normalized_path = path or ""
+
+        # Try cache first - get full directory listing
+        cached_items = self._cache.get_path_data(normalized_path)
+        if cached_items:
+            # Apply filtering and pagination to cached data
+            filtered_items = self._apply_filters(cached_items, pagination)
+            sorted_items = self._sort_items(filtered_items, pagination.sort_by, pagination.sort_order)
+
+            total_count = len(sorted_items)
+            start_idx = pagination.offset
+            end_idx = start_idx + pagination.limit
+            paginated_items = sorted_items[start_idx:end_idx]
+
+            return PaginatedResult.create(paginated_items, total_count, pagination)
+
+        if path:
+            target_path = Path(self._resolved_path) / path
+        else:
+            target_path = Path(self._resolved_path)
+
+        if not target_path.exists():
+            raise SourceNotFoundError(f"Directory does not exist: {target_path}")
+
+        if not target_path.is_dir():
+            raise SourceDataError(f"Path is not a directory: {target_path}")
+
+        if not os.access(str(target_path), os.R_OK):
+            raise SourcePermissionError(f"No read permission for directory: {target_path}")
+
+        try:
+            # Use os.scandir for efficient directory scanning
+            all_items = []
+            with os.scandir(target_path) as entries:
+                for entry in entries:
+                    try:
+                        # Get stat info efficiently
+                        stat_result = entry.stat()
+
+                        # Apply filter early if specified
+                        is_directory = entry.is_dir()
+                        if pagination.filter_type:
+                            if pagination.filter_type == 'files' and is_directory:
+                                continue
+                            elif pagination.filter_type == 'directories' and not is_directory:
+                                continue
+
+                        # Use base class method for consistent timestamp formatting
+                        time_data = self.format_last_modified(stat_result.st_mtime)
+
+                        item_info = {
+                            'name': entry.name,
+                            'path': str(entry.path),
+                            'type': 'directory' if is_directory else 'file',
+                            'is_directory': is_directory,
+                            'size': stat_result.st_size if not is_directory else None,
+                            'permissions': oct(stat_result.st_mode)[-3:],
+                            'is_symlink': entry.is_symlink()
+                        }
+                        # Add standardized time fields
+                        item_info.update(time_data)
+
+                        # Add lazy loading metadata for directories
+                        if is_directory:
+                            item_info['has_children'] = True  # Assume directories have children
+                            item_info['explorable'] = True
+                            item_info['children'] = []  # Empty for lazy loading
+
+                        all_items.append(item_info)
+
+                    except (OSError, PermissionError):
+                        # Skip items we can't access
+                        all_items.append({
+                            'name': entry.name,
+                            'path': str(entry.path),
+                            'type': 'unknown',
+                            'error': 'Permission denied'
+                        })
+
+            # Cache the full directory listing (before pagination)
+            self._cache.cache_path_data(normalized_path, all_items, expanded=True)
+
+            # Apply filtering and pagination
+            filtered_items = self._apply_filters(all_items, pagination)
+            sorted_items = self._sort_items(filtered_items, pagination.sort_by, pagination.sort_order)
+
+            total_count = len(sorted_items)
+            start_idx = pagination.offset
+            end_idx = start_idx + pagination.limit
+            paginated_items = sorted_items[start_idx:end_idx]
+
+            return PaginatedResult.create(paginated_items, total_count, pagination)
+
+        except Exception as e:
+            raise SourceConnectionError(f"Failed to list directory: {str(e)}")
+
+    def _apply_filters(self, items: List[Dict[str, Any]], pagination: PaginationOptions) -> List[Dict[str, Any]]:
+        """Apply filtering based on pagination options."""
+        if not pagination.filter_type:
+            return items
+
+        filtered_items = []
+        for item in items:
+            is_directory = item.get('is_directory', False)
+            if pagination.filter_type == 'files' and not is_directory:
+                filtered_items.append(item)
+            elif pagination.filter_type == 'directories' and is_directory:
+                filtered_items.append(item)
+            elif pagination.filter_type not in ['files', 'directories']:
+                filtered_items.append(item)
+
+        return filtered_items
     
     def is_writable(self) -> bool:
         """Check if the local file source supports writing."""

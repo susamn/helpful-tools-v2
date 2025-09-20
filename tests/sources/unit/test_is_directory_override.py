@@ -288,8 +288,13 @@ class TestBaseClassFallbackBehavior:
         directory_result = source.is_directory()
         file_result = source.is_file()
 
-        # Basic sanity check - they should be opposites
-        assert directory_result != file_result
+        # Basic sanity check - if path doesn't exist, both should be False
+        # If path exists, they should be opposites
+        if not os.path.exists('/tmp/test.txt'):
+            assert directory_result is False
+            assert file_result is False
+        else:
+            assert directory_result != file_result
 
 
 class TestLevelConfigurationAccess:

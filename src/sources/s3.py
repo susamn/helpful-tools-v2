@@ -10,9 +10,9 @@ import time
 import configparser
 from pathlib import Path
 
-from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult, PaginationOptions, PaginatedResult
 from .exceptions import (
-    SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
+    SourceNotFoundError, SourceConnectionError, SourcePermissionError,
     SourceDataError, SourceTimeoutError, SourceAuthenticationError, SourceConfigurationError
 )
 
@@ -396,7 +396,141 @@ class S3Source(BaseDataSource):
                     contents.append(item_info)
             
             return contents
-            
+
+        except Exception as e:
+            error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', 'Unknown')
+            if error_code in ['404', 'NoSuchBucket']:
+                raise SourceNotFoundError(f"S3 bucket not found: {self._bucket}")
+            elif error_code in ['403', 'Forbidden']:
+                raise SourcePermissionError(f"Access denied to list S3 bucket: {self._bucket}")
+            else:
+                raise SourceConnectionError(f"Failed to list S3 contents: {str(e)}")
+
+    def list_contents_paginated(self, path: Optional[str] = None,
+                              pagination: Optional[PaginationOptions] = None) -> PaginatedResult:
+        """List contents of S3 bucket or prefix with pagination using S3's native pagination."""
+        if pagination is None:
+            pagination = PaginationOptions()
+
+        # Normalize path
+        normalized_path = path or ""
+
+        # Try cache first - get full directory listing
+        cached_items = self._cache.get_path_data(normalized_path)
+        if cached_items:
+            # Apply filtering and pagination to cached data
+            filtered_items = self._apply_filters(cached_items, pagination)
+            sorted_items = self._sort_items(filtered_items, pagination.sort_by, pagination.sort_order)
+
+            total_count = len(sorted_items)
+            start_idx = pagination.offset
+            end_idx = start_idx + pagination.limit
+            paginated_items = sorted_items[start_idx:end_idx]
+
+            return PaginatedResult.create(paginated_items, total_count, pagination)
+
+        try:
+            s3_client = self._get_s3_client()
+
+            # Determine prefix to list
+            prefix = path if path else self._key
+            if prefix and not prefix.endswith('/'):
+                prefix += '/'
+
+            # Use S3's native pagination with MaxKeys
+            paginator = s3_client.get_paginator('list_objects_v2')
+
+            # Calculate S3 pagination parameters
+            # S3 paginator uses different parameter names
+            max_keys = min(pagination.limit * pagination.page, 1000)  # S3 max is 1000
+
+            page_iterator = paginator.paginate(
+                Bucket=self._bucket,
+                Prefix=prefix or '',
+                Delimiter='/',
+                PaginationConfig={
+                    'MaxItems': max_keys,
+                    'PageSize': pagination.limit
+                }
+            )
+
+            all_items = []
+
+            for page in page_iterator:
+                # Add directories (common prefixes)
+                for prefix_info in page.get('CommonPrefixes', []):
+                    prefix_name = prefix_info['Prefix'].rstrip('/')
+                    directory_name = prefix_name.split('/')[-1] if '/' in prefix_name else prefix_name
+
+                    # Skip empty directory names
+                    if not directory_name:
+                        continue
+
+                    # Apply filter early
+                    if pagination.filter_type == 'files':
+                        continue
+
+                    all_items.append({
+                        'name': directory_name,
+                        'path': f"s3://{self._bucket}/{prefix_info['Prefix']}",
+                        'type': 'directory',
+                        'is_directory': True,
+                        'has_children': True,  # Assume S3 prefixes have children
+                        'explorable': True,
+                        'children': [],  # Empty for lazy loading
+                        'prefix': prefix_info['Prefix'],
+                        'size': None,
+                        'last_modified': None
+                    })
+
+                # Add files
+                for obj in page.get('Contents', []):
+                    # Skip the prefix itself and empty keys
+                    if obj['Key'] == prefix or not obj['Key'].strip() or obj['Key'].endswith('/'):
+                        continue
+
+                    file_name = obj['Key'].split('/')[-1] if '/' in obj['Key'] else obj['Key']
+
+                    # Skip empty file names
+                    if not file_name:
+                        continue
+
+                    # Apply filter early
+                    if pagination.filter_type == 'directories':
+                        continue
+
+                    # Use base class method for consistent timestamp formatting
+                    time_data = self.format_last_modified(obj['LastModified'])
+
+                    item_info = {
+                        'name': file_name,
+                        'path': f"s3://{self._bucket}/{obj['Key']}",
+                        'type': 'file',
+                        'is_directory': False,
+                        'size': obj['Size'],
+                        'etag': obj['ETag'].strip('"'),
+                        'storage_class': obj.get('StorageClass', 'STANDARD'),
+                        'key': obj['Key']
+                    }
+                    # Add standardized time fields
+                    item_info.update(time_data)
+
+                    all_items.append(item_info)
+
+            # Cache the full directory listing (before pagination)
+            self._cache.cache_path_data(normalized_path, all_items, expanded=True)
+
+            # Apply filtering and pagination
+            filtered_items = self._apply_filters(all_items, pagination)
+            sorted_items = self._sort_items(filtered_items, pagination.sort_by, pagination.sort_order)
+
+            total_count = len(sorted_items)
+            start_idx = pagination.offset
+            end_idx = start_idx + pagination.limit
+            paginated_items = sorted_items[start_idx:end_idx]
+
+            return PaginatedResult.create(paginated_items, total_count, pagination)
+
         except Exception as e:
             error_code = getattr(e, 'response', {}).get('Error', {}).get('Code', 'Unknown')
             if error_code in ['404', 'NoSuchBucket']:
@@ -560,6 +694,23 @@ class S3Source(BaseDataSource):
                     parent_path += '/'
                 return f"{parent_path}{item['name']}/"
     
+    def _apply_filters(self, items: List[Dict[str, Any]], pagination: PaginationOptions) -> List[Dict[str, Any]]:
+        """Apply filtering based on pagination options."""
+        if not pagination.filter_type:
+            return items
+
+        filtered_items = []
+        for item in items:
+            is_directory = item.get('is_directory', False)
+            if pagination.filter_type == 'files' and not is_directory:
+                filtered_items.append(item)
+            elif pagination.filter_type == 'directories' and is_directory:
+                filtered_items.append(item)
+            elif pagination.filter_type not in ['files', 'directories']:
+                filtered_items.append(item)
+
+        return filtered_items
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up S3 client connections."""
         if self._s3_client:
