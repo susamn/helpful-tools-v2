@@ -501,8 +501,13 @@ class JsonTool {
     /**
      * Format JSON with current indent preferences
      */
-    formatJsonWithIndent(obj) {
-        const indent = this.indentPrefs.type === 'tabs' ? '\t' : ' '.repeat(this.indentPrefs.size);
+    formatJsonWithIndent(obj, customIndentSize = null) {
+        let indent;
+        if (customIndentSize !== null) {
+            indent = ' '.repeat(customIndentSize);
+        } else {
+            indent = this.indentPrefs.type === 'tabs' ? '\t' : ' '.repeat(this.indentPrefs.size);
+        }
         return JSON.stringify(obj, null, indent);
     }
 
@@ -887,6 +892,132 @@ class JsonTool {
     }
 
     /**
+     * Extract key from JSONPath expression
+     */
+    extractJsonPathKey(jsonPath) {
+        // Handle different JSONPath patterns
+        const path = jsonPath.trim();
+
+        // Remove $ prefix if present
+        const cleanPath = path.startsWith('$') ? path.substring(1) : path;
+
+        // Split by dots and brackets to get path segments
+        const segments = cleanPath.split(/[.\[\]]+/).filter(Boolean);
+
+        // Return the last segment as the key, or 'value' if complex expression
+        if (segments.length > 0) {
+            const lastSegment = segments[segments.length - 1];
+            // Skip numeric indices and special characters
+            if (!/^\d+$/.test(lastSegment) && !/[*?@()]/.test(lastSegment)) {
+                return lastSegment;
+            }
+        }
+
+        // Fallback for complex expressions
+        return 'value';
+    }
+
+    /**
+     * Build result object based on JSONPath and result values
+     */
+    buildResultObject(jsonPath, resultValues) {
+        const key = this.extractJsonPathKey(jsonPath);
+
+        if (resultValues.length === 0) {
+            return {};
+        } else if (resultValues.length === 1) {
+            // Single result - create object with key-value pair
+            const resultObj = {};
+            resultObj[key] = resultValues[0];
+            return resultObj;
+        } else {
+            // Multiple results - create object with key containing array
+            const resultObj = {};
+            resultObj[key] = resultValues;
+            return resultObj;
+        }
+    }
+
+    /**
+     * Apply deemphasis to result keys while keeping values emphasized
+     */
+    highlightJsonWithDeemphasizedKeys(jsonText) {
+        // Parse the JSON text line by line to identify keys vs values
+        const lines = jsonText.split('\n');
+        let highlighted = '';
+
+        for (let line of lines) {
+            const trimmedLine = line.trim();
+
+            // Check if this line contains a key-value pair
+            const keyValueMatch = line.match(/^(\s*)"([^"]+)":\s*(.+)$/);
+
+            if (keyValueMatch) {
+                const indent = keyValueMatch[1];
+                const key = keyValueMatch[2];
+                const value = keyValueMatch[3];
+
+                // Deemphasize the key, emphasize the value
+                highlighted += `${indent}<span class="deemphasized">"${key}":</span> ${this.highlightJson(value)}\n`;
+            } else {
+                // Regular line (brackets, arrays, etc.) - apply normal highlighting
+                highlighted += this.highlightJson(line) + '\n';
+            }
+        }
+
+        return highlighted.trimEnd(); // Remove trailing newline
+    }
+
+    /**
+     * Format JSONL JSONPath results with proper indentation and highlighting
+     */
+    formatJsonlPathResults(results) {
+        let html = '<span class="deemphasized">[\n</span>';
+
+        results.forEach((res, index) => {
+            // Format each result object
+            html += '<span class="deemphasized">  {\n</span>';
+
+            // from_object field
+            html += '    <span class="deemphasized">"from_object":</span> ';
+            html += `<span class="json-number">${res.from_object}</span>`;
+            html += '<span class="deemphasized">,</span>\n';
+
+            // result field
+            html += '    <span class="deemphasized">"result":</span> ';
+
+            // Format the result object with proper indentation
+            const resultJson = this.formatJsonWithIndent(res.result, 2);
+            const resultLines = resultJson.split('\n');
+
+            if (resultLines.length === 1) {
+                // Single line result - deemphasize keys
+                html += this.highlightJsonWithDeemphasizedKeys(resultJson);
+            } else {
+                // Multi-line result - add proper indentation and deemphasize keys
+                html += '{\n';
+                for (let i = 1; i < resultLines.length - 1; i++) {
+                    const line = resultLines[i];
+                    // Add 6 spaces for proper alignment (4 for object + 2 for result)
+                    html += '      ' + this.highlightJsonWithDeemphasizedKeys(line) + '\n';
+                }
+                html += '    }';
+            }
+
+            html += '\n  <span class="deemphasized">}</span>';
+
+            // Add comma if not last item
+            if (index < results.length - 1) {
+                html += '<span class="deemphasized">,</span>';
+            }
+            html += '\n';
+        });
+
+        html += '<span class="deemphasized">]</span>';
+        return html;
+    }
+
+    /**
      * Perform JSONPath lookup on JSONL data
      */
     performJsonlPathLookup(path) {
@@ -897,47 +1028,39 @@ class JsonTool {
             const paths = path.split(',').map(p => p.trim());
 
             jsonObjects.forEach((obj, index) => {
-                const lineResults = [];
+                let combinedResult = {};
+                let hasResults = false;
                 let error = null;
+
                 for (const p of paths) {
                     const evalResult = this.evaluateJsonPath(obj, p);
                     if (evalResult.error) {
                         error = evalResult.error;
                         break;
                     }
-                    lineResults.push(...evalResult.result);
+
+                    if (evalResult.result.length > 0) {
+                        hasResults = true;
+                        const pathResult = this.buildResultObject(p, evalResult.result);
+                        // Merge results from multiple paths
+                        combinedResult = { ...combinedResult, ...pathResult };
+                    }
                 }
 
                 if (error) {
                     this.showMessage(`Invalid JSONPath expression in object ${index}: ${error}`, 'error');
                     // Continue to next line
-                } else if (lineResults.length > 0) {
+                } else if (hasResults) {
                     results.push({
                         from_object: index,
-                        value: {
-                            result: lineResults
-                        }
+                        result: combinedResult
                     });
                 }
             });
-            
-            if (results.length > 0) {
-                let html = '<span class="deemphasized">[\n</span>';
-                results.forEach((res, index) => {
-                    html += '<span class="deemphasized">  {\n</span>';
-                    html += `    <span class="deemphasized">"from_object": ${res.from_object},</span>\n`;
-                    html += `    <span class="deemphasized">"value": {</span>\n`;
-                    html += `      <span class="deemphasized">"result":</span> ${this.highlightJson(this.formatJsonWithIndent(res.value.result))}\n`;
-                    html += `    <span class="deemphasized">}</span>\n`;
-                    html += '  <span class="deemphasized">}</span>';
-                    if (index < results.length - 1) {
-                        html += '<span class="deemphasized">,</span>';
-                    }
-                    html += '\n';
-                });
-                html += '<span class="deemphasized">]</span>';
 
-                this.displayOutput(html, results, true, true);
+            if (results.length > 0) {
+                const formattedResults = this.formatJsonlPathResults(results);
+                this.displayOutput(formattedResults, results, true, true);
                 this.showMessage(`JSONPath found in ${results.length} object${results.length > 1 ? 's' : ''}`, 'success');
             } else {
                 this.showMessage(`JSONPath not found in any JSONL objects: ${path}`, 'warning');
