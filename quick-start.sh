@@ -51,53 +51,192 @@ is_running() {
 
 # Function to setup virtual environment and install dependencies
 setup_venv() {
+    local force_check="${1:-false}"
+    local dependency_marker="$CONFIG_DIR/.dependencies_verified"
+
+    # Skip dependency check if recently verified (unless forced)
+    if [ "$force_check" != "true" ] && [ -f "$dependency_marker" ]; then
+        local marker_age=$(($(date +%s) - $(stat -c %Y "$dependency_marker" 2>/dev/null || echo 0)))
+        # Skip check if dependencies were verified less than 24 hours ago
+        if [ $marker_age -lt 86400 ]; then
+            echo -e "${GREEN}✅ Dependencies recently verified (skipping check)${NC}"
+            return 0
+        fi
+    fi
+
+    # Create temporary log file for rolling logs
+    local temp_log=$(mktemp)
+    local install_log=$(mktemp)
+
     echo -e "${YELLOW}📦 Setting up virtual environment...${NC}"
 
     # Create venv if it doesn't exist
     if [ ! -d "$PROJECT_DIR/$VENV_DIR" ]; then
         echo -e "${YELLOW}🐍 Creating virtual environment...${NC}"
-        python3 -m venv "$PROJECT_DIR/$VENV_DIR"
-        echo -e "${GREEN}✅ Virtual environment created${NC}"
+        python3 -m venv "$PROJECT_DIR/$VENV_DIR" > "$temp_log" 2>&1
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ Virtual environment created${NC}"
+        else
+            echo -e "${RED}❌ Failed to create virtual environment${NC}"
+            cat "$temp_log"
+            rm -f "$temp_log" "$install_log"
+            exit 1
+        fi
     fi
 
-    # Install/update dependencies
+    # Install/update dependencies with rolling log
     echo -e "${YELLOW}📋 Installing/updating dependencies...${NC}"
-    "$PROJECT_DIR/$VENV_DIR/bin/pip" install --quiet --upgrade pip
-    "$PROJECT_DIR/$VENV_DIR/bin/pip" install -r "$PROJECT_DIR/requirements.txt"
 
-    # Verify critical dependencies
+    # Show a spinner/progress while installing
+    (
+        "$PROJECT_DIR/$VENV_DIR/bin/pip" install --quiet --upgrade pip > "$install_log" 2>&1
+        "$PROJECT_DIR/$VENV_DIR/bin/pip" install --quiet -r "$PROJECT_DIR/requirements.txt" >> "$install_log" 2>&1
+    ) &
+    local pip_pid=$!
+
+    # Show progress dots while pip is running
+    local dots=0
+    while kill -0 $pip_pid 2>/dev/null; do
+        case $dots in
+            0) printf "📦 Installing " ;;
+            1) printf "." ;;
+            2) printf "." ;;
+            3) printf "."; dots=-1 ;;
+        esac
+        dots=$((dots + 1))
+        sleep 0.5
+    done
+    wait $pip_pid
+    local pip_exit=$?
+    echo ""  # New line after dots
+
+    if [ $pip_exit -ne 0 ]; then
+        echo -e "${RED}❌ Failed to install dependencies${NC}"
+        echo -e "${YELLOW}Installation log:${NC}"
+        tail -20 "$install_log"
+        rm -f "$temp_log" "$install_log"
+        exit 1
+    fi
+
+    # Verify all dependencies from requirements.txt - keep output clean
     echo -e "${YELLOW}🔍 Verifying installation...${NC}"
-    "$PROJECT_DIR/$VENV_DIR/bin/python" -c "
+    local verification_result=$("$PROJECT_DIR/$VENV_DIR/bin/python" -c "
 import sys
-dependencies = [
-    ('Flask', 'flask'),
-    ('PyYAML', 'yaml'),
-    ('XMLtodict', 'xmltodict'),
-    ('Pytest', 'pytest'),
-    ('Behave', 'behave'),
-    ('Selenium', 'selenium'),
-]
+import re
+
+# Read requirements.txt and extract package names
+requirements_file = '$PROJECT_DIR/requirements.txt'
+dependencies = []
+
+# Mapping for packages with different import names
+import_mapping = {
+    'PyYAML': 'yaml',
+    'XMLtodict': 'xmltodict',
+    'requests-mock': 'requests_mock',
+    'pytest-mock': 'pytest_mock',
+    'webdriver-manager': 'webdriver_manager',
+    'smbprotocol': 'smbprotocol',
+}
+
+try:
+    with open(requirements_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                # Extract package name (before == or other version specifiers)
+                package_name = re.split('[=<>!]', line)[0].strip()
+                if package_name:
+                    # Use mapping or convert to lowercase for import
+                    import_name = import_mapping.get(package_name, package_name.lower())
+                    dependencies.append((package_name, import_name))
+except FileNotFoundError:
+    print('❌ requirements.txt not found')
+    sys.exit(1)
 
 all_good = True
-for name, module in dependencies:
+for display_name, import_name in dependencies:
     try:
-        __import__(module)
-        print(f'✅ {name}')
+        __import__(import_name)
+        print(f'✅ {display_name}')
     except ImportError:
-        print(f'❌ {name} - MISSING')
+        print(f'❌ {display_name} - MISSING')
         all_good = False
 
 if all_good:
-    print('🎉 All core dependencies verified!')
+    print(f'🎉 All {len(dependencies)} dependencies verified!')
 else:
     print('⚠️  Some dependencies are missing. Re-running installation...')
     sys.exit(1)
-" || {
+" 2>"$temp_log")
+
+    local verify_exit=$?
+
+    # Show only the clean verification output
+    echo "$verification_result"
+
+    if [ $verify_exit -ne 0 ]; then
         echo -e "${YELLOW}⚠️  Re-installing dependencies...${NC}"
-        "$PROJECT_DIR/$VENV_DIR/bin/pip" install -r "$PROJECT_DIR/requirements.txt"
-    }
+        "$PROJECT_DIR/$VENV_DIR/bin/pip" install --quiet -r "$PROJECT_DIR/requirements.txt" > "$install_log" 2>&1
+
+        # Re-verify after reinstall
+        "$PROJECT_DIR/$VENV_DIR/bin/python" -c "
+import sys
+import re
+
+# Read requirements.txt and extract package names
+requirements_file = '$PROJECT_DIR/requirements.txt'
+dependencies = []
+
+# Mapping for packages with different import names
+import_mapping = {
+    'PyYAML': 'yaml',
+    'XMLtodict': 'xmltodict',
+    'requests-mock': 'requests_mock',
+    'pytest-mock': 'pytest_mock',
+    'webdriver-manager': 'webdriver_manager',
+    'smbprotocol': 'smbprotocol',
+}
+
+try:
+    with open(requirements_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                package_name = re.split('[=<>!]', line)[0].strip()
+                if package_name:
+                    import_name = import_mapping.get(package_name, package_name.lower())
+                    dependencies.append((package_name, import_name))
+except FileNotFoundError:
+    print('❌ requirements.txt not found')
+    sys.exit(1)
+
+all_good = True
+for display_name, import_name in dependencies:
+    try:
+        __import__(import_name)
+    except ImportError:
+        all_good = False
+
+if not all_good:
+    print('❌ Some dependencies still missing after reinstall')
+    sys.exit(1)
+"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}❌ Failed to install some dependencies${NC}"
+            echo -e "${YELLOW}Check installation log:${NC}"
+            tail -10 "$install_log"
+            rm -f "$temp_log" "$install_log"
+            exit 1
+        fi
+    fi
 
     echo -e "${GREEN}✅ Dependencies installed and verified${NC}"
+
+    # Create marker file to skip future checks for 24 hours
+    touch "$dependency_marker"
+
+    # Clean up temporary files
+    rm -f "$temp_log" "$install_log"
 }
 
 # Function to start the application
@@ -105,12 +244,25 @@ start_app() {
     # Ensure config directory exists
     ensure_config_dir
 
-    # Check for port parameter
+    # Check for flags and port parameter
     local start_port="$PORT"
-    if [ -n "$2" ] && [[ "$2" =~ ^[0-9]+$ ]]; then
-        start_port="$2"
-        echo -e "${BLUE}🔧 Using specified port: $start_port${NC}"
-    fi
+    local force_deps="false"
+
+    # Parse arguments
+    for arg in "$@"; do
+        case $arg in
+            --force-deps)
+                force_deps="true"
+                shift
+                ;;
+            *)
+                if [[ "$arg" =~ ^[0-9]+$ ]]; then
+                    start_port="$arg"
+                    echo -e "${BLUE}🔧 Using specified port: $start_port${NC}"
+                fi
+                ;;
+        esac
+    done
 
     if is_running; then
         local pid=$(cat "$PID_FILE")
@@ -124,7 +276,7 @@ start_app() {
         return
     fi
 
-    setup_venv
+    setup_venv "$force_deps"
 
     echo -e "${BLUE}🚀 Starting Helpful-Tools-v2 on port $start_port in background...${NC}"
 
@@ -238,7 +390,7 @@ run_tests() {
         export HELPFUL_TOOLS_CONFIG_DIR="$CONFIG_DIR"
     fi
 
-    setup_venv
+    setup_venv true  # Force dependency check for testing
 
     cd "$PROJECT_DIR"
     "$PROJECT_DIR/$VENV_DIR/bin/python" -m pytest tests/ -v --tb=short
@@ -275,7 +427,7 @@ run_bdd_tests() {
     fi
 
     # Setup virtual environment
-    setup_venv
+    setup_venv true  # Force dependency check for BDD testing
 
     # Check if application is running
     echo -e "${YELLOW}🔍 Checking server status...${NC}"
@@ -412,7 +564,7 @@ except Exception as e:
 # Function to install/update dependencies only
 install_dependencies() {
     echo -e "${BLUE}📦 Installing/updating all dependencies...${NC}"
-    setup_venv
+    setup_venv true  # Force dependency check
     echo -e "${GREEN}✅ Dependencies installation completed${NC}"
 }
 
@@ -441,9 +593,9 @@ show_help() {
     echo -e "${BLUE}Usage: $0 {command} [port]${NC}"
     echo ""
     echo -e "${BLUE}Available commands:${NC}"
-    echo -e "  ${YELLOW}start [port]${NC} - Start Helpful-Tools-v2 in background (default port: 8000)"
-    echo -e "  ${YELLOW}stop${NC}         - Stop Helpful-Tools-v2"
-    echo -e "  ${YELLOW}restart [port]${NC} - Restart Helpful-Tools-v2"
+    echo -e "  ${YELLOW}start [port] [--force-deps]${NC} - Start Helpful-Tools-v2 in background (default port: 8000)"
+    echo -e "  ${YELLOW}stop${NC}                        - Stop Helpful-Tools-v2"
+    echo -e "  ${YELLOW}restart [port] [--force-deps]${NC} - Restart Helpful-Tools-v2"
     echo -e "  ${YELLOW}status${NC}       - Check if Helpful-Tools-v2 is running"
     echo -e "  ${YELLOW}logs${NC}         - Show recent logs"
     echo -e "  ${YELLOW}test${NC}         - Run unit and integration tests"
@@ -455,6 +607,7 @@ show_help() {
     echo -e "${BLUE}Examples:${NC}"
     echo -e "  ${YELLOW}./quick-start.sh start${NC}                      # Start on default port (8000)"
     echo -e "  ${YELLOW}./quick-start.sh start 3000${NC}                 # Start on port 3000"
+    echo -e "  ${YELLOW}./quick-start.sh start --force-deps${NC}         # Force dependency check"
     echo -e "  ${YELLOW}./quick-start.sh restart 5000${NC}               # Restart on port 5000"
     echo -e "  ${YELLOW}./quick-start.sh test${NC}                       # Run unit tests"
     echo -e "  ${YELLOW}./quick-start.sh bdd${NC}                        # Run all BDD tests"
