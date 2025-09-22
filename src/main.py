@@ -497,6 +497,31 @@ def clear_history(tool_name):
 def history_stats():
     return jsonify(history_manager.get_all_history_stats())
 
+@app.route('/api/history/<tool_name>/<entry_id>/star', methods=['PUT'])
+def toggle_star_history_entry(tool_name, entry_id):
+    """Toggle star status for a local history entry"""
+    if not validate_tool_name(tool_name):
+        return jsonify({'error': 'Invalid tool name'}), 400
+
+    try:
+        data = request.get_json()
+        if data is None or 'starred' not in data:
+            return jsonify({'error': 'Missing starred field'}), 400
+
+        starred = bool(data['starred'])
+        success = history_manager.update_star_status(tool_name, entry_id, starred)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Entry {"starred" if starred else "unstarred"} successfully'
+            })
+        else:
+            return jsonify({'error': 'Entry not found'}), 404
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # Global history API endpoints
 @app.route('/api/global-history', methods=['GET'])
 def get_global_history():
@@ -533,6 +558,28 @@ def delete_global_history_entry(entry_id):
             return jsonify({'success': True, 'message': 'Global history entry deleted'})
         else:
             return jsonify({'error': 'Global history entry not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/global-history/<entry_id>/star', methods=['PUT'])
+def toggle_star_global_history_entry(entry_id):
+    """Toggle star status for a global history entry"""
+    try:
+        data = request.get_json()
+        if data is None or 'starred' not in data:
+            return jsonify({'error': 'Missing starred field'}), 400
+
+        starred = bool(data['starred'])
+        success = history_manager.update_global_star_status(entry_id, starred)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Entry {"starred" if starred else "unstarred"} successfully'
+            })
+        else:
+            return jsonify({'error': 'Entry not found'}), 404
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

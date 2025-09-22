@@ -61,7 +61,8 @@ class HistoryManager:
             "timestamp": datetime.now().isoformat(),
             "data": data,
             "operation": operation,
-            "preview": self._generate_preview(data)
+            "preview": self._generate_preview(data),
+            "starred": False
         }
         
         # Add to beginning of list (most recent first)
@@ -109,7 +110,8 @@ class HistoryManager:
                 "timestamp": entry["timestamp"],
                 "preview": entry["preview"],
                 "operation": entry.get("operation", "process"),
-                "formatted_date": self._format_date(entry["timestamp"])
+                "formatted_date": self._format_date(entry["timestamp"]),
+                "starred": entry.get("starred", False)
             }
             for entry in history
         ]
@@ -206,7 +208,8 @@ class HistoryManager:
                 "operation": entry.get("operation", "process"),
                 "tool_name": entry["tool_name"],
                 "tool_color": entry["tool_color"],
-                "formatted_date": self._format_date(entry["timestamp"])
+                "formatted_date": self._format_date(entry["timestamp"]),
+                "starred": entry.get("starred", False)
             }
             for entry in history
         ]
@@ -276,11 +279,57 @@ class HistoryManager:
     def clear_global_history(self) -> Dict[str, Any]:
         """Clear all global history"""
         self.global_history = []
-        
+
         return {
             "success": True,
             "message": "Global history cleared"
         }
+
+    def update_star_status(self, tool_name: str, entry_id: str, starred: bool) -> bool:
+        """Update star status for a local history entry and sync with global"""
+        if tool_name not in self.history_data:
+            return False
+
+        # Update in local history
+        local_updated = False
+        for entry in self.history_data[tool_name]:
+            if entry["id"] == entry_id:
+                entry["starred"] = starred
+                local_updated = True
+                break
+
+        # Update in global history
+        global_updated = False
+        for entry in self.global_history:
+            if entry["id"] == entry_id:
+                entry["starred"] = starred
+                global_updated = True
+                break
+
+        return local_updated or global_updated
+
+    def update_global_star_status(self, entry_id: str, starred: bool) -> bool:
+        """Update star status for a global history entry and sync with local histories"""
+        # Update in global history
+        global_updated = False
+        tool_name = None
+        for entry in self.global_history:
+            if entry["id"] == entry_id:
+                entry["starred"] = starred
+                tool_name = entry["tool_name"]
+                global_updated = True
+                break
+
+        # Update in local history if tool exists
+        local_updated = False
+        if tool_name and tool_name in self.history_data:
+            for entry in self.history_data[tool_name]:
+                if entry["id"] == entry_id:
+                    entry["starred"] = starred
+                    local_updated = True
+                    break
+
+        return global_updated or local_updated
 
 # Global instance
 history_manager = HistoryManager()

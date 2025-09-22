@@ -137,11 +137,18 @@ class HistoryManager {
                     <div class="hist-item-content">
                         <input type="checkbox" class="hist-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
                         <div class="hist-meta">
-                            <span class="hist-id">ID: ${item.id}</span>
+                            <span class="hist-id">ID: ${item.id}${item.starred ? ' ⭐' : ''}</span>
                             <span class="hist-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
                         </div>
                     </div>
-                    <button class="hist-delete-btn" onclick="window.historyManager.deleteHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                    <div class="hist-actions">
+                        <button class="hist-star-btn ${item.starred ? 'starred' : ''}"
+                                onclick="window.historyManager.toggleStarHistoryItem('${item.id}', ${!item.starred}); event.stopPropagation();"
+                                title="${item.starred ? 'Remove star' : 'Add star'}">
+                            ${item.starred ? '⭐' : '☆'}
+                        </button>
+                        <button class="hist-delete-btn" onclick="window.historyManager.deleteHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                    </div>
                 </div>
                 <div class="hist-preview">${item.preview}</div>
             </div>
@@ -200,12 +207,19 @@ class HistoryManager {
                     <input type="checkbox" class="hist-global-checkbox" data-id="${item.id}" onclick="event.stopPropagation()">
                     <div class="hist-global-item-meta">
                         <div class="hist-global-id-tool">
-                            <span class="hist-id">ID: ${item.id}</span>
+                            <span class="hist-id">ID: ${item.id}${item.starred ? ' ⭐' : ''}</span>
                             <span class="hist-global-tool-label" style="background-color: ${getToolColor(item.tool_name)}">${item.tool_name}</span>
                         </div>
                         <span class="hist-date">${this.formatTimestamp(item.timestamp)} - ${item.operation}</span>
                     </div>
-                    <button class="hist-delete-btn" onclick="window.historyManager.deleteGlobalHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                    <div class="hist-actions">
+                        <button class="hist-star-btn ${item.starred ? 'starred' : ''}"
+                                onclick="window.historyManager.toggleStarGlobalHistoryItem('${item.id}', ${!item.starred}); event.stopPropagation();"
+                                title="${item.starred ? 'Remove star' : 'Add star'}">
+                            ${item.starred ? '⭐' : '☆'}
+                        </button>
+                        <button class="hist-delete-btn" onclick="window.historyManager.deleteGlobalHistoryItem('${item.id}'); event.stopPropagation();">×</button>
+                    </div>
                 </div>
                 <div class="hist-preview">${item.preview}</div>
             </div>
@@ -577,6 +591,62 @@ class HistoryManager {
     }
 
     /**
+     * Toggle star status for local history item
+     */
+    async toggleStarHistoryItem(entryId, shouldStar) {
+        try {
+            const response = await fetch(`/api/history/${this.toolName}/${entryId}/star`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    starred: shouldStar
+                })
+            });
+
+            if (response.ok) {
+                this.showMessage(shouldStar ? 'Item starred' : 'Star removed', 'success');
+                this.loadHistory(); // Refresh local history display
+                this.loadGlobalHistory(); // Refresh global history display (if open)
+            } else {
+                this.showMessage('Failed to update star status', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating star status:', error);
+            this.showMessage('Failed to update star status', 'error');
+        }
+    }
+
+    /**
+     * Toggle star status for global history item
+     */
+    async toggleStarGlobalHistoryItem(entryId, shouldStar) {
+        try {
+            const response = await fetch(`/api/global-history/${entryId}/star`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    starred: shouldStar
+                })
+            });
+
+            if (response.ok) {
+                this.showMessage(shouldStar ? 'Item starred' : 'Star removed', 'success');
+                this.loadHistory(); // Refresh local history display
+                this.loadGlobalHistory(); // Refresh global history display
+            } else {
+                this.showMessage('Failed to update star status', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating star status:', error);
+            this.showMessage('Failed to update star status', 'error');
+        }
+    }
+
+    /**
      * Clear all local history for this tool
      */
     async clearHistory() {
@@ -588,7 +658,7 @@ class HistoryManager {
             const response = await fetch(`/api/history/${this.toolName}`, {
                 method: 'DELETE'
             });
-            
+
             if (response.ok) {
                 this.showMessage('History cleared successfully', 'success');
                 this.loadHistory(); // Refresh display
