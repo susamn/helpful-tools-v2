@@ -330,7 +330,37 @@ class JSONPathEvaluator extends QueryEvaluator {
     }
 
     /**
-     * Get partial property name suggestions
+     * Calculate fuzzy match score between input and target
+     */
+    calculateFuzzyScore(input, target) {
+        input = input.toLowerCase();
+        target = target.toLowerCase();
+
+        // Exact match gets highest score
+        if (target === input) return 100;
+        if (target.startsWith(input)) return 90;
+
+        // Character sequence matching
+        let score = 0;
+        let inputIndex = 0;
+
+        for (let i = 0; i < target.length && inputIndex < input.length; i++) {
+            if (target[i] === input[inputIndex]) {
+                score += target.length - Math.abs(i - inputIndex);
+                inputIndex++;
+            }
+        }
+
+        // All characters found
+        if (inputIndex === input.length) {
+            score = (score / target.length) * 80;
+        }
+
+        return score;
+    }
+
+    /**
+     * Get partial property name suggestions with fuzzy matching
      */
     getPartialPropertySuggestions(document, partialQuery, context, lastDotIndex) {
         const parentPath = partialQuery.substring(0, lastDotIndex);
@@ -344,18 +374,29 @@ class JSONPathEvaluator extends QueryEvaluator {
             if (typeof target !== 'object' || target === null) return [];
 
             const suggestions = [];
+            const scoredMatches = [];
+
+            // Calculate fuzzy scores for all keys
             Object.keys(target).forEach(key => {
-                if (key.toLowerCase().startsWith(partialProperty.toLowerCase())) {
-                    const value = target[key];
-                    const valueType = this.getValueType(value);
-                    suggestions.push({
-                        text: key,
-                        insertText: parentPath + '.' + key,
-                        type: valueType,
-                        description: this.getTypeDescription(valueType, key),
-                        sampleValue: this.getSampleValue(value)
-                    });
+                const score = this.calculateFuzzyScore(partialProperty, key);
+                if (score > 30) { // Relevance threshold
+                    scoredMatches.push({ key, score, value: target[key] });
                 }
+            });
+
+            // Sort by score (descending)
+            scoredMatches.sort((a, b) => b.score - a.score);
+
+            // Convert to suggestions
+            scoredMatches.forEach(({ key, value }) => {
+                const valueType = this.getValueType(value);
+                suggestions.push({
+                    text: key,
+                    insertText: parentPath + '.' + key,
+                    type: valueType,
+                    description: this.getTypeDescription(valueType, key),
+                    sampleValue: this.getSampleValue(value)
+                });
             });
 
             return suggestions;

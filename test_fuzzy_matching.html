@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuzzy Matching Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-container { max-width: 800px; margin: 0 auto; }
+        .test-json { background: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .query-input { width: 100%; padding: 10px; margin-bottom: 10px; }
+        .suggestions { border: 1px solid #ccc; max-height: 200px; overflow-y: auto; }
+        .suggestion { padding: 8px; border-bottom: 1px solid #eee; cursor: pointer; }
+        .suggestion:hover { background: #f0f0f0; }
+        .result { margin-top: 20px; padding: 10px; background: #e8f5e8; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Fuzzy Matching Test for JSONPath Autosuggestion</h1>
+
+        <h2>Test JSON Document</h2>
+        <div class="test-json">
+            <pre id="testJson">{
+  "userProfile": {
+    "personalInfo": {
+      "firstName": "John",
+      "lastName": "Doe",
+      "emailAddress": "john.doe@example.com",
+      "phoneNumber": "+1-555-0123"
+    },
+    "accountSettings": {
+      "preferredLanguage": "en-US",
+      "notificationPreferences": {
+        "emailNotifications": true,
+        "smsNotifications": false,
+        "pushNotifications": true
+      },
+      "privacySettings": {
+        "profileVisibility": "public",
+        "dataSharing": false
+      }
+    },
+    "subscriptionInfo": {
+      "planType": "premium",
+      "billingCycle": "monthly",
+      "nextBillingDate": "2024-01-15"
+    }
+  },
+  "appData": {
+    "recentActivity": [
+      {"timestamp": "2024-01-01T10:00:00Z", "action": "login"},
+      {"timestamp": "2024-01-01T11:30:00Z", "action": "profile_update"}
+    ],
+    "preferences": {
+      "theme": "dark",
+      "autoSave": true
+    }
+  }
+}</pre>
+        </div>
+
+        <h2>Test Fuzzy Matching</h2>
+        <p>Try typing partial property names to test fuzzy matching:</p>
+        <ul>
+            <li>Type <code>$.userProfile.personal</code> (should match "personalInfo")</li>
+            <li>Type <code>$.userProfile.account</code> (should match "accountSettings")</li>
+            <li>Type <code>$.userProfile.personalInfo.email</code> (should match "emailAddress")</li>
+            <li>Type <code>$.appData.prefer</code> (should match "preferences")</li>
+            <li>Type <code>$.userProfile.accountSettings.notify</code> (should match "notificationPreferences")</li>
+        </ul>
+
+        <input type="text" id="queryInput" class="query-input" placeholder="Enter JSONPath query (e.g., $.userProfile.person)" />
+        <div id="suggestions" class="suggestions" style="display: none;"></div>
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <!-- Include the suggestion engine scripts -->
+    <script src="/static/js/document-query-suggestions/core/QueryEvaluator.js"></script>
+    <script src="/static/js/document-query-suggestions/core/DocumentParser.js"></script>
+    <script src="/static/js/document-query-suggestions/core/SuggestionEngine.js"></script>
+    <script src="/static/js/document-query-suggestions/evaluators/JSONPathEvaluator.js"></script>
+    <script src="/static/js/document-query-suggestions/parsers/JSONDocumentParser.js"></script>
+    <script src="/static/js/document-query-suggestions/adapters/AutocompleteAdapter.js"></script>
+
+    <script>
+        // Test fuzzy matching functionality
+        async function initializeFuzzyMatchingTest() {
+            const testJsonElement = document.getElementById('testJson');
+            const queryInput = document.getElementById('queryInput');
+            const suggestionsDiv = document.getElementById('suggestions');
+            const resultDiv = document.getElementById('result');
+
+            const testJsonContent = testJsonElement.textContent;
+
+            // Initialize suggestion engine
+            const suggestionEngine = new DocumentQuerySuggestionEngine('json', 'jsonpath');
+            await suggestionEngine.initialize(testJsonContent);
+
+            // Handle input events
+            queryInput.addEventListener('input', async (e) => {
+                const query = e.target.value;
+                const cursorPosition = e.target.selectionStart;
+
+                if (query.length > 0) {
+                    try {
+                        const suggestions = await suggestionEngine.getSuggestions(query, cursorPosition);
+
+                        if (suggestions.length > 0) {
+                            suggestionsDiv.innerHTML = '';
+                            suggestions.forEach((suggestion, index) => {
+                                const suggestionElement = document.createElement('div');
+                                suggestionElement.className = 'suggestion';
+                                suggestionElement.innerHTML = `
+                                    <strong>${suggestion.text}</strong>
+                                    <small>(${suggestion.type})</small>
+                                    ${suggestion.description ? '<br><em>' + suggestion.description + '</em>' : ''}
+                                `;
+                                suggestionElement.addEventListener('click', () => {
+                                    queryInput.value = suggestion.insertText;
+                                    suggestionsDiv.style.display = 'none';
+                                });
+                                suggestionsDiv.appendChild(suggestionElement);
+                            });
+                            suggestionsDiv.style.display = 'block';
+                        } else {
+                            suggestionsDiv.style.display = 'none';
+                        }
+
+                        // Show fuzzy matching results
+                        resultDiv.innerHTML = `
+                            <h3>Fuzzy Matching Results</h3>
+                            <p><strong>Query:</strong> ${query}</p>
+                            <p><strong>Cursor Position:</strong> ${cursorPosition}</p>
+                            <p><strong>Suggestions Found:</strong> ${suggestions.length}</p>
+                            <pre>${JSON.stringify(suggestions, null, 2)}</pre>
+                        `;
+                        resultDiv.style.display = 'block';
+                    } catch (error) {
+                        resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                        resultDiv.style.display = 'block';
+                        suggestionsDiv.style.display = 'none';
+                    }
+                } else {
+                    suggestionsDiv.style.display = 'none';
+                    resultDiv.style.display = 'none';
+                }
+            });
+
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!queryInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                    suggestionsDiv.style.display = 'none';
+                }
+            });
+
+            console.log('Fuzzy matching test initialized successfully');
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', initializeFuzzyMatchingTest);
+    </script>
+</body>
+</html>
