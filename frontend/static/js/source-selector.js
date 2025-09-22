@@ -939,6 +939,9 @@ class SourceSelector {
             // For lazy loading, directories should show + if they might have children
             const hasChildren = isDirectory && (item.has_children !== false);
 
+            // Skip cache detection during initial render to avoid breaking expansion
+            const isCached = false;
+
             // Format file size
             const sizeText = !isDirectory && item.size !== null ? this.formatFileSize(item.size) : '';
 
@@ -956,7 +959,7 @@ class SourceSelector {
 
             let itemHtml = `
                 <div class="tree-item-container">
-                    <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''}"
+                    <div class="tree-item ${itemClass} ${levelClass} ${nonExplorable ? 'non-explorable' : ''} ${isCached ? 'cached' : ''}"
                          data-path="${item.path}"
                          data-is-directory="${isDirectory}"
                          data-source-id="${source.id}"
@@ -973,7 +976,8 @@ class SourceSelector {
 
             // For lazy loading, always add empty children container for directories
             if (isDirectory && hasChildren) {
-                itemHtml += '<div class="tree-children collapsed" data-loaded="false"></div>';
+                const loadedStatus = isCached ? 'true' : 'false';
+                itemHtml += `<div class="tree-children collapsed" data-loaded="${loadedStatus}"></div>`;
             }
 
             itemHtml += '</div>';
@@ -996,6 +1000,28 @@ class SourceSelector {
                 e.stopPropagation();
                 await this.handleTreeToggle(toggle, source);
             });
+        });
+
+        // Apply cached styling after rendering to avoid breaking expansion
+        setTimeout(() => {
+            this.applyCachedStyling(container, source);
+        }, 0);
+    }
+
+    /**
+     * Apply cached styling to folders after rendering
+     */
+    applyCachedStyling(container, source) {
+        container.querySelectorAll('.tree-item.directory').forEach(treeItem => {
+            const folderPath = treeItem.dataset.path;
+            try {
+                const isCached = this.persistentCache.getCachedFolderData(source.id, folderPath, { page: 1, limit: 50 }) !== null;
+                if (isCached) {
+                    treeItem.classList.add('cached');
+                }
+            } catch (error) {
+                // Silently ignore cache detection errors
+            }
         });
     }
 
@@ -1873,22 +1899,23 @@ showExplorerPanel(source, directoryData, isUserInitiated = true) {
      * Restore tree expanded state and scroll position
      */
     restoreTreeExpandedState(explorerState) {
-        // Restore expanded paths
-        explorerState.expandedPaths.forEach(path => {
-            const treeItem = document.querySelector(`[data-path="${path}"]`);
-            if (treeItem) {
-                const toggle = treeItem.querySelector('.tree-toggle');
-                const treeItemContainer = treeItem.closest('.tree-item-container');
-                if (treeItemContainer) {
-                    const children = treeItemContainer.querySelector('.tree-children');
+        // Do not auto-expand cached folders - keep them collapsed by default
+        // User can manually expand folders they want to see
+        // explorerState.expandedPaths.forEach(path => {
+        //     const treeItem = document.querySelector(`[data-path="${path}"]`);
+        //     if (treeItem) {
+        //         const toggle = treeItem.querySelector('.tree-toggle');
+        //         const treeItemContainer = treeItem.closest('.tree-item-container');
+        //         if (treeItemContainer) {
+        //             const children = treeItemContainer.querySelector('.tree-children');
 
-                    if (toggle && children && children.classList.contains('collapsed')) {
-                        children.classList.remove('collapsed');
-                        toggle.textContent = '-';
-                    }
-                }
-            }
-        });
+        //             if (toggle && children && children.classList.contains('collapsed')) {
+        //                 children.classList.remove('collapsed');
+        //                 toggle.textContent = '-';
+        //             }
+        //         }
+        //     }
+        // });
 
         // Restore scroll position
         const explorerContent = document.getElementById(`${this.options.containerId}-explorer-content`);
