@@ -840,13 +840,18 @@ class YamlTool {
         this.currentSource = source;
 
         // Update file path label
+        let displayPath = '';
         if (source.pathDisplay) {
-            this.elements.filePathLabel.textContent = `Source: ${source.pathDisplay}`;
+            displayPath = source.pathDisplay;
         } else if (source.selectedFile) {
-            this.elements.filePathLabel.textContent = `Source: ${source.name}/${source.selectedFile}`;
+            displayPath = `${source.name}/${source.selectedFile}`;
+        } else if (source.path) {
+            displayPath = `${source.name}: ${source.path}`;
         } else {
-            this.elements.filePathLabel.textContent = `Source: ${source.name}`;
+            displayPath = source.name;
         }
+        this.elements.filePathLabel.textContent = displayPath;
+        this.elements.filePathLabel.style.display = 'inline';
 
         // Auto-format the loaded data
         this.formatYaml();

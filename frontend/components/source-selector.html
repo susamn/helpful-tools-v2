@@ -26,6 +26,14 @@
             </div>
             <div class="explorer-content" id="sourceSelector-explorer-content"></div>
         </div>
+        <!-- File Loading Overlay -->
+        <div class="file-loading-overlay" id="sourceSelector-file-loading" style="display: none;">
+            <div class="file-loading-content">
+                <div class="file-loading-spinner">⏳</div>
+                <div class="file-loading-text">Loading file...</div>
+                <div class="file-loading-details" id="sourceSelector-file-loading-details"></div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -917,5 +925,61 @@
 /* Tree collapse/expand functionality */
 .tree-children.collapsed {
     display: none;
+}
+
+/* File Loading Overlay */
+.file-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+
+.file-loading-content {
+    text-align: center;
+    padding: 32px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e0e0e0;
+    max-width: 300px;
+}
+
+.file-loading-spinner {
+    font-size: 48px;
+    margin-bottom: 16px;
+    animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    from {
+        opacity: 0.6;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+}
+
+.file-loading-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.file-loading-details {
+    font-size: 14px;
+    color: #666;
+    line-height: 1.4;
+    word-break: break-word;
 }
 </style>

@@ -1135,34 +1135,49 @@ class SourceSelector {
             
             // Mark current item as selected
             element.classList.add('selected');
-            
-            // Fetch file content
-            const response = await fetch(`/api/sources/${source.id}/file?path=${encodeURIComponent(filePath)}`);
-            
-            if (response.ok) {
-                const data = await response.text();
-                
-                // Hide the modal
-                this.hide();
-                
-                // Create modified source object with file path
-                const fileSource = {
-                    ...source,
-                    selectedFile: filePath,
-                    pathDisplay: `${source.name}/${filePath}`
-                };
-                
-                // Trigger fetch callback
-                if (this.options.onFetch) {
-                    this.options.onFetch(data, fileSource);
-                }
-            } else {
-                const error = await response.json();
-                if (typeof showStatusMessage === 'function') {
-                    showStatusMessage(`Error loading file: ${error.error}`, 'error', 4000);
+
+            // Show loading indicator
+            this.showFileLoading(filePath, source.name);
+
+            try {
+                // Fetch file content
+                const response = await fetch(`/api/sources/${source.id}/file?path=${encodeURIComponent(filePath)}`);
+
+                if (response.ok) {
+                    const data = await response.text();
+
+                    // Hide loading indicator
+                    this.hideFileLoading();
+
+                    // Hide the modal
+                    this.hide();
+
+                    // Create modified source object with file path
+                    const fileSource = {
+                        ...source,
+                        selectedFile: filePath,
+                        pathDisplay: `${source.name}/${filePath}`
+                    };
+
+                    // Trigger fetch callback
+                    if (this.options.onFetch) {
+                        this.options.onFetch(data, fileSource);
+                    }
                 } else {
-                    alert(`Error loading file: ${error.error}`);
+                    // Hide loading indicator
+                    this.hideFileLoading();
+
+                    const error = await response.json();
+                    if (typeof showStatusMessage === 'function') {
+                        showStatusMessage(`Error loading file: ${error.error}`, 'error', 4000);
+                    } else {
+                        alert(`Error loading file: ${error.error}`);
+                    }
                 }
+            } catch (fetchError) {
+                // Hide loading indicator on any error
+                this.hideFileLoading();
+                throw fetchError;
             }
         } catch (error) {
             console.error('Error selecting file:', error);
@@ -1888,6 +1903,36 @@ showExplorerPanel(source, directoryData, isUserInitiated = true) {
                 // Add selection to restored item
                 selectedElement.classList.add('selected');
             }
+        }
+    }
+
+    /**
+     * Show file loading indicator
+     */
+    showFileLoading(filePath, sourceName) {
+        const loadingOverlay = document.getElementById(`${this.options.containerId}-file-loading`);
+        const loadingDetails = document.getElementById(`${this.options.containerId}-file-loading-details`);
+
+        if (loadingOverlay && loadingDetails) {
+            // Update loading details
+            loadingDetails.innerHTML = `
+                <strong>Source:</strong> ${this.escapeHtml(sourceName)}<br>
+                <strong>File:</strong> ${this.escapeHtml(filePath)}
+            `;
+
+            // Show the overlay
+            loadingOverlay.style.display = 'flex';
+        }
+    }
+
+    /**
+     * Hide file loading indicator
+     */
+    hideFileLoading() {
+        const loadingOverlay = document.getElementById(`${this.options.containerId}-file-loading`);
+
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'none';
         }
     }
 

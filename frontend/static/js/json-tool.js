@@ -1613,8 +1613,17 @@ class JsonTool {
             this.elements.jsonInput.value = data;
 
             // Show the source URL/path in the file path label
-            const resolvedPath = this.resolveSourcePath(source);
-            this.elements.filePathLabel.textContent = this.truncateFilePath(resolvedPath);
+            let displayPath = '';
+            if (source.pathDisplay) {
+                displayPath = source.pathDisplay;
+            } else if (source.selectedFile) {
+                displayPath = `${source.name}/${source.selectedFile}`;
+            } else if (source.path) {
+                displayPath = `${source.name}: ${source.path}`;
+            } else {
+                displayPath = source.name;
+            }
+            this.elements.filePathLabel.textContent = displayPath;
             this.elements.filePathLabel.style.display = 'inline';
 
             // Auto-format the JSON if it's valid
