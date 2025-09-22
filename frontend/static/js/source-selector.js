@@ -932,7 +932,7 @@ class SourceSelector {
         const html = items.map(item => {
             const isDirectory = item.is_directory;
             const icon = isDirectory ? '📁' : '📄';
-            const levelClass = level > 0 ? `tree-level-${Math.min(level, 3)}` : '';
+            const levelClass = level > 0 ? `tree-level-${level}` : '';
             const itemClass = isDirectory ? 'directory' : 'file';
             const nonExplorable = isDirectory && item.explorable === false;
 
@@ -1009,6 +1009,19 @@ class SourceSelector {
     }
 
     /**
+     * Get the current level of a tree item from its CSS class
+     */
+    getCurrentLevel(treeItem) {
+        const classList = Array.from(treeItem.classList);
+        const levelClass = classList.find(cls => cls.startsWith('tree-level-'));
+        if (levelClass) {
+            const level = parseInt(levelClass.replace('tree-level-', ''));
+            return isNaN(level) ? 0 : level;
+        }
+        return 0;
+    }
+
+    /**
      * Apply cached styling to folders after rendering
      */
     applyCachedStyling(container, source) {
@@ -1049,8 +1062,12 @@ class SourceSelector {
                     const result = await this.loadFolderContents(folderPath, source);
 
                     if (result.success && result.items.length > 0) {
+                        // Calculate the correct level for children based on parent level
+                        const currentLevel = this.getCurrentLevel(treeItem);
+                        const childLevel = currentLevel + 1;
+
                         // Render children with lazy loading
-                        this.renderFileTree(result.items, children, source, 1);
+                        this.renderFileTree(result.items, children, source, childLevel);
                         children.dataset.loaded = 'true';
 
                         // Cache the data
