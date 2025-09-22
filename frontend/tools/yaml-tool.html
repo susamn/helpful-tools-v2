@@ -107,11 +107,26 @@
             font-style: italic;
             margin-right: 6px;
             opacity: 0.8;
-            max-width: 560px; /* ~80 characters at 10px font */
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            cursor: pointer;
             color: #1976d2;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+
+        .file-path-tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            max-width: 500px;
+            word-break: break-all;
+            z-index: 10000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            display: none;
         }
         .separator {
             width: 1px;
@@ -826,7 +841,8 @@
                     <span>Input YAML</span>
                     <div class="header-controls">
                         <input type="file" id="fileInput" accept=".yaml,.yml,.txt" style="display: none;">
-                        <span class="file-path-label" id="filePathLabel" style="display: none;"></span>
+                        <span class="file-path-label" id="filePathLabel" style="display: none;">[path]</span>
+                        <div class="file-path-tooltip" id="filePathTooltip"></div>
                         <button class="file-upload-btn" id="uploadFileBtn" onclick="document.getElementById('fileInput').click()">📁 Upload File</button>
                         <button class="file-upload-btn" id="loadFromSourceBtn">📂 Load from Source</button>
                     </div>

@@ -44,6 +44,7 @@ class YamlTool {
             fileInput: document.getElementById('fileInput'),
             uploadFileBtn: document.getElementById('uploadFileBtn'),
             filePathLabel: document.getElementById('filePathLabel'),
+            filePathTooltip: document.getElementById('filePathTooltip'),
 
             // Collapsible controls
             expandAllBtn: document.getElementById('expandAllBtn'),
@@ -113,6 +114,9 @@ class YamlTool {
         this.elements.expandAllBtn.addEventListener('click', () => this.expandAll());
         this.elements.collapseAllBtn.addEventListener('click', () => this.collapseAll());
         this.elements.toggleMarkupBtn.addEventListener('click', () => this.toggleMarkup());
+
+        // File path tooltip functionality
+        this.setupFilePathTooltip();
 
         // Controls
         this.elements.indentType.addEventListener('change', () => this.updateIndentPreference());
@@ -716,7 +720,7 @@ class YamlTool {
         this.elements.yamlInput.value = '';
         this.clearOutput();
         this.elements.yamlPathInput.value = '';
-        this.elements.filePathLabel.textContent = '';
+        this.clearFilePath();
         this.originalOutputData = null;
         this.currentSource = null;
         this.updateStats('', null);
@@ -850,8 +854,7 @@ class YamlTool {
         } else {
             displayPath = source.name;
         }
-        this.elements.filePathLabel.textContent = displayPath;
-        this.elements.filePathLabel.style.display = 'inline';
+        this.setFilePath(displayPath);
 
         // Auto-format the loaded data
         this.formatYaml();
@@ -873,7 +876,7 @@ class YamlTool {
         const reader = new FileReader();
         reader.onload = (e) => {
             this.elements.yamlInput.value = e.target.result;
-            this.elements.filePathLabel.textContent = `File: ${file.name}`;
+            this.setFilePath(file.name);
             this.formatYaml();
             this.showMessage(`File "${file.name}" loaded successfully`, 'success');
         };
@@ -1033,6 +1036,70 @@ class YamlTool {
                 messageDiv.parentNode.removeChild(messageDiv);
             }
         }, 2500);
+    }
+
+    /**
+     * Set up file path tooltip functionality
+     */
+    setupFilePathTooltip() {
+        if (!this.elements.filePathLabel || !this.elements.filePathTooltip) {
+            return;
+        }
+
+        this.currentFilePath = '';
+
+        // Show tooltip on click
+        this.elements.filePathLabel.addEventListener('click', (e) => {
+            if (this.currentFilePath) {
+                this.showPathTooltip(e, this.currentFilePath);
+            }
+        });
+
+        // Hide tooltip when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!this.elements.filePathLabel.contains(e.target) &&
+                !this.elements.filePathTooltip.contains(e.target)) {
+                this.hidePathTooltip();
+            }
+        });
+    }
+
+    /**
+     * Show path tooltip at click position
+     */
+    showPathTooltip(event, path) {
+        this.elements.filePathTooltip.textContent = path;
+        this.elements.filePathTooltip.style.display = 'block';
+
+        // Position tooltip near click point
+        const rect = this.elements.filePathLabel.getBoundingClientRect();
+        this.elements.filePathTooltip.style.left = rect.left + 'px';
+        this.elements.filePathTooltip.style.top = (rect.bottom + 5) + 'px';
+    }
+
+    /**
+     * Hide path tooltip
+     */
+    hidePathTooltip() {
+        this.elements.filePathTooltip.style.display = 'none';
+    }
+
+    /**
+     * Set file path and store for tooltip
+     */
+    setFilePath(path) {
+        this.currentFilePath = path;
+        this.elements.filePathLabel.style.display = 'inline';
+        this.elements.filePathLabel.textContent = '[path]';
+    }
+
+    /**
+     * Clear file path
+     */
+    clearFilePath() {
+        this.currentFilePath = '';
+        this.elements.filePathLabel.style.display = 'none';
+        this.hidePathTooltip();
     }
 }
 
