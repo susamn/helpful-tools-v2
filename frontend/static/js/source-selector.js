@@ -749,7 +749,9 @@ class SourceSelector {
                     type: this.currentEditingSource.type,
                     staticConfig: this.currentEditingSource.staticConfig || {},
                     pathTemplate: this.currentEditingSource.pathTemplate || this.currentEditingSource.path || '',
-                    dynamicVariables: updatedVars
+                    dynamicVariables: updatedVars,
+                    is_directory: this.currentEditingSource.is_directory || false,
+                    level: this.currentEditingSource.level || 0
                 })
             });
 
@@ -820,7 +822,9 @@ class SourceSelector {
                     type: this.currentEditingSource.type,
                     staticConfig: this.currentEditingSource.staticConfig || {},
                     pathTemplate: this.currentEditingSource.pathTemplate || this.currentEditingSource.path || '',
-                    dynamicVariables: updatedVars
+                    dynamicVariables: updatedVars,
+                    is_directory: this.currentEditingSource.is_directory || false,
+                    level: this.currentEditingSource.level || 0
                 })
             });
 

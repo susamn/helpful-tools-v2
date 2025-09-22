@@ -1369,9 +1369,30 @@ def test_source_connection(source_type, config, source_data=None):
         # Create source instance and test connection
         source = SourceFactory.create_source(source_config)
         test_result = source.test_connection()
-        
+
+        # Additional validation for directory sources
+        additional_warnings = []
+        if source_config.is_directory:
+            # Check if source supports directory listing when configured as directory
+            if not source.is_listable():
+                additional_warnings.append(f"Warning: Source type '{source_type}' does not support directory listing but is configured as a directory")
+
+            # For local files, check if path actually exists and is a directory
+            if source_type == 'local_file' and test_result.success:
+                try:
+                    resolved_path = source_config.get_resolved_path()
+                    if resolved_path:
+                        import os
+                        expanded_path = os.path.expanduser(resolved_path)
+                        if not os.path.exists(expanded_path):
+                            additional_warnings.append(f"Warning: Path does not exist: {expanded_path}")
+                        elif not os.path.isdir(expanded_path):
+                            additional_warnings.append(f"Warning: Path is not a directory: {expanded_path}")
+                except Exception as e:
+                    additional_warnings.append(f"Warning: Could not validate directory path: {str(e)}")
+
         # Convert ConnectionTestResult to dictionary format expected by the API
-        return {
+        result = {
             'success': test_result.success,
             'status': test_result.status,
             'message': test_result.message,
@@ -1379,6 +1400,16 @@ def test_source_connection(source_type, config, source_data=None):
             'error': test_result.error,
             'metadata': test_result.metadata.__dict__ if test_result.metadata else None
         }
+
+        # Add warnings to the message if any
+        if additional_warnings:
+            warning_text = "\n".join(additional_warnings)
+            if result['message']:
+                result['message'] += f"\n\n{warning_text}"
+            else:
+                result['message'] = warning_text
+
+        return result
     except Exception as e:
         return {'success': False, 'error': f'Test failed: {str(e)}'}
 
@@ -1818,7 +1849,12 @@ def browse_source_directory_paginated(source_id):
 
         # Check if source supports listing
         if not source_instance.is_listable():
-            return jsonify({'success': False, 'error': 'Source does not support directory listing'}), 400
+            source_type = source_config.source_type
+            if source_config.is_directory:
+                error_msg = f"Source type '{source_type}' does not support directory listing. Consider changing the source configuration to 'file' type instead of 'directory' type."
+            else:
+                error_msg = f"Source type '{source_type}' does not support directory listing."
+            return jsonify({'success': False, 'error': error_msg}), 400
 
         # If refresh parameter is present, clear all cache to ensure fresh data
         if refresh:
