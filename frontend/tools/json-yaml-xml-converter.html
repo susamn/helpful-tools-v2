@@ -17,6 +17,12 @@
             background-color: #f0f0f0;
             color: #333;
             font-size: 13px;
+            height: 100vh;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
         }
         .header {
             background: linear-gradient(to bottom, #ffffff, #e8e8e8);
@@ -229,13 +235,17 @@
             text-overflow: ellipsis;
         }
         .main-container {
-            height: calc(100vh - 80px);
+            flex: 1;
             display: flex;
             flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
         }
         .panels-container {
             flex: 1;
             display: flex;
+            overflow: hidden;
+            min-height: 0;
         }
         .panel {
             flex: 1;
@@ -259,12 +269,66 @@
             justify-content: space-between;
             align-items: center;
         }
+
+        .panel-title-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .file-upload-btn {
+            background: linear-gradient(to bottom, #e8f4fd, #d1e7ff);
+            border: 1px solid #4a90e2;
+            color: #1565c0;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .file-upload-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8f4fd);
+        }
+        .file-path-label {
+            font-size: 10px;
+            font-style: italic;
+            margin-right: 6px;
+            opacity: 0.8;
+            cursor: pointer;
+            color: #1976d2;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+        }
+        .file-path-tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-family: monospace;
+            max-width: 500px;
+            word-break: break-all;
+            z-index: 10000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            display: none;
+        }
         .panel-content {
             flex: 1;
             position: relative;
             background: #ffffff;
             overflow: hidden;
             min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
         }
         .panel-textarea {
             width: 100%;
@@ -277,10 +341,13 @@
             line-height: 1.4;
             resize: none;
             background: white;
-            overflow: auto;
+            overflow-y: auto;
+            overflow-x: auto;
             word-wrap: break-word;
             white-space: pre-wrap;
             box-sizing: border-box;
+            flex: 1;
+            min-height: 0;
         }
         .panel-textarea::placeholder {
             color: #999;
@@ -294,11 +361,15 @@
             font-size: 12px;
             line-height: 1.4;
             background: white;
-            overflow: auto;
+            overflow-y: auto;
+            overflow-x: auto;
             white-space: pre-wrap;
             word-wrap: break-word;
+            word-break: break-all;
             border: none;
             box-sizing: border-box;
+            flex: 1;
+            min-height: 0;
             min-width: 0;
         }
         .error-display {
@@ -362,6 +433,54 @@
             border-radius: 3px;
             font-size: 10px;
             font-weight: bold;
+        }
+
+        /* Collapsible elements */
+        .collapsible {
+            cursor: pointer;
+            user-select: none;
+        }
+        .collapsible:hover {
+            background-color: #f0f0f0;
+        }
+        .expand-collapse-btn {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            line-height: 10px;
+            text-align: center;
+            background: #e8e8e8;
+            border: 1px solid #c0c0c0;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 4px;
+            cursor: pointer;
+            color: #666;
+        }
+        .expand-collapse-btn:hover {
+            background: #d0d0d0;
+        }
+        .collapsed-content {
+            display: none;
+        }
+        .collapsed-indicator {
+            color: #888;
+            font-style: italic;
+        }
+
+        /* YAML-specific collapsible styles */
+        .line {
+            margin: 0;
+            padding: 0;
+            white-space: pre;
+        }
+        .line.collapsible:hover {
+            background-color: #f0f0f0;
+        }
+        .line.collapsed::after {
+            content: ' ...';
+            color: #888;
+            font-style: italic;
         }
         .format-indicator.json {
             background: #4a90e2;
@@ -600,6 +719,9 @@
         <button id="formatBtn">Format</button>
         <button id="swapBtn">Swap</button>
         <div class="separator"></div>
+        <button id="expandAllBtn">Expand All</button>
+        <button id="collapseAllBtn">Collapse All</button>
+        <div class="separator"></div>
         <button id="clearBtn">Clear</button>
         <button id="copyBtn">Copy Output</button>
         <div class="separator"></div>
@@ -640,8 +762,17 @@
         <div class="panels-container">
             <div class="panel">
                 <div class="panel-header">
-                    Input
-                    <span class="format-indicator unknown" id="inputFormat">AUTO-DETECT</span>
+                    <div class="panel-title-section">
+                        Input
+                        <span class="format-indicator unknown" id="inputFormat">AUTO-DETECT</span>
+                    </div>
+                    <div class="header-controls">
+                        <input type="file" id="fileInput" accept=".json,.yaml,.yml,.xml" style="display: none;">
+                        <span class="file-path-label" id="filePathLabel" style="display: none;">[path]</span>
+                        <div class="file-path-tooltip" id="filePathTooltip"></div>
+                        <button class="file-upload-btn" id="uploadFileBtn" onclick="document.getElementById('fileInput').click()">📁 Upload File</button>
+                        <button class="file-upload-btn" id="loadFromSourceBtn">📂 Load from Source</button>
+                    </div>
                 </div>
                 <div class="panel-content">
                     <textarea 
@@ -673,11 +804,27 @@ Example XML:
             
             <div class="panel">
                 <div class="panel-header">
-                    Output
-                    <span class="format-indicator unknown" id="outputFormat">RESULT</span>
+                    <div class="panel-title-section">
+                        Output
+                        <span class="format-indicator unknown" id="outputFormat">RESULT</span>
+                    </div>
+                    <div class="header-controls">
+                        <button class="file-upload-btn" id="toggleMarkupBtn">🎨 Enhanced View</button>
+                    </div>
                 </div>
                 <div class="panel-content">
-                    <div class="formatted-output" id="outputArea"></div>
+                    <textarea
+                        class="panel-textarea"
+                        id="outputArea"
+                        readonly
+                        placeholder="Converted output will appear here..."
+                        style="display: block;"
+                    ></textarea>
+                    <div
+                        class="formatted-output"
+                        id="outputAreaFormatted"
+                        style="display: none;"
+                    ></div>
                 </div>
             </div>
         </div>
@@ -707,6 +854,10 @@ Example XML:
         </div>
     </div>
     <script src="/static/js/common-functions.js"></script>
+    <script src="/static/js/source-selector.js"></script>
+    <script src="/static/js/source-selector-loader.js"></script>
+    <script src="/static/js/validation.js"></script>
+    <script src="/static/js/validation-utils.js"></script>
     <script src="/static/js/history.js"></script>
     <script src="/static/js/json-yaml-xml-converter.js"></script>
 </body>
