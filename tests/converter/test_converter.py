@@ -43,6 +43,24 @@ class TestFormatConverter:
         """Test unknown format detection."""
         invalid_data = 'this is not any known format'
         assert self.converter.detect_format(invalid_data) == 'unknown'
+
+    def test_detect_format_empty_string(self):
+        """Test detection with empty string - covers line 38."""
+        assert self.converter.detect_format("") == 'unknown'
+
+    def test_detect_format_whitespace_only(self):
+        """Test detection with whitespace only - covers line 38."""
+        assert self.converter.detect_format("   \n\t  ") == 'unknown'
+
+    def test_detect_format_malformed_yaml(self):
+        """Test detection with malformed YAML - covers lines 60-61."""
+        malformed_yaml = "key: value\n  invalid: [unclosed"
+        assert self.converter.detect_format(malformed_yaml) == 'unknown'
+
+    def test_detect_format_yaml_without_indicators(self):
+        """Test YAML detection without : or - indicators."""
+        simple_text = "just plain text"
+        assert self.converter.detect_format(simple_text) == 'unknown'
     
     def test_json_to_yaml_simple(self):
         """Test simple JSON to YAML conversion."""

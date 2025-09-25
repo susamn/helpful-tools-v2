@@ -20,7 +20,7 @@ from unittest.mock import patch, MagicMock
 import sys
 sys.path.insert(0, '/home/susamn/dotfiles/workspace/tools/helpful-tools-v2/src')
 
-from main import app, test_source_connection, convert_to_source_config
+from main import app, check_source_connection, convert_to_source_config
 
 
 class TestSourceSelectorFixes:
@@ -97,7 +97,7 @@ class TestSourceSelectorFixes:
         }
 
         # Test connection should succeed with warnings for directory validation
-        test_result = test_source_connection('local_file', dir_source['config'], dir_source)
+        test_result = check_source_connection('local_file', dir_source['config'], dir_source)
         assert test_result['success'] == True
         # Should not have warnings since the directory exists
         assert 'Warning: Path is not a directory' not in test_result.get('message', '')
@@ -112,7 +112,7 @@ class TestSourceSelectorFixes:
             'level': 1
         }
 
-        test_result = test_source_connection('local_file', file_as_dir_source['config'], file_as_dir_source)
+        test_result = check_source_connection('local_file', file_as_dir_source['config'], file_as_dir_source)
         assert test_result['success'] == True
         # Should warn about path issues (either not directory or path doesn't exist due to trailing slash)
         message = test_result.get('message', '')
@@ -128,7 +128,7 @@ class TestSourceSelectorFixes:
             'level': 1
         }
 
-        test_result = test_source_connection('local_file', nonexistent_source['config'], nonexistent_source)
+        test_result = check_source_connection('local_file', nonexistent_source['config'], nonexistent_source)
         # Connection test should either fail or warn about path
         message = test_result.get('message', '') + test_result.get('error', '')
         assert 'Path does not exist' in message
@@ -146,7 +146,7 @@ class TestSourceSelectorFixes:
             'level': 1
         }
 
-        test_result = test_source_connection('http', http_dir_source['config'], http_dir_source)
+        test_result = check_source_connection('http', http_dir_source['config'], http_dir_source)
         # Should warn that HTTP doesn't support directory listing
         assert 'Warning: Source type \'http\' does not support directory listing but is configured as a directory' in test_result.get('message', '')
 
@@ -160,7 +160,7 @@ class TestSourceSelectorFixes:
             'level': 0
         }
 
-        test_result = test_source_connection('http', http_file_source['config'], http_file_source)
+        test_result = check_source_connection('http', http_file_source['config'], http_file_source)
         # Should not warn about directory listing since it's configured as a file
         assert 'does not support directory listing' not in test_result.get('message', '')
 

@@ -1336,7 +1336,7 @@ def test_source_endpoint(source_id):
         config = source['config']
         
         # Test based on source type using the new source package
-        test_result = test_source_connection(source_type, config, source)
+        test_result = check_source_connection(source_type, config, source)
         
         # Update source status
         sources[source_id]['status'] = 'connected' if test_result['success'] else 'error'
@@ -1347,7 +1347,7 @@ def test_source_endpoint(source_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-def test_source_connection(source_type, config, source_data=None):
+def check_source_connection(source_type, config, source_data=None):
     """Test connection using the new source package"""
     try:
         # Convert source data to SourceConfig format
