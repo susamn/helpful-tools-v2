@@ -261,6 +261,10 @@ class SourceSelector {
         this.currentExplorerSource = null;
         this.currentEditingSource = null;
 
+        // Initialize timers
+        this.updateInterval = null;
+        this.startUpdateTimer();
+
         // Initialize asynchronously
         this.initializeComponent().then(() => {
             this.initialized = true;
@@ -444,6 +448,8 @@ class SourceSelector {
                     this.testSourceConnection(source);
                 } else if (action === 'fetch') {
                     this.fetchSourceData(source);
+                } else if (action === 'refresh') {
+                    this.refreshSource(source);
                 }
             }
         });
@@ -520,6 +526,7 @@ class SourceSelector {
                         </div>
                         <div class="source-expiry-selector">
                             ${this.renderExpiryInfo(source.expiry)}
+                            <div class="source-id">${this.escapeHtml(source.id)}</div>
                             <div class="source-type-icon">${fileTypeIcon}</div>
                         </div>
                     </div>
@@ -533,6 +540,7 @@ class SourceSelector {
                         </div>
                         <div class="source-status">
                             <span class="test-status" id="test-status-${source.id}"></span>
+                            <button class="source-btn source-refresh-btn" data-action="refresh" data-source-id="${source.id}" title="Refresh source">🔄</button>
                         </div>
                     </div>
                 </div>
@@ -570,7 +578,7 @@ class SourceSelector {
             const countdown = this.formatCountdown(timeDiff);
             const statusClass = timeDiff < 24 * 60 * 60 * 1000 ? 'expiring-soon' : 'expires';
             
-            return `<span class="expiry-status ${statusClass}" data-expiry-timestamp="${expiry.expiry_timestamp}">⏰ Expires in ${countdown}</span>`;
+            return `<span class="expiry-status ${statusClass}" data-expiry-timestamp="${expiry.expiry_timestamp}">⏰ ${countdown}</span>`;
         }
 
         if (expiry.status === 'error') {
@@ -581,19 +589,22 @@ class SourceSelector {
     }
 
     /**
-     * Format countdown time (same as sources app)
+     * Format countdown time with seconds
      */
     formatCountdown(milliseconds) {
         const days = Math.floor(milliseconds / (1000 * 60 * 60 * 24));
         const hours = Math.floor((milliseconds % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((milliseconds % (1000 * 60)) / 1000);
 
         if (days > 0) {
-            return `${days}d ${hours}h`;
+            return `${days}d ${hours}h ${minutes}m`;
         } else if (hours > 0) {
-            return `${hours}h ${minutes}m`;
+            return `${hours}h ${minutes}m ${seconds}s`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds}s`;
         } else {
-            return `${minutes}m`;
+            return `${seconds}s`;
         }
     }
 
@@ -1330,6 +1341,47 @@ class SourceSelector {
         }
     }
 
+    /**
+     * Refresh a source by reloading it from the API
+     */
+    async refreshSource(source) {
+        try {
+            const refreshBtn = document.querySelector(`[data-action="refresh"][data-source-id="${source.id}"]`);
+            if (refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.classList.add('spinning');
+            }
+
+            // Reload sources to get fresh data
+            await this.loadSources();
+
+            // If this source is currently being explored, refresh the explorer too
+            if (this.currentExplorerSource && this.currentExplorerSource.id === source.id) {
+                // Clear cache and refresh explorer data
+                this.clearSourceCache(source.id);
+                await this.fetchSourceDataWithCacheBust(source);
+            }
+
+            if (typeof showStatusMessage === 'function') {
+                showStatusMessage(`Source "${source.name}" refreshed successfully`, 'success', 2000);
+            }
+        } catch (error) {
+            console.error('Error refreshing source:', error);
+            if (typeof showStatusMessage === 'function') {
+                showStatusMessage(`Error refreshing source: ${error.message}`, 'error', 4000);
+            } else {
+                alert(`Error refreshing source: ${error.message}`);
+            }
+        } finally {
+            // Re-enable refresh button and stop spinning animation
+            const refreshBtn = document.querySelector(`[data-action="refresh"][data-source-id="${source.id}"]`);
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.classList.remove('spinning');
+            }
+        }
+    }
+
 showExplorerPanel(source, directoryData, isUserInitiated = true) {
         // Update both legacy and new state management
         this.currentExplorerSource = source;
@@ -1985,6 +2037,64 @@ showExplorerPanel(source, directoryData, isUserInitiated = true) {
     }
 
     /**
+     * Start the update timer for expiry displays (runs every second)
+     */
+    startUpdateTimer() {
+        // Clear any existing timer
+        this.stopUpdateTimer();
+
+        // Update expiry displays every second to show countdown with seconds
+        this.updateInterval = setInterval(() => {
+            this.updateExpiryDisplays();
+        }, 1000);
+    }
+
+    /**
+     * Stop the update timer
+     */
+    stopUpdateTimer() {
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+            this.updateInterval = null;
+        }
+    }
+
+
+    /**
+     * Update all visible expiry displays
+     */
+    updateExpiryDisplays() {
+        // Only update if modal is visible
+        const modal = document.getElementById(this.options.containerId);
+        if (!modal || modal.style.display === 'none') {
+            return;
+        }
+
+        // Update each expiry status element
+        const expiryElements = modal.querySelectorAll('.expiry-status[data-expiry-timestamp]');
+        expiryElements.forEach(element => {
+            const expiryTimestamp = parseInt(element.dataset.expiryTimestamp);
+            if (expiryTimestamp) {
+                const expiryTime = new Date(expiryTimestamp * 1000);
+                const now = new Date();
+                const timeDiff = expiryTime.getTime() - now.getTime();
+
+                if (timeDiff <= 0) {
+                    // Expired
+                    element.className = 'expiry-status expired';
+                    element.textContent = '⚠️ Expired';
+                } else {
+                    // Update countdown
+                    const countdown = this.formatCountdown(timeDiff);
+                    const statusClass = timeDiff < 24 * 60 * 60 * 1000 ? 'expiring-soon' : 'expires';
+                    element.className = `expiry-status ${statusClass}`;
+                    element.textContent = `⏰ ${countdown}`;
+                }
+            }
+        });
+    }
+
+    /**
      * Escape HTML to prevent XSS
      */
     escapeHtml(text) {
@@ -1997,11 +2107,14 @@ showExplorerPanel(source, directoryData, isUserInitiated = true) {
      * Destroy the component
      */
     destroy() {
+        // Stop update timer
+        this.stopUpdateTimer();
+
         const modal = document.getElementById(this.options.containerId);
         const overlay = document.getElementById(`${this.options.containerId}-overlay`);
         const varsModal = document.getElementById(`${this.options.containerId}-vars-modal`);
         const varsOverlay = document.getElementById(`${this.options.containerId}-vars-overlay`);
-        
+
         [modal, overlay, varsModal, varsOverlay].forEach(element => {
             if (element) element.remove();
         });
