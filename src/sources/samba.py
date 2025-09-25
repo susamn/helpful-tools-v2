@@ -381,20 +381,42 @@ class SambaSource(BaseDataSource):
                 # Skip . and .. entries
                 if file_info.filename in ['.', '..']:
                     continue
-                
-                is_directory = file_info.isDirectory
-                item_path = f"{target_path.rstrip('/')}/{file_info.filename}"
-                
-                contents.append({
-                    'name': file_info.filename,
-                    'path': f"smb://{self._parsed_url['host']}/{share}{item_path}",
-                    'type': 'directory' if is_directory else 'file',
-                    'size': None if is_directory else file_info.file_size,
-                    'last_modified': datetime.fromtimestamp(file_info.last_write_time).isoformat() if file_info.last_write_time else None,
-                    'is_readonly': file_info.isReadOnly,
-                    'is_hidden': file_info.isHidden,
-                    'creation_time': datetime.fromtimestamp(file_info.create_time).isoformat() if file_info.create_time else None
-                })
+
+                try:
+                    is_directory = file_info.isDirectory
+                    item_path = f"{target_path.rstrip('/')}/{file_info.filename}"
+
+                    # Use base class method for consistent timestamp formatting
+                    time_data = self.format_last_modified(file_info.last_write_time)
+
+                    item_info = {
+                        'name': file_info.filename,
+                        'path': f"smb://{self._parsed_url['host']}/{share}{item_path}",
+                        'type': 'directory' if is_directory else 'file',
+                        'is_directory': is_directory,
+                        'size': None if is_directory else file_info.file_size,
+                        'is_readonly': file_info.isReadOnly,
+                        'is_hidden': file_info.isHidden,
+                        'creation_time': datetime.fromtimestamp(file_info.create_time).isoformat() if file_info.create_time else None
+                    }
+                    # Add standardized time fields
+                    item_info.update(time_data)
+
+                    # Add lazy loading metadata for directories
+                    if is_directory:
+                        item_info['has_children'] = True  # Assume directories have children
+                        item_info['explorable'] = True
+                        item_info['children'] = []  # Empty for lazy loading
+
+                    contents.append(item_info)
+                except Exception:
+                    # Skip items we can't access
+                    contents.append({
+                        'name': file_info.filename,
+                        'path': f"smb://{self._parsed_url['host']}/{share}{target_path.rstrip('/')}/{file_info.filename}",
+                        'type': 'unknown',
+                        'error': 'Permission denied or invalid attributes'
+                    })
             
             return contents
             
@@ -422,6 +444,52 @@ class SambaSource(BaseDataSource):
     def is_listable(self) -> bool:
         """SMB sources support listing."""
         return True
+
+    def is_directory(self) -> bool:
+        """Check if SMB source points to a directory."""
+        # First check config override
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return self.config.is_directory
+
+        # Fallback to SMB attributes check
+        try:
+            smb_conn = self._get_smb_connection()
+            attrs = smb_conn.getAttributes(self._parsed_url['share'], self._parsed_url['path'])
+            return attrs.isDirectory
+        except Exception:
+            return False
+
+    def is_file(self) -> bool:
+        """Check if SMB source points to a single file."""
+        # First check config override (inverse of is_directory)
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return not self.config.is_directory
+
+        # Fallback to SMB attributes check
+        try:
+            smb_conn = self._get_smb_connection()
+            attrs = smb_conn.getAttributes(self._parsed_url['share'], self._parsed_url['path'])
+            return not attrs.isDirectory
+        except Exception:
+            return False
+
+    def _build_child_path(self, parent_path: Optional[str], item: Dict[str, Any]) -> str:
+        """
+        Build child path for SMB directory exploration.
+
+        Args:
+            parent_path: Parent directory path
+            item: Directory item metadata containing 'name'
+
+        Returns:
+            Full SMB path to child directory
+        """
+        if parent_path is None:
+            parent_path = self._parsed_url['path']
+
+        # Build path by joining parent path with item name
+        child_path = f"{parent_path.rstrip('/')}/{item['name']}"
+        return child_path
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up SMB connection."""

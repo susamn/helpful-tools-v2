@@ -83,7 +83,22 @@ class SftpSource(BaseDataSource):
             # Add authentication method
             if private_key_path:
                 try:
-                    private_key = paramiko.RSAKey.from_private_key_file(private_key_path)
+                    # Try different key types
+                    private_key = None
+                    for key_class in [paramiko.RSAKey, paramiko.ECDSAKey, paramiko.Ed25519Key, paramiko.DSSKey]:
+                        try:
+                            passphrase = self.config.static_config.get('private_key_passphrase')
+                            if passphrase:
+                                private_key = key_class.from_private_key_file(private_key_path, password=passphrase)
+                            else:
+                                private_key = key_class.from_private_key_file(private_key_path)
+                            break
+                        except Exception:
+                            continue
+
+                    if not private_key:
+                        raise SourceAuthenticationError(f"Could not load private key from {private_key_path}")
+
                     connect_kwargs['pkey'] = private_key
                 except Exception as e:
                     raise SourceAuthenticationError(f"Failed to load private key: {str(e)}")
@@ -92,6 +107,7 @@ class SftpSource(BaseDataSource):
             else:
                 # Try to use SSH agent or default keys
                 connect_kwargs['look_for_keys'] = True
+                connect_kwargs['allow_agent'] = self.config.static_config.get('allow_agent', True)
             
             # Connect
             self._ssh_client.connect(**connect_kwargs)
@@ -353,19 +369,41 @@ class SftpSource(BaseDataSource):
             
             contents = []
             for item in sftp_client.listdir_attr(target_path):
-                is_directory = stat.S_ISDIR(item.st_mode)
-                item_path = f"{target_path.rstrip('/')}/{item.filename}"
-                
-                contents.append({
-                    'name': item.filename,
-                    'path': f"sftp://{self._parsed_url['host']}:{self._parsed_url['port']}{item_path}",
-                    'type': 'directory' if is_directory else 'file',
-                    'size': None if is_directory else item.st_size,
-                    'last_modified': datetime.fromtimestamp(item.st_mtime).isoformat() if item.st_mtime else None,
-                    'permissions': oct(item.st_mode)[-3:] if item.st_mode else None,
-                    'uid': item.st_uid,
-                    'gid': item.st_gid
-                })
+                try:
+                    is_directory = stat.S_ISDIR(item.st_mode)
+                    item_path = f"{target_path.rstrip('/')}/{item.filename}"
+
+                    # Use base class method for consistent timestamp formatting
+                    time_data = self.format_last_modified(item.st_mtime)
+
+                    item_info = {
+                        'name': item.filename,
+                        'path': f"sftp://{self._parsed_url['host']}:{self._parsed_url['port']}{item_path}",
+                        'type': 'directory' if is_directory else 'file',
+                        'is_directory': is_directory,
+                        'size': None if is_directory else item.st_size,
+                        'permissions': oct(item.st_mode)[-3:] if item.st_mode else None,
+                        'uid': item.st_uid,
+                        'gid': item.st_gid
+                    }
+                    # Add standardized time fields
+                    item_info.update(time_data)
+
+                    # Add lazy loading metadata for directories
+                    if is_directory:
+                        item_info['has_children'] = True  # Assume directories have children
+                        item_info['explorable'] = True
+                        item_info['children'] = []  # Empty for lazy loading
+
+                    contents.append(item_info)
+                except Exception:
+                    # Skip items we can't access
+                    contents.append({
+                        'name': item.filename,
+                        'path': f"sftp://{self._parsed_url['host']}:{self._parsed_url['port']}{target_path.rstrip('/')}/{item.filename}",
+                        'type': 'unknown',
+                        'error': 'Permission denied or invalid attributes'
+                    })
             
             return contents
             
@@ -390,6 +428,52 @@ class SftpSource(BaseDataSource):
     def is_listable(self) -> bool:
         """SFTP sources support listing."""
         return True
+
+    def is_directory(self) -> bool:
+        """Check if SFTP source points to a directory."""
+        # First check config override
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return self.config.is_directory
+
+        # Fallback to SFTP stat check
+        try:
+            sftp_client = self._get_sftp_client()
+            attrs = sftp_client.stat(self._parsed_url['path'])
+            return stat.S_ISDIR(attrs.st_mode)
+        except Exception:
+            return False
+
+    def is_file(self) -> bool:
+        """Check if SFTP source points to a single file."""
+        # First check config override (inverse of is_directory)
+        if hasattr(self.config, 'is_directory') and self.config.is_directory is not None:
+            return not self.config.is_directory
+
+        # Fallback to SFTP stat check
+        try:
+            sftp_client = self._get_sftp_client()
+            attrs = sftp_client.stat(self._parsed_url['path'])
+            return stat.S_ISREG(attrs.st_mode)
+        except Exception:
+            return False
+
+    def _build_child_path(self, parent_path: Optional[str], item: Dict[str, Any]) -> str:
+        """
+        Build child path for SFTP directory exploration.
+
+        Args:
+            parent_path: Parent directory path
+            item: Directory item metadata containing 'name'
+
+        Returns:
+            Full SFTP path to child directory
+        """
+        if parent_path is None:
+            parent_path = self._parsed_url['path']
+
+        # Build path by joining parent path with item name
+        child_path = f"{parent_path.rstrip('/')}/{item['name']}"
+        return child_path
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Clean up SFTP and SSH connections."""

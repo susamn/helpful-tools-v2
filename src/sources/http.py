@@ -8,10 +8,11 @@ from typing import Union, Iterator, List, Dict, Any, Optional
 from urllib.parse import urlparse, urljoin
 import time
 
-from .base import BaseDataSource, SourceMetadata, ConnectionTestResult
+from .base import BaseDataSource, SourceMetadata, ConnectionTestResult, PaginationOptions, PaginatedResult
 from .exceptions import (
-    SourceNotFoundError, SourceConnectionError, SourcePermissionError, 
-    SourceDataError, SourceTimeoutError, SourceAuthenticationError
+    SourceNotFoundError, SourceConnectionError, SourcePermissionError,
+    SourceDataError, SourceTimeoutError, SourceAuthenticationError,
+    SourceConfigurationError
 )
 
 
@@ -28,51 +29,96 @@ class HttpSource(BaseDataSource):
         """Get requests session with configuration."""
         if self._session:
             return self._session
-        
+
         try:
             import requests
             from requests.auth import HTTPBasicAuth, HTTPDigestAuth
             from requests.adapters import HTTPAdapter
             from urllib3.util.retry import Retry
+            import urllib3
         except ImportError:
             raise SourceConnectionError("requests library is required for HTTP sources")
-        
+
         self._session = requests.Session()
-        
+
         # Configure timeout
         timeout = self._get_timeout()
         self._session.timeout = timeout
-        
+
         # Configure authentication
         auth_type = self.config.static_config.get('auth_type')
         if auth_type:
             username = self.config.static_config.get('username')
             password = self.config.static_config.get('password')
-            
+
+            if not username and auth_type in ['basic', 'digest']:
+                raise SourceConfigurationError(f"Username is required for {auth_type} authentication")
+
             if auth_type == 'basic':
-                self._session.auth = HTTPBasicAuth(username, password)
+                self._session.auth = HTTPBasicAuth(username, password or '')
             elif auth_type == 'digest':
-                self._session.auth = HTTPDigestAuth(username, password)
-        
+                self._session.auth = HTTPDigestAuth(username, password or '')
+            elif auth_type == 'bearer':
+                token = self.config.static_config.get('token')
+                if not token:
+                    raise SourceConfigurationError("Token is required for bearer authentication")
+                self._session.headers['Authorization'] = f'Bearer {token}'
+            elif auth_type == 'api_key':
+                api_key = self.config.static_config.get('api_key')
+                header_name = self.config.static_config.get('api_key_header', 'X-API-Key')
+                if not api_key:
+                    raise SourceConfigurationError("API key is required for api_key authentication")
+                self._session.headers[header_name] = api_key
+
         # Configure headers
         headers = self.config.static_config.get('headers', {})
-        if headers:
+        if headers and isinstance(headers, dict):
             self._session.headers.update(headers)
-        
-        # Configure retry strategy
+
+        # Configure user agent
+        user_agent = self.config.static_config.get('user_agent', 'Helpful-Tools-HTTP-Client/1.0')
+        self._session.headers['User-Agent'] = user_agent
+
+        # Configure retry strategy with exponential backoff
+        retry_config = self.config.static_config.get('retry', {})
         retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
+            total=retry_config.get('total', 3),
+            backoff_factor=retry_config.get('backoff_factor', 2),
+            status_forcelist=retry_config.get('status_forcelist', [429, 500, 502, 503, 504]),
+            allowed_methods=retry_config.get('allowed_methods', ['HEAD', 'GET', 'OPTIONS']),
+            respect_retry_after_header=True
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=self.config.static_config.get('pool_connections', 10),
+            pool_maxsize=self.config.static_config.get('pool_maxsize', 10)
+        )
         self._session.mount("http://", adapter)
         self._session.mount("https://", adapter)
-        
+
         # Configure SSL verification
         verify_ssl = self.config.static_config.get('verify_ssl', True)
-        self._session.verify = verify_ssl
-        
+        if verify_ssl and isinstance(verify_ssl, str):
+            # Custom CA certificate path
+            self._session.verify = verify_ssl
+        else:
+            self._session.verify = bool(verify_ssl)
+
+        # Configure SSL client certificate
+        client_cert = self.config.static_config.get('client_cert')
+        if client_cert:
+            if isinstance(client_cert, dict):
+                cert_file = client_cert.get('cert')
+                key_file = client_cert.get('key')
+                if cert_file and key_file:
+                    self._session.cert = (cert_file, key_file)
+            elif isinstance(client_cert, str):
+                self._session.cert = client_cert
+
+        # Disable SSL warnings if verification is disabled
+        if not self._session.verify:
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         return self._session
     
     def test_connection(self) -> ConnectionTestResult:
@@ -130,20 +176,55 @@ class HttpSource(BaseDataSource):
                 
         except Exception as e:
             error_type = type(e).__name__
+            response_time = (datetime.now() - start_time).total_seconds()
+
+            # Handle specific exceptions
             if 'timeout' in error_type.lower() or 'timeout' in str(e).lower():
                 return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='timeout',
-                    message=f'HTTP request timeout: {self._resolved_path}',
-                    response_time=(datetime.now() - start_time).total_seconds(),
+                    message=f'HTTP request timeout after {response_time:.1f}s: {self._resolved_path}',
+                    response_time=response_time,
                     error='Request timeout'
+                ))
+            elif 'ConnectionError' in error_type or 'connection' in str(e).lower():
+                return self._cache_test_result(ConnectionTestResult(
+                    success=False,
+                    status='error',
+                    message=f'HTTP connection error: {self._resolved_path}',
+                    response_time=response_time,
+                    error='Network connection failed'
+                ))
+            elif 'SSLError' in error_type or 'ssl' in str(e).lower():
+                return self._cache_test_result(ConnectionTestResult(
+                    success=False,
+                    status='error',
+                    message=f'SSL/TLS error: {self._resolved_path}',
+                    response_time=response_time,
+                    error='SSL certificate verification failed'
+                ))
+            elif 'TooManyRedirects' in error_type:
+                return self._cache_test_result(ConnectionTestResult(
+                    success=False,
+                    status='error',
+                    message=f'Too many redirects: {self._resolved_path}',
+                    response_time=response_time,
+                    error='Redirect loop detected'
+                ))
+            elif isinstance(e, SourceConfigurationError):
+                return self._cache_test_result(ConnectionTestResult(
+                    success=False,
+                    status='error',
+                    message=f'Configuration error: {str(e)}',
+                    response_time=response_time,
+                    error=str(e)
                 ))
             else:
                 return self._cache_test_result(ConnectionTestResult(
                     success=False,
                     status='error',
                     message=f'HTTP connection failed: {str(e)}',
-                    response_time=(datetime.now() - start_time).total_seconds(),
+                    response_time=response_time,
                     error=str(e)
                 ))
     
@@ -345,23 +426,249 @@ class HttpSource(BaseDataSource):
     
     def list_contents(self, path: Optional[str] = None) -> List[Dict[str, Any]]:
         """List contents - limited support for directory-style HTTP resources."""
-        # Most HTTP resources don't support directory listing
-        # This would need to be implemented based on specific server capabilities
-        # For now, return basic information about the current resource
+        # Check if this is a directory-style API endpoint
+        api_config = self.config.static_config.get('directory_api')
+
+        if api_config and isinstance(api_config, dict):
+            return self._list_api_directory(path, api_config)
+
+        # For regular HTTP resources, return basic information about the current resource
         try:
             metadata = self.get_metadata()
-            
-            return [{
-                'name': self._parsed_url.path.split('/')[-1] or 'index',
+            filename = self._parsed_url.path.split('/')[-1] or 'index'
+
+            # Use base class method for consistent timestamp formatting
+            time_data = self.format_last_modified(metadata.last_modified)
+
+            item_info = {
+                'name': filename,
                 'path': self._resolved_path,
                 'type': 'file',
+                'is_directory': False,
                 'size': metadata.size,
-                'last_modified': metadata.last_modified.isoformat() if metadata.last_modified else None,
                 'content_type': metadata.content_type
-            }]
-            
+            }
+            # Add standardized time fields
+            item_info.update(time_data)
+
+            return [item_info]
+
         except Exception as e:
             raise SourceConnectionError(f"Failed to list HTTP resource: {str(e)}")
+
+    def _list_api_directory(self, path: Optional[str], api_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """List contents using a directory-style API endpoint."""
+        try:
+            session = self._get_session()
+
+            # Build API URL
+            api_endpoint = api_config.get('endpoint', '')
+            if path:
+                # Construct URL with path parameter
+                if api_config.get('path_param'):
+                    params = {api_config['path_param']: path}
+                    response = session.get(api_endpoint, params=params)
+                else:
+                    # Append path to endpoint
+                    endpoint_url = f"{api_endpoint.rstrip('/')}/{path.lstrip('/')}"
+                    response = session.get(endpoint_url)
+            else:
+                response = session.get(api_endpoint)
+
+            if response.status_code != 200:
+                raise SourceConnectionError(f"API returned status {response.status_code}")
+
+            # Parse response
+            data = response.json()
+
+            # Extract items based on configuration
+            items_path = api_config.get('items_path', 'items')
+            if '.' in items_path:
+                # Navigate nested JSON path
+                items = data
+                for key in items_path.split('.'):
+                    items = items.get(key, [])
+            else:
+                items = data.get(items_path, data if isinstance(data, list) else [])
+
+            # Map items to standard format
+            name_field = api_config.get('name_field', 'name')
+            size_field = api_config.get('size_field', 'size')
+            type_field = api_config.get('type_field', 'type')
+            modified_field = api_config.get('modified_field', 'last_modified')
+
+            result = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+
+                item_name = item.get(name_field, 'unknown')
+                item_type = item.get(type_field, 'file')
+                is_directory = item_type.lower() in ['directory', 'folder', 'dir']
+
+                # Build item path
+                if path:
+                    item_path = f"{self._resolved_path.rstrip('/')}/{path.strip('/')}/{item_name}"
+                else:
+                    item_path = f"{self._resolved_path.rstrip('/')}/{item_name}"
+
+                # Use base class method for consistent timestamp formatting
+                time_data = self.format_last_modified(item.get(modified_field))
+
+                item_info = {
+                    'name': item_name,
+                    'path': item_path,
+                    'type': 'directory' if is_directory else 'file',
+                    'is_directory': is_directory,
+                    'size': item.get(size_field),
+                    'content_type': item.get('content_type'),
+                }
+                # Add standardized time fields
+                item_info.update(time_data)
+
+                # Add lazy loading metadata for directories
+                if is_directory:
+                    item_info['has_children'] = True
+                    item_info['explorable'] = True
+                    item_info['children'] = []
+
+                result.append(item_info)
+
+            return result
+
+        except Exception as e:
+            if isinstance(e, SourceConnectionError):
+                raise
+            else:
+                raise SourceConnectionError(f"Failed to list API directory: {str(e)}")
+
+    def list_contents_paginated(self, path: Optional[str] = None,
+                              pagination: Optional[PaginationOptions] = None) -> PaginatedResult:
+        """List contents with pagination support for API endpoints."""
+        if pagination is None:
+            pagination = PaginationOptions()
+
+        # Check if API supports native pagination
+        api_config = self.config.static_config.get('directory_api')
+        if api_config and api_config.get('supports_pagination'):
+            return self._list_api_directory_paginated(path, pagination, api_config)
+
+        # Fall back to base implementation for non-API sources
+        return super().list_contents_paginated(path, pagination)
+
+    def _list_api_directory_paginated(self, path: Optional[str],
+                                    pagination: PaginationOptions,
+                                    api_config: Dict[str, Any]) -> PaginatedResult:
+        """List contents using paginated API endpoint."""
+        try:
+            session = self._get_session()
+
+            # Build API URL with pagination parameters
+            api_endpoint = api_config.get('endpoint', '')
+            params = {}
+
+            # Add path parameter
+            if path and api_config.get('path_param'):
+                params[api_config['path_param']] = path
+
+            # Add pagination parameters
+            page_param = api_config.get('page_param', 'page')
+            limit_param = api_config.get('limit_param', 'limit')
+            params[page_param] = pagination.page
+            params[limit_param] = pagination.limit
+
+            # Add sorting parameters
+            if api_config.get('supports_sorting'):
+                sort_param = api_config.get('sort_param', 'sort_by')
+                order_param = api_config.get('order_param', 'sort_order')
+                params[sort_param] = pagination.sort_by
+                params[order_param] = pagination.sort_order
+
+            # Add filtering parameters
+            if pagination.filter_type and api_config.get('supports_filtering'):
+                filter_param = api_config.get('filter_param', 'type')
+                params[filter_param] = pagination.filter_type
+
+            # Make API request
+            if path and not api_config.get('path_param'):
+                endpoint_url = f"{api_endpoint.rstrip('/')}/{path.lstrip('/')}"
+                response = session.get(endpoint_url, params=params)
+            else:
+                response = session.get(api_endpoint, params=params)
+
+            if response.status_code != 200:
+                raise SourceConnectionError(f"API returned status {response.status_code}")
+
+            data = response.json()
+
+            # Extract pagination metadata
+            total_count = data.get(api_config.get('total_field', 'total'), 0)
+
+            # Extract items
+            items_path = api_config.get('items_path', 'items')
+            if '.' in items_path:
+                items = data
+                for key in items_path.split('.'):
+                    items = items.get(key, [])
+            else:
+                items = data.get(items_path, data if isinstance(data, list) else [])
+
+            # Map items to standard format (similar to _list_api_directory)
+            mapped_items = self._map_api_items(items, api_config, path)
+
+            return PaginatedResult.create(mapped_items, total_count, pagination)
+
+        except Exception as e:
+            if isinstance(e, SourceConnectionError):
+                raise
+            else:
+                raise SourceConnectionError(f"Failed to list paginated API directory: {str(e)}")
+
+    def _map_api_items(self, items: List[Dict[str, Any]], api_config: Dict[str, Any], path: Optional[str]) -> List[Dict[str, Any]]:
+        """Map API response items to standard format."""
+        name_field = api_config.get('name_field', 'name')
+        size_field = api_config.get('size_field', 'size')
+        type_field = api_config.get('type_field', 'type')
+        modified_field = api_config.get('modified_field', 'last_modified')
+
+        result = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            item_name = item.get(name_field, 'unknown')
+            item_type = item.get(type_field, 'file')
+            is_directory = item_type.lower() in ['directory', 'folder', 'dir']
+
+            # Build item path
+            if path:
+                item_path = f"{self._resolved_path.rstrip('/')}/{path.strip('/')}/{item_name}"
+            else:
+                item_path = f"{self._resolved_path.rstrip('/')}/{item_name}"
+
+            # Use base class method for consistent timestamp formatting
+            time_data = self.format_last_modified(item.get(modified_field))
+
+            item_info = {
+                'name': item_name,
+                'path': item_path,
+                'type': 'directory' if is_directory else 'file',
+                'is_directory': is_directory,
+                'size': item.get(size_field),
+                'content_type': item.get('content_type'),
+            }
+            # Add standardized time fields
+            item_info.update(time_data)
+
+            # Add lazy loading metadata for directories
+            if is_directory:
+                item_info['has_children'] = True
+                item_info['explorable'] = True
+                item_info['children'] = []
+
+            result.append(item_info)
+
+        return result
     
     def is_writable(self) -> bool:
         """HTTP sources may support writing via PUT/POST."""

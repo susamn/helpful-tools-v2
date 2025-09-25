@@ -33,7 +33,3 @@ class SourceTimeoutError(SourceException):
 class SourceAuthenticationError(SourceException):
     """Raised when authentication to source fails."""
     pass
-
-class SourceConfigurationError(SourceException):
-    """Raised when source configuration is invalid."""
-    pass

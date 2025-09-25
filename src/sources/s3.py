@@ -21,11 +21,11 @@ class S3Source(BaseDataSource):
     """Implementation for AWS S3 sources."""
     
     def __init__(self, config):
-        super().__init__(config)
         self._resolved_path = config.get_resolved_path()
         self._bucket, self._key = self._parse_s3_path()
         self._s3_client = None
         self._session = None
+        super().__init__(config)
     
     def _parse_s3_path(self) -> tuple[str, str]:
         """Parse S3 path to extract bucket and key."""
@@ -56,16 +56,38 @@ class S3Source(BaseDataSource):
             # Get configuration
             profile = self.config.static_config.get('aws_profile')
             region = self.config.static_config.get('region', 'us-east-1')
-            
+            endpoint_url = self.config.static_config.get('endpoint_url')  # For S3-compatible services
+
             # Create session with profile if specified
             if profile:
                 self._session = boto3.Session(profile_name=profile)
             else:
                 self._session = boto3.Session()
-            
+
+            # Prepare client configuration
+            client_config = {}
+
+            # Configure retry behavior
+            retry_config = self.config.static_config.get('retry', {})
+            if retry_config:
+                from botocore.config import Config
+                client_config['config'] = Config(
+                    retries={
+                        'max_attempts': retry_config.get('max_attempts', 3),
+                        'mode': retry_config.get('mode', 'adaptive')
+                    },
+                    read_timeout=self.config.static_config.get('read_timeout', 60),
+                    connect_timeout=self.config.static_config.get('connect_timeout', 60),
+                    max_pool_connections=self.config.static_config.get('max_pool_connections', 50)
+                )
+
+            # Set endpoint URL for S3-compatible services
+            if endpoint_url:
+                client_config['endpoint_url'] = endpoint_url
+
             # Create S3 client
-            self._s3_client = self._session.client('s3', region_name=region)
-            
+            self._s3_client = self._session.client('s3', region_name=region, **client_config)
+
             return self._s3_client
             
         except NoCredentialsError:
@@ -605,66 +627,112 @@ class S3Source(BaseDataSource):
     
     def get_expiry_time(self) -> Optional[datetime]:
         """
-        Get AWS credential expiry time from the credentials file.
-        
+        Get AWS credential expiry time from various sources.
+
         Returns:
-            datetime: Expiry time if found in AWS credentials, None otherwise
+            datetime: Expiry time if found, None otherwise
         """
+        # Try to get expiry from session credentials first
         try:
-            # Get the AWS profile name
+            session = self._session or boto3.Session()
+            credentials = session.get_credentials()
+            if credentials and hasattr(credentials, 'token') and credentials.token:
+                # This is a temporary credential, check for expiry
+                if hasattr(credentials, '_expiry_time'):
+                    return credentials._expiry_time
+        except Exception:
+            pass
+
+        # Fallback to reading from credentials file
+        try:
             profile = self.config.static_config.get('aws_profile', 'default')
-            
+
             # Read AWS credentials file
             credentials_path = Path.home() / '.aws' / 'credentials'
             if not credentials_path.exists():
                 return None
-            
+
             config = configparser.ConfigParser()
             config.read(credentials_path)
-            
+
             # Check if the profile exists
             if profile not in config.sections():
                 return None
-            
-            # Look for expiration field
+
             profile_section = config[profile]
-            expiry_field = None
-            
+
             # Common expiry field names in AWS credentials
-            expiry_fields = ['expires_at', 'expiry_time', 'expiration', 'aws_session_token_expiry', 'token_expiration']
-            
+            expiry_fields = [
+                'aws_session_token_expiry', 'token_expiration',
+                'expiration', 'expires_at', 'expiry_time'
+            ]
+
             for field in expiry_fields:
                 if field in profile_section:
                     expiry_field = profile_section[field]
-                    break
-            
-            if not expiry_field:
-                return None
-            
-            # Parse the expiry time - try different formats
+                    return self._parse_expiry_time(expiry_field)
+
+        except Exception:
+            pass
+
+        return None
+
+    def _parse_expiry_time(self, expiry_field: str) -> Optional[datetime]:
+        """Parse expiry time string in various formats."""
+        try:
+            # ISO format (YYYY-MM-DDTHH:MM:SSZ or YYYY-MM-DDTHH:MM:SS+00:00)
+            if 'T' in expiry_field:
+                if expiry_field.endswith('Z'):
+                    return datetime.fromisoformat(expiry_field[:-1] + '+00:00')
+                else:
+                    return datetime.fromisoformat(expiry_field)
+
+            # Unix timestamp
+            if expiry_field.replace('.', '').isdigit():
+                return datetime.fromtimestamp(float(expiry_field))
+
+            # Try dateutil parser if available
             try:
-                # ISO format (YYYY-MM-DDTHH:MM:SSZ)
-                if 'T' in expiry_field:
-                    if expiry_field.endswith('Z'):
-                        return datetime.fromisoformat(expiry_field[:-1] + '+00:00')
-                    else:
-                        return datetime.fromisoformat(expiry_field)
-                
-                # Unix timestamp
-                if expiry_field.isdigit():
-                    return datetime.fromtimestamp(int(expiry_field))
-                
-                # Try other common formats
                 from dateutil import parser
                 return parser.parse(expiry_field)
-                
-            except (ValueError, ImportError):
-                # If dateutil is not available or parsing fails, return None
-                return None
-                
-        except Exception:
-            # If any error occurs reading credentials, return None
-            return None
+            except ImportError:
+                # dateutil not available, try basic parsing
+                pass
+
+        except (ValueError, TypeError):
+            pass
+
+        return None
+
+    def _validate_config(self) -> None:
+        """Validate S3 source configuration."""
+        super()._validate_config()
+
+        # Validate bucket name
+        if not self._bucket:
+            raise SourceConfigurationError("S3 bucket name is required")
+
+        # Basic bucket name validation
+        if len(self._bucket) < 3 or len(self._bucket) > 63:
+            raise SourceConfigurationError("S3 bucket name must be between 3 and 63 characters")
+
+        if not self._bucket.replace('-', '').replace('.', '').isalnum():
+            raise SourceConfigurationError("S3 bucket name contains invalid characters")
+
+        # Validate region
+        region = self.config.static_config.get('region', 'us-east-1')
+        valid_regions = [
+            'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2',
+            'eu-west-1', 'eu-west-2', 'eu-west-3', 'eu-central-1',
+            'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1',
+            'sa-east-1', 'ca-central-1'
+        ]
+
+        # Allow custom regions for S3-compatible services
+        endpoint_url = self.config.static_config.get('endpoint_url')
+        if not endpoint_url and region not in valid_regions and not region.startswith('us-gov-'):
+            # Just warn for unknown regions, don't fail
+            pass
     
     def _build_child_path(self, parent_path: Optional[str], item: Dict[str, Any]) -> str:
         """
