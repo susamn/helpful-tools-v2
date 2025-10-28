@@ -1,0 +1,60 @@
+{
+  "Comment": "Parallel processing workflow",
+  "StartAt": "PreprocessData",
+  "States": {
+    "PreprocessData": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:PreprocessData",
+      "Comment": "Prepare data for parallel processing",
+      "Next": "ParallelProcessing"
+    },
+    "ParallelProcessing": {
+      "Type": "Parallel",
+      "Comment": "Execute multiple tasks in parallel",
+      "Branches": [
+        {
+          "StartAt": "ProcessImages",
+          "States": {
+            "ProcessImages": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ProcessImages",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "ExtractMetadata",
+          "States": {
+            "ExtractMetadata": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ExtractMetadata",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "GenerateThumbnails",
+          "States": {
+            "GenerateThumbnails": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:GenerateThumbnails",
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "AggregateResults"
+    },
+    "AggregateResults": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:AggregateResults",
+      "Comment": "Combine results from parallel branches",
+      "Next": "SaveResults"
+    },
+    "SaveResults": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SaveResults",
+      "End": true
+    }
+  }
+}

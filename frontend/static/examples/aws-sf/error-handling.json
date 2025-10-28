@@ -1,0 +1,82 @@
+{
+  "Comment": "Workflow with error handling and retries",
+  "StartAt": "ProcessTransaction",
+  "States": {
+    "ProcessTransaction": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ProcessTransaction",
+      "Comment": "Process the transaction with retry logic",
+      "TimeoutSeconds": 30,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed", "States.Timeout"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["TransactionError"],
+          "Next": "RefundTransaction"
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleError"
+        }
+      ],
+      "Next": "ValidateResult"
+    },
+    "ValidateResult": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ValidateResult",
+      "Comment": "Validate the transaction result",
+      "Catch": [
+        {
+          "ErrorEquals": ["ValidationError"],
+          "Next": "HandleValidationError"
+        }
+      ],
+      "Next": "SendConfirmation"
+    },
+    "SendConfirmation": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SendConfirmation",
+      "Comment": "Send confirmation to user",
+      "Next": "Success"
+    },
+    "RefundTransaction": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:RefundTransaction",
+      "Comment": "Refund the transaction",
+      "Next": "NotifyRefund"
+    },
+    "NotifyRefund": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:NotifyRefund",
+      "Comment": "Notify user about refund",
+      "Next": "TransactionFailed"
+    },
+    "HandleValidationError": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:HandleValidationError",
+      "Comment": "Handle validation errors",
+      "Next": "TransactionFailed"
+    },
+    "HandleError": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:HandleError",
+      "Comment": "Handle general errors",
+      "Next": "TransactionFailed"
+    },
+    "Success": {
+      "Type": "Succeed",
+      "Comment": "Transaction completed successfully"
+    },
+    "TransactionFailed": {
+      "Type": "Fail",
+      "Error": "TransactionProcessingFailed",
+      "Cause": "The transaction could not be processed"
+    }
+  }
+}

@@ -173,6 +173,14 @@ TOOLS = [
         "tags": ["sources", "data", "s3", "sftp", "samba", "http", "files", "credentials"],
         "has_history": True,
         "icon": "🗄️"
+    },
+    {
+        "name": "AWS Step Functions Viewer",
+        "description": "Visualize AWS Step Functions state machines with interactive graph rendering, state details, and multiple layout options",
+        "path": "/tools/aws-sf-viewer",
+        "tags": ["aws", "step-functions", "state-machine", "visualization", "graph", "workflow"],
+        "has_history": False,
+        "icon": "🔀"
     }
 ]
 

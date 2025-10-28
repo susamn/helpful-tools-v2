@@ -1,0 +1,35 @@
+{
+  "Comment": "A simple workflow that processes orders",
+  "StartAt": "ValidateOrder",
+  "States": {
+    "ValidateOrder": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ValidateOrder",
+      "Comment": "Validate the incoming order",
+      "Next": "CheckInventory"
+    },
+    "CheckInventory": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:CheckInventory",
+      "Comment": "Check if items are in stock",
+      "Next": "ProcessPayment"
+    },
+    "ProcessPayment": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ProcessPayment",
+      "Comment": "Process customer payment",
+      "TimeoutSeconds": 30,
+      "Next": "ShipOrder"
+    },
+    "ShipOrder": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ShipOrder",
+      "Comment": "Ship the order to customer",
+      "Next": "OrderComplete"
+    },
+    "OrderComplete": {
+      "Type": "Succeed",
+      "Comment": "Order processing completed successfully"
+    }
+  }
+}

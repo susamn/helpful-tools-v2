@@ -1,0 +1,61 @@
+{
+  "Comment": "Order processing workflow with choice state",
+  "StartAt": "ReceiveOrder",
+  "States": {
+    "ReceiveOrder": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ReceiveOrder",
+      "Comment": "Receive and parse the order",
+      "Next": "CheckOrderType"
+    },
+    "CheckOrderType": {
+      "Type": "Choice",
+      "Comment": "Route based on order type",
+      "Choices": [
+        {
+          "Variable": "$.orderType",
+          "StringEquals": "express",
+          "Next": "ExpressProcessing"
+        },
+        {
+          "Variable": "$.orderType",
+          "StringEquals": "standard",
+          "Next": "StandardProcessing"
+        },
+        {
+          "Variable": "$.orderValue",
+          "NumericGreaterThan": 1000,
+          "Next": "PremiumProcessing"
+        }
+      ],
+      "Default": "StandardProcessing"
+    },
+    "ExpressProcessing": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ExpressProcess",
+      "Comment": "Fast track processing for express orders",
+      "Next": "NotifyCustomer"
+    },
+    "StandardProcessing": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:StandardProcess",
+      "Comment": "Standard processing workflow",
+      "Next": "NotifyCustomer"
+    },
+    "PremiumProcessing": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:PremiumProcess",
+      "Comment": "Special handling for high-value orders",
+      "Next": "NotifyCustomer"
+    },
+    "NotifyCustomer": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:NotifyCustomer",
+      "Comment": "Send notification to customer",
+      "Next": "OrderComplete"
+    },
+    "OrderComplete": {
+      "Type": "Succeed"
+    }
+  }
+}
