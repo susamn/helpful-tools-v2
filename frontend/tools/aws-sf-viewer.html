@@ -167,18 +167,63 @@
         }
         .json-content {
             flex: 1;
-            overflow: auto;
-            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
             background: white;
         }
-        .json-content pre {
-            margin: 0;
+        .json-textarea {
+            flex: 1;
+            width: 100%;
+            border: none;
+            outline: none;
+            padding: 8px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 10px;
             line-height: 1.3;
             color: #333;
-            white-space: pre;
-            word-wrap: normal;
+            resize: none;
+            background: white;
+            overflow: auto;
+        }
+        .json-error {
+            background: #FFEBEE;
+            border-top: 1px solid #F44336;
+            border-bottom: 1px solid #F44336;
+            color: #C62828;
+            padding: 6px 8px;
+            font-size: 10px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            white-space: pre-wrap;
+            display: none;
+        }
+        .json-error.show {
+            display: block;
+        }
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .header-controls button {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 2px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+        }
+        .header-controls button:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .header-controls button.primary {
+            background: linear-gradient(to bottom, #4a90e2, #357abd);
+            color: white;
+            border: 1px solid #2968a3;
+        }
+        .header-controls button.primary:hover {
+            background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
         }
         .graph-container {
             width: 50%;
@@ -208,6 +253,9 @@
             font-size: 11px;
             font-weight: bold;
             color: #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .panel-content {
             flex: 1;
@@ -356,10 +404,8 @@
     </div>
 
     <div class="toolbar">
-        <label for="file-input">
-            <button class="primary">📁 Upload JSON</button>
-        </label>
-        <input type="file" id="file-input" accept=".json" />
+        <button class="primary" id="upload-file-btn">📁 Upload JSON</button>
+        <input type="file" id="file-input" accept=".json" style="display: none;" />
         <span class="file-name" id="file-name">No file selected</span>
 
         <div class="separator"></div>
@@ -397,9 +443,17 @@
 
     <div class="main-container">
         <div class="json-panel">
-            <div class="panel-header">JSON Definition</div>
+            <div class="panel-header">
+                <span>JSON Definition</span>
+                <div class="header-controls">
+                    <button class="primary" id="apply-json-btn" title="Apply JSON and render">✓ Apply</button>
+                    <button id="format-json-btn" title="Format JSON">Format</button>
+                    <button id="clear-json-btn" title="Clear JSON">Clear</button>
+                </div>
+            </div>
+            <div class="json-error" id="json-error"></div>
             <div class="json-content">
-                <pre id="json-display"><span style="color: #999; font-style: italic;">Load a state machine to view JSON...</span></pre>
+                <textarea class="json-textarea" id="json-textarea" placeholder="Paste or type your AWS Step Functions state machine JSON here..."></textarea>
             </div>
         </div>
 
@@ -484,6 +538,7 @@
             initializeUI() {
                 this.elements = {
                     fileInput: document.getElementById('file-input'),
+                    uploadFileBtn: document.getElementById('upload-file-btn'),
                     fileName: document.getElementById('file-name'),
                     exampleSelect: document.getElementById('example-select'),
                     layoutSelect: document.getElementById('layout-select'),
@@ -499,14 +554,21 @@
                     transitionCount: document.getElementById('transitionCount'),
                     fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
                     fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
-                    jsonDisplay: document.getElementById('json-display')
+                    jsonTextarea: document.getElementById('json-textarea'),
+                    jsonError: document.getElementById('json-error'),
+                    applyJsonBtn: document.getElementById('apply-json-btn'),
+                    formatJsonBtn: document.getElementById('format-json-btn'),
+                    clearJsonBtn: document.getElementById('clear-json-btn')
                 };
 
                 this.cy = this.renderer.initialize();
             }
 
             attachEventListeners() {
+                // File upload
+                this.elements.uploadFileBtn.addEventListener('click', () => this.elements.fileInput.click());
                 this.elements.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
                 this.elements.exampleSelect.addEventListener('change', (e) => this.loadExample(e.target.value));
                 this.elements.layoutSelect.addEventListener('change', (e) => this.renderer.applyLayout(e.target.value));
                 this.elements.zoomInBtn.addEventListener('click', () => this.renderer.zoomIn());
@@ -517,6 +579,11 @@
                 // Font controls
                 this.elements.fontIncreaseBtn.addEventListener('click', () => this.changeFontSize(1));
                 this.elements.fontDecreaseBtn.addEventListener('click', () => this.changeFontSize(-1));
+
+                // JSON editor controls
+                this.elements.applyJsonBtn.addEventListener('click', () => this.applyJson());
+                this.elements.formatJsonBtn.addEventListener('click', () => this.formatJson());
+                this.elements.clearJsonBtn.addEventListener('click', () => this.clearJson());
 
                 this.cy.on('tap', 'node', (evt) => this.handleNodeClick(evt));
                 this.cy.on('tap', (evt) => {
@@ -536,6 +603,7 @@
                 if (!file) return;
 
                 this.elements.fileName.textContent = file.name;
+                this.elements.exampleSelect.value = ''; // Reset example dropdown
                 this.showLoading(true);
                 this.hideError();
 
@@ -547,6 +615,7 @@
                     this.renderStateMachine(json);
                     this.elements.statusText.textContent = `Loaded: ${file.name}`;
                 } catch (error) {
+                    this.showJsonError(`Invalid JSON file: ${error.message}`);
                     this.showError(`Failed to load file: ${error.message}`);
                     this.elements.statusText.textContent = 'Error loading file';
                 } finally {
@@ -557,6 +626,7 @@
             async loadExample(path) {
                 if (!path) return;
 
+                this.elements.fileInput.value = ''; // Reset file input
                 this.showLoading(true);
                 this.hideError();
 
@@ -572,6 +642,7 @@
                     this.elements.fileName.textContent = path.split('/').pop();
                     this.elements.statusText.textContent = `Loaded example: ${path.split('/').pop()}`;
                 } catch (error) {
+                    this.showJsonError(`Failed to load example: ${error.message}`);
                     this.showError(`Failed to load example: ${error.message}`);
                     this.elements.statusText.textContent = 'Error loading example';
                 } finally {
@@ -581,7 +652,68 @@
 
             displayJson(json) {
                 const formatted = JSON.stringify(json, null, 2);
-                this.elements.jsonDisplay.textContent = formatted;
+                this.elements.jsonTextarea.value = formatted;
+                this.hideJsonError();
+            }
+
+            applyJson() {
+                const jsonText = this.elements.jsonTextarea.value.trim();
+
+                if (!jsonText) {
+                    this.showJsonError('Please enter JSON data');
+                    return;
+                }
+
+                try {
+                    const json = JSON.parse(jsonText);
+                    this.currentJson = json;
+                    this.hideJsonError();
+                    this.renderStateMachine(json);
+                    this.elements.statusText.textContent = 'JSON applied successfully';
+                    this.elements.fileName.textContent = 'Manual JSON';
+                } catch (error) {
+                    this.showJsonError(`Invalid JSON: ${error.message}`);
+                    this.elements.statusText.textContent = 'Invalid JSON';
+                }
+            }
+
+            formatJson() {
+                const jsonText = this.elements.jsonTextarea.value.trim();
+
+                if (!jsonText) {
+                    this.showJsonError('No JSON to format');
+                    return;
+                }
+
+                try {
+                    const json = JSON.parse(jsonText);
+                    const formatted = JSON.stringify(json, null, 2);
+                    this.elements.jsonTextarea.value = formatted;
+                    this.hideJsonError();
+                    this.elements.statusText.textContent = 'JSON formatted';
+                } catch (error) {
+                    this.showJsonError(`Cannot format invalid JSON: ${error.message}`);
+                }
+            }
+
+            clearJson() {
+                this.elements.jsonTextarea.value = '';
+                this.hideJsonError();
+                this.cy.elements().remove();
+                this.clearStateDetails();
+                this.elements.stateCount.textContent = '0';
+                this.elements.transitionCount.textContent = '0';
+                this.elements.statusText.textContent = 'JSON cleared';
+                this.elements.fileName.textContent = 'No file selected';
+            }
+
+            showJsonError(message) {
+                this.elements.jsonError.textContent = message;
+                this.elements.jsonError.classList.add('show');
+            }
+
+            hideJsonError() {
+                this.elements.jsonError.classList.remove('show');
             }
 
             renderStateMachine(json) {
@@ -591,12 +723,14 @@
                     this.renderer.render(graph);
                     this.clearStateDetails();
                     this.hideError();
+                    this.hideJsonError();
 
                     // Update status
                     this.elements.stateCount.textContent = graph.nodes.length;
                     this.elements.transitionCount.textContent = graph.edges.length;
                     this.elements.statusText.textContent = 'State machine loaded successfully';
                 } catch (error) {
+                    this.showJsonError(`Parse Error: ${error.message}`);
                     this.showError(error.message);
                     this.elements.statusText.textContent = 'Error parsing state machine';
                     throw error;
