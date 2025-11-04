@@ -120,6 +120,11 @@ class JsonTool {
         });
         this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
 
+        // Functions help button
+        const functionsHelpBtn = document.getElementById('functionsHelpBtn');
+        if (functionsHelpBtn) {
+            functionsHelpBtn.addEventListener('click', () => this.showFunctionsHelp());
+        }
 
         // Input change detection for real-time stats
         this.elements.jsonInput.addEventListener('input', () => this.updateJsonStats());
@@ -836,11 +841,205 @@ class JsonTool {
     }
 
     /**
+     * Parse JSONPath expression with functions
+     * Supports syntax: $.path | function() or function($.path)
+     */
+    parseJsonPathWithFunctions(expression) {
+        expression = expression.trim();
+        console.log('Parsing expression:', expression);
+
+        // Check for chained functions FIRST: $.path | func1() | func2()
+        // This needs to be checked before single pipe to avoid incorrect matching
+        if (expression.includes('|')) {
+            const parts = expression.split('|').map(p => p.trim());
+
+            // Check if all parts after the first are functions (end with ())
+            const allFunctions = parts.slice(1).every(p => /^\w+\s*\(\s*\)$/.test(p));
+
+            if (allFunctions && parts.length > 1) {
+                const path = parts[0];
+                const functions = parts.slice(1).map(f => f.replace(/\s*\(\s*\)/, '').trim());
+                const result = { path, functions };
+                console.log('Matched pipe syntax (possibly chained):', result);
+                return result;
+            }
+        }
+
+        // Check for function syntax: function($.path)
+        const funcMatch = expression.match(/^(\w+)\s*\(\s*(.+?)\s*\)$/);
+        if (funcMatch) {
+            const result = {
+                path: funcMatch[2].trim(),
+                functions: [funcMatch[1]]
+            };
+            console.log('Matched function syntax:', result);
+            return result;
+        }
+
+        // No functions, just a path
+        const result = {
+            path: expression,
+            functions: []
+        };
+        console.log('No functions, plain path:', result);
+        return result;
+    }
+
+    /**
+     * Apply function to JSONPath results
+     */
+    applyFunction(funcName, data) {
+        switch(funcName.toLowerCase()) {
+            case 'list':
+                return this.functionList(data);
+            case 'uniq':
+            case 'unique':
+                return this.functionUniq(data);
+            case 'count':
+                return this.functionCount(data);
+            case 'flatten':
+                return this.functionFlatten(data);
+            case 'keys':
+                return this.functionKeys(data);
+            case 'values':
+                return this.functionValues(data);
+            case 'sort':
+                return this.functionSort(data);
+            case 'reverse':
+                return this.functionReverse(data);
+            case 'first':
+                return this.functionFirst(data);
+            case 'last':
+                return this.functionLast(data);
+            default:
+                throw new Error(`Unknown function: ${funcName}`);
+        }
+    }
+
+    /**
+     * list() - Ensure result is an array
+     */
+    functionList(data) {
+        if (Array.isArray(data)) return data;
+        return [data];
+    }
+
+    /**
+     * uniq() - Get unique values
+     */
+    functionUniq(data) {
+        if (!Array.isArray(data)) return data;
+
+        // Handle arrays of primitives
+        if (data.length === 0 || typeof data[0] !== 'object') {
+            return [...new Set(data)];
+        }
+
+        // Handle arrays of objects - compare by JSON string
+        const seen = new Set();
+        return data.filter(item => {
+            const key = JSON.stringify(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
+    /**
+     * count() - Count elements
+     */
+    functionCount(data) {
+        if (Array.isArray(data)) {
+            return { count: data.length };
+        } else if (typeof data === 'object' && data !== null) {
+            return { count: Object.keys(data).length };
+        }
+        return { count: 1 };
+    }
+
+    /**
+     * flatten() - Flatten nested arrays
+     */
+    functionFlatten(data) {
+        if (!Array.isArray(data)) return data;
+        return data.flat(Infinity);
+    }
+
+    /**
+     * keys() - Get object keys
+     */
+    functionKeys(data) {
+        if (Array.isArray(data)) {
+            return data.map(item =>
+                typeof item === 'object' && item !== null ? Object.keys(item) : []
+            ).flat();
+        } else if (typeof data === 'object' && data !== null) {
+            return Object.keys(data);
+        }
+        return [];
+    }
+
+    /**
+     * values() - Get object values
+     */
+    functionValues(data) {
+        if (Array.isArray(data)) {
+            return data.map(item =>
+                typeof item === 'object' && item !== null ? Object.values(item) : item
+            ).flat();
+        } else if (typeof data === 'object' && data !== null) {
+            return Object.values(data);
+        }
+        return [data];
+    }
+
+    /**
+     * sort() - Sort array
+     */
+    functionSort(data) {
+        if (!Array.isArray(data)) return data;
+        return [...data].sort((a, b) => {
+            if (typeof a === 'string' && typeof b === 'string') {
+                return a.localeCompare(b);
+            }
+            return a < b ? -1 : a > b ? 1 : 0;
+        });
+    }
+
+    /**
+     * reverse() - Reverse array
+     */
+    functionReverse(data) {
+        if (!Array.isArray(data)) return data;
+        return [...data].reverse();
+    }
+
+    /**
+     * first() - Get first element
+     */
+    functionFirst(data) {
+        if (Array.isArray(data) && data.length > 0) {
+            return data[0];
+        }
+        return data;
+    }
+
+    /**
+     * last() - Get last element
+     */
+    functionLast(data) {
+        if (Array.isArray(data) && data.length > 0) {
+            return data[data.length - 1];
+        }
+        return data;
+    }
+
+    /**
      * Perform JSONPath lookup
      */
     performJsonPathLookup() {
-        const path = this.elements.jsonPathInput.value.trim();
-        if (!path) {
+        const expression = this.elements.jsonPathInput.value.trim();
+        if (!expression) {
             this.clearSearch();
             return;
         }
@@ -853,15 +1052,18 @@ class JsonTool {
         const outputText = this.originalOutputData.text;
 
         try {
+            // Parse expression for functions
+            const { path, functions } = this.parseJsonPathWithFunctions(expression);
+
             // Check if the current data is JSONL
             const inputText = this.elements.jsonInput.value.trim();
             if (this.isJsonl(inputText)) {
-                this.performJsonlPathLookup(path);
+                this.performJsonlPathLookup(path, functions);
             } else {
                 // Regular JSON path lookup
                 const parsed = JSON.parse(outputText);
                 const paths = path.split(',').map(p => p.trim());
-                const allResults = [];
+                let allResults = [];
                 let error = null;
 
                 for (const p of paths) {
@@ -878,14 +1080,25 @@ class JsonTool {
                     return;
                 }
 
+                // Apply functions to results
+                try {
+                    for (const func of functions) {
+                        allResults = this.applyFunction(func, allResults);
+                    }
+                } catch (funcError) {
+                    this.showMessage(`Function error: ${funcError.message}`, 'error');
+                    return;
+                }
+
                 console.log('JSONPath result:', allResults);
-                
-                if (allResults && allResults.length > 0) {
+
+                if (allResults !== undefined && allResults !== null) {
                     // Display result in output window
                     const formattedResult = this.formatJsonWithIndent(allResults);
+                    const funcInfo = functions.length > 0 ? ` (with ${functions.join(', ')})` : '';
                     this.displayOutput(formattedResult, allResults, true);  // Mark as JSONPath result
                     this.highlightJsonPath(path);
-                    this.showMessage('JSONPath result displayed in output', 'success');
+                    this.showMessage(`JSONPath result displayed${funcInfo}`, 'success');
                 } else {
                     this.showMessage(`JSONPath not found: ${path}`, 'warning');
                 }
@@ -1024,12 +1237,15 @@ class JsonTool {
     /**
      * Perform JSONPath lookup on JSONL data
      */
-    performJsonlPathLookup(path) {
+    performJsonlPathLookup(path, functions = []) {
         try {
             const inputText = this.elements.jsonInput.value.trim();
             const jsonObjects = this.parseJsonlObjects(inputText);
             const results = [];
             const paths = path.split(',').map(p => p.trim());
+
+            console.log('JSONL Lookup - Path:', path, 'Functions:', functions);
+            console.log('JSONL Objects count:', jsonObjects.length);
 
             jsonObjects.forEach((obj, index) => {
                 let combinedResult = {};
@@ -1038,12 +1254,14 @@ class JsonTool {
 
                 for (const p of paths) {
                     const evalResult = this.evaluateJsonPath(obj, p);
+                    console.log(`Object ${index}, Path ${p}:`, evalResult);
+
                     if (evalResult.error) {
                         error = evalResult.error;
                         break;
                     }
 
-                    if (evalResult.result.length > 0) {
+                    if (evalResult.result && evalResult.result.length > 0) {
                         hasResults = true;
                         const pathResult = this.buildResultObject(p, evalResult.result);
                         // Merge results from multiple paths
@@ -1052,6 +1270,7 @@ class JsonTool {
                 }
 
                 if (error) {
+                    console.error(`Error in object ${index}:`, error);
                     this.showMessage(`Invalid JSONPath expression in object ${index}: ${error}`, 'error');
                     // Continue to next line
                 } else if (hasResults) {
@@ -1062,14 +1281,63 @@ class JsonTool {
                 }
             });
 
-            if (results.length > 0) {
-                const formattedResults = this.formatJsonlPathResults(results);
-                this.displayOutput(formattedResults, results, true, true);
-                this.showMessage(`JSONPath found in ${results.length} object${results.length > 1 ? 's' : ''}`, 'success');
+            console.log('Results before functions:', results);
+
+            // Apply functions if specified
+            let finalResults = results;
+            if (functions.length > 0 && results.length > 0) {
+                // Extract all values from all objects
+                let allValues = [];
+                results.forEach(result => {
+                    const values = Object.values(result.result);
+                    values.forEach(val => {
+                        if (Array.isArray(val)) {
+                            allValues.push(...val);
+                        } else {
+                            allValues.push(val);
+                        }
+                    });
+                });
+
+                console.log('All extracted values:', allValues);
+
+                // Apply functions to combined values
+                try {
+                    for (const func of functions) {
+                        console.log(`Applying function: ${func}`);
+                        allValues = this.applyFunction(func, allValues);
+                        console.log('Result after function:', allValues);
+                    }
+                    finalResults = allValues;
+                } catch (funcError) {
+                    console.error('Function error:', funcError);
+                    this.showMessage(`Function error: ${funcError.message}`, 'error');
+                    return;
+                }
+            }
+
+            console.log('Final results:', finalResults);
+
+            if (finalResults && (Array.isArray(finalResults) ? finalResults.length > 0 : finalResults !== null)) {
+                const funcInfo = functions.length > 0 ? ` (with ${functions.join(', ')})` : '';
+
+                if (functions.length > 0) {
+                    // Display simplified result when functions are applied
+                    const formattedResult = this.formatJsonWithIndent(finalResults);
+                    this.displayOutput(formattedResult, finalResults, true);
+                    this.showMessage(`JSONPath result displayed${funcInfo}`, 'success');
+                } else {
+                    // Display per-object results when no functions
+                    const formattedResults = this.formatJsonlPathResults(finalResults);
+                    this.displayOutput(formattedResults, finalResults, true, true);
+                    this.showMessage(`JSONPath found in ${finalResults.length} object${finalResults.length > 1 ? 's' : ''}`, 'success');
+                }
             } else {
+                console.error('No results found');
                 this.showMessage(`JSONPath not found in any JSONL objects: ${path}`, 'warning');
             }
         } catch (error) {
+            console.error('JSONL JSONPath error:', error);
             this.showMessage(`JSONL JSONPath error: ${error.message}`, 'error');
         }
     }
@@ -1118,6 +1386,252 @@ class JsonTool {
     }
 
     /**
+     * Show functions help dialog
+     */
+    showFunctionsHelp() {
+        const helpText = `
+<div style="font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 600px;">
+    <h2 style="margin-top: 0; color: #333; font-size: 18px;">JSONPath Functions</h2>
+    <p style="color: #666; font-size: 13px; margin-bottom: 20px;">
+        Apply functions to JSONPath results using pipe syntax or function syntax:
+    </p>
+
+    <div style="background: #f5f5f5; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-family: monospace; font-size: 12px;">
+        <strong>Pipe Syntax:</strong> $.path | function()<br>
+        <strong>Function Syntax:</strong> function($.path)<br>
+        <strong>Chained:</strong> $.path | func1() | func2()
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+            <tr style="background: #f0f0f0; text-align: left;">
+                <th style="padding: 8px; border: 1px solid #ddd;">Function</th>
+                <th style="padding: 8px; border: 1px solid #ddd;">Description</th>
+                <th style="padding: 8px; border: 1px solid #ddd;">Example</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>list()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Ensure result is an array</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.user | list()</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>uniq()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Get unique values</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$..name | uniq()</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>count()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Count elements or object keys</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | count()</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>flatten()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Flatten nested arrays</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.data | flatten()</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>keys()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Get object keys</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.object | keys()</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>values()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Get object values</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.object | values()</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>sort()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Sort array</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | sort()</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>reverse()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Reverse array</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | reverse()</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>first()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Get first element</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | first()</td>
+            </tr>
+            <tr style="background: #fafafa;">
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>last()</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Get last element</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | last()</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+        `;
+
+        // Use the existing message/alert system or create a simple modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            position: relative;
+        `;
+        content.innerHTML = helpText;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '× Close';
+        closeBtn.style.cssText = `
+            position: sticky;
+            top: 0;
+            right: 0;
+            float: right;
+            margin: 10px;
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        `;
+        closeBtn.onclick = () => modal.remove();
+
+        content.prepend(closeBtn);
+        modal.appendChild(content);
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
+
+        document.body.appendChild(modal);
+    }
+
+    /**
+     * Get available function suggestions
+     */
+    getFunctionSuggestions() {
+        return [
+            { name: 'list()', description: 'Ensure result is an array' },
+            { name: 'uniq()', description: 'Get unique values' },
+            { name: 'unique()', description: 'Get unique values (alias)' },
+            { name: 'count()', description: 'Count elements' },
+            { name: 'flatten()', description: 'Flatten nested arrays' },
+            { name: 'keys()', description: 'Get object keys' },
+            { name: 'values()', description: 'Get object values' },
+            { name: 'sort()', description: 'Sort array' },
+            { name: 'reverse()', description: 'Reverse array' },
+            { name: 'first()', description: 'Get first element' },
+            { name: 'last()', description: 'Get last element' }
+        ];
+    }
+
+    /**
+     * Show function suggestions
+     */
+    showFunctionSuggestions(inputElement) {
+        const functions = this.getFunctionSuggestions();
+        const inputValue = inputElement.value;
+
+        // Get the part after the last pipe
+        const lastPipeIndex = inputValue.lastIndexOf('|');
+        const searchTerm = inputValue.substring(lastPipeIndex + 1).trim().toLowerCase();
+
+        // Filter functions based on search term
+        const filtered = searchTerm
+            ? functions.filter(f => f.name.toLowerCase().startsWith(searchTerm))
+            : functions;
+
+        // Create or get suggestions dropdown
+        let dropdown = document.getElementById('function-suggestions-dropdown');
+        if (!dropdown) {
+            dropdown = document.createElement('div');
+            dropdown.id = 'function-suggestions-dropdown';
+            dropdown.className = 'func-dropdown';
+            document.body.appendChild(dropdown);
+        }
+
+        if (filtered.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        // Position dropdown below input (using fixed positioning like dqs-dropdown)
+        const rect = inputElement.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.left = rect.left + 'px';
+        dropdown.style.top = (rect.bottom + 2) + 'px';
+        dropdown.style.minWidth = rect.width + 'px';
+
+        // Build suggestions HTML with classes matching dqs styles
+        dropdown.innerHTML = filtered.map((func, index) => `
+            <div class="func-item" data-index="${index}">
+                <div class="func-suggestion-content">
+                    <div class="func-suggestion-text">${func.name}</div>
+                    <div class="func-suggestion-description">${func.description}</div>
+                </div>
+            </div>
+        `).join('');
+
+        dropdown.style.display = 'block';
+
+        // Track selected index
+        let selectedIndex = 0;
+
+        const updateSelection = () => {
+            dropdown.querySelectorAll('.func-item').forEach((item, idx) => {
+                if (idx === selectedIndex) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        };
+
+        // Initial selection
+        updateSelection();
+
+        // Add click handlers
+        dropdown.querySelectorAll('.func-item').forEach((item, index) => {
+            item.addEventListener('mouseenter', () => {
+                selectedIndex = index;
+                updateSelection();
+            });
+            item.addEventListener('click', () => {
+                const func = filtered[index];
+                // Replace text after last pipe with selected function
+                const beforePipe = inputValue.substring(0, lastPipeIndex + 1);
+                inputElement.value = beforePipe + ' ' + func.name;
+                dropdown.style.display = 'none';
+                inputElement.focus();
+            });
+        });
+    }
+
+    /**
+     * Hide function suggestions
+     */
+    hideFunctionSuggestions() {
+        const dropdown = document.getElementById('function-suggestions-dropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    }
+
+    /**
      * Initialize JSONPath autocomplete using the generic library
      */
     initializeJsonPathAutocomplete() {
@@ -1137,6 +1651,82 @@ class JsonTool {
                 },
                 onError: (error) => {
                     console.error('JSONPath autocomplete error:', error);
+                }
+            });
+
+            // Add input listener to detect pipe and show function suggestions
+            this.elements.jsonPathInput.addEventListener('input', (e) => {
+                const value = e.target.value;
+                const hasPipe = value.includes('|');
+
+                if (hasPipe) {
+                    // Disable JSONPath autocomplete
+                    if (this.autocompleteAdapter && this.autocompleteAdapter.disable) {
+                        this.autocompleteAdapter.disable();
+                    }
+                    // Show function suggestions
+                    this.showFunctionSuggestions(e.target);
+                } else {
+                    // Enable JSONPath autocomplete
+                    if (this.autocompleteAdapter && this.autocompleteAdapter.enable) {
+                        this.autocompleteAdapter.enable();
+                    }
+                    // Hide function suggestions
+                    this.hideFunctionSuggestions();
+                }
+            });
+
+            // Add keyboard navigation for function suggestions
+            this.elements.jsonPathInput.addEventListener('keydown', (e) => {
+                const dropdown = document.getElementById('function-suggestions-dropdown');
+                if (!dropdown || dropdown.style.display === 'none') return;
+
+                const items = dropdown.querySelectorAll('.func-item');
+                if (items.length === 0) return;
+
+                let currentIndex = -1;
+                items.forEach((item, index) => {
+                    if (item.classList.contains('selected')) {
+                        currentIndex = index;
+                    }
+                });
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const nextIndex = (currentIndex + 1) % items.length;
+                    items.forEach((item, idx) => {
+                        if (idx === nextIndex) {
+                            item.classList.add('selected');
+                        } else {
+                            item.classList.remove('selected');
+                        }
+                    });
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prevIndex = currentIndex <= 0 ? items.length - 1 : currentIndex - 1;
+                    items.forEach((item, idx) => {
+                        if (idx === prevIndex) {
+                            item.classList.add('selected');
+                        } else {
+                            item.classList.remove('selected');
+                        }
+                    });
+                } else if (e.key === 'Enter') {
+                    if (currentIndex >= 0 && currentIndex < items.length) {
+                        e.preventDefault();
+                        items[currentIndex].click();
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.hideFunctionSuggestions();
+                }
+            });
+
+            // Hide function suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                const dropdown = document.getElementById('function-suggestions-dropdown');
+                if (dropdown && e.target !== this.elements.jsonPathInput && !dropdown.contains(e.target)) {
+                    this.hideFunctionSuggestions();
                 }
             });
 
