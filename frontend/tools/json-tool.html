@@ -870,8 +870,9 @@
         <div class="separator"></div>
         <div class="search-controls">
             <label>JSONPath:</label>
-            <input type="text" id="jsonPathInput" placeholder="e.g., $.users[0].name | uniq() or count($.items)" title="Available functions: list(), uniq(), count(), flatten(), keys(), values(), sort(), reverse(), first(), last()">
+            <input type="text" id="jsonPathInput" placeholder="e.g., $.users[0].name | uniq()" title="Available functions: list(), uniq(), count(), flatten(), keys(), values(), sort(), reverse(), first(), last()" style="flex: 1; min-width: 200px;">
             <button id="clearSearchBtn">Clear</button>
+            <button id="patternsBtn" title="Show common JSONPath patterns">*</button>
             <button id="functionsHelpBtn" title="Show available functions">?</button>
         </div>
         <div class="separator"></div>

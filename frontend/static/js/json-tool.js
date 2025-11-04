@@ -126,6 +126,12 @@ class JsonTool {
             functionsHelpBtn.addEventListener('click', () => this.showFunctionsHelp());
         }
 
+        // Patterns button
+        const patternsBtn = document.getElementById('patternsBtn');
+        if (patternsBtn) {
+            patternsBtn.addEventListener('click', () => this.showPatternsHelp());
+        }
+
         // Input change detection for real-time stats
         this.elements.jsonInput.addEventListener('input', () => this.updateJsonStats());
 
@@ -1516,6 +1522,235 @@ class JsonTool {
         modal.onclick = (e) => {
             if (e.target === modal) modal.remove();
         };
+
+        document.body.appendChild(modal);
+    }
+
+    /**
+     * Show common JSONPath patterns dialog
+     */
+    showPatternsHelp() {
+        const helpText = `
+<div style="font-family: 'Segoe UI', sans-serif; padding: 20px; max-width: 700px;">
+    <h2 style="margin-top: 0; color: #333; font-size: 18px;">Common JSONPath Patterns</h2>
+    <p style="color: #666; font-size: 13px; margin-bottom: 20px;">
+        Quick reference for frequently used JSONPath expressions
+    </p>
+
+    <div style="margin-bottom: 30px;">
+        <h3 style="color: #555; font-size: 15px; margin-bottom: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">📌 Basic Selection</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 15px;">
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; width: 40%;">$.property</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Select a property</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$.parent.child</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Nested property</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[0]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">First element of array</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[-1]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Last element of array</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[0:3]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">First three elements (slice)</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <h3 style="color: #555; font-size: 15px; margin-bottom: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">🔄 Wildcards & Recursion</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 15px;">
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; width: 40%;">$[*]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">All array elements</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$.items[*].name</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">All names in items array</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$..name</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">All 'name' properties recursively</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$..*</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">All values recursively</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <h3 style="color: #555; font-size: 15px; margin-bottom: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">🎯 Multiple Fields</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 15px;">
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; width: 40%;">$.name,$.email</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Select multiple fields (comma-separated)</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[0,2,4]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Select specific array indices</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$['name','email']</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Select multiple properties (bracket notation)</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <h3 style="color: #555; font-size: 15px; margin-bottom: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">🔍 Filtering</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 15px;">
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; width: 40%;">$[?(@.price < 10)]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Items where price less than 10</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[?(@.active == true)]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Items where active is true</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[?(@.name)]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Items that have 'name' property</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[?(!@.email)]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Items WITHOUT 'email' property</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[?(@.type != 'work')]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Items where type is NOT 'work'</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[?(@.name =~ /^A/)]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Items where name starts with 'A' (regex)</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin-bottom: 30px;">
+        <h3 style="color: #555; font-size: 15px; margin-bottom: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">🔗 Parent-Child Selection</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 15px;">
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; width: 40%;">$[?(@.addresses[?(@.state=='CO')])]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Objects with Colorado addresses</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$.addresses[?(@.type=='work')]</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Only work addresses</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$.users[?(@.age > 18)].name</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Names of users older than 18</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <h3 style="color: #555; font-size: 15px; margin-bottom: 10px; border-bottom: 2px solid #e0e0e0; padding-bottom: 5px;">✨ With Functions</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; width: 40%;">$.items[*].name | uniq()</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Unique names</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[?(!@.email)] | count()</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Count items without email</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$.prices[*] | sort() | first()</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Lowest price</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$..city | uniq() | sort()</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">All unique cities, sorted</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="background: #e3f2fd; padding: 12px; border-radius: 4px; margin-top: 20px;">
+        <strong style="color: #1976d2;">💡 Tip:</strong>
+        <span style="color: #555; font-size: 12px;">Click on any pattern to copy it to your clipboard!</span>
+    </div>
+</div>
+        `;
+
+        // Use the existing message/alert system or create a simple modal
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        const content = document.createElement('div');
+        content.style.cssText = `
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            position: relative;
+        `;
+        content.innerHTML = helpText;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '× Close';
+        closeBtn.style.cssText = `
+            position: sticky;
+            top: 0;
+            right: 0;
+            float: right;
+            margin: 10px;
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        `;
+        closeBtn.onclick = () => modal.remove();
+
+        content.prepend(closeBtn);
+        modal.appendChild(content);
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.remove();
+        };
+
+        // Add click-to-copy functionality for pattern cells
+        content.querySelectorAll('td[style*="monospace"]').forEach(cell => {
+            cell.style.cursor = 'pointer';
+            cell.title = 'Click to copy';
+            cell.addEventListener('click', async () => {
+                const pattern = cell.textContent.trim();
+                try {
+                    await navigator.clipboard.writeText(pattern);
+                    const originalBg = cell.style.background;
+                    cell.style.background = '#4caf50';
+                    cell.style.color = 'white';
+                    setTimeout(() => {
+                        cell.style.background = originalBg;
+                        cell.style.color = '';
+                    }, 500);
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                }
+            });
+        });
 
         document.body.appendChild(modal);
     }
