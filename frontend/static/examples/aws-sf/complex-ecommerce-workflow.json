@@ -1,0 +1,413 @@
+{
+  "Comment": "Complex E-Commerce Order Processing Workflow - Tests Walk Feature with 30+ States",
+  "StartAt": "ReceiveOrder",
+  "States": {
+    "ReceiveOrder": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ReceiveOrder",
+      "Comment": "Initial order reception and validation",
+      "Next": "ValidateOrderData",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "OrderValidationFailed"
+        }
+      ]
+    },
+    "ValidateOrderData": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ValidateOrder",
+      "Comment": "Validate order structure and required fields",
+      "Next": "CheckCustomerType",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "CheckCustomerType": {
+      "Type": "Choice",
+      "Comment": "Route based on customer type - Premium, Standard, or New",
+      "Choices": [
+        {
+          "Variable": "$.customerType",
+          "StringEquals": "premium",
+          "Next": "PremiumCustomerProcessing"
+        },
+        {
+          "Variable": "$.customerType",
+          "StringEquals": "standard",
+          "Next": "StandardCustomerProcessing"
+        },
+        {
+          "Variable": "$.customerType",
+          "StringEquals": "new",
+          "Next": "NewCustomerOnboarding"
+        }
+      ],
+      "Default": "StandardCustomerProcessing"
+    },
+    "PremiumCustomerProcessing": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:PremiumProcessing",
+      "Comment": "Special processing for premium customers",
+      "Next": "ApplyPremiumDiscount"
+    },
+    "ApplyPremiumDiscount": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ApplyDiscount",
+      "Comment": "Apply premium customer discount",
+      "Next": "CheckInventoryParallel"
+    },
+    "StandardCustomerProcessing": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:StandardProcessing",
+      "Comment": "Standard processing flow",
+      "Next": "CheckInventoryParallel"
+    },
+    "NewCustomerOnboarding": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:OnboardCustomer",
+      "Comment": "Onboard new customer and create profile",
+      "Next": "SendWelcomeEmail"
+    },
+    "SendWelcomeEmail": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SendEmail",
+      "Comment": "Send welcome email to new customer",
+      "Next": "ApplyNewCustomerDiscount"
+    },
+    "ApplyNewCustomerDiscount": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ApplyDiscount",
+      "Comment": "Apply first-time customer discount",
+      "Next": "CheckInventoryParallel"
+    },
+    "CheckInventoryParallel": {
+      "Type": "Parallel",
+      "Comment": "Check inventory and verify payment in parallel",
+      "Branches": [
+        {
+          "StartAt": "CheckInventory",
+          "States": {
+            "CheckInventory": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:CheckInventory",
+              "Comment": "Verify product availability",
+              "Next": "ReserveInventory"
+            },
+            "ReserveInventory": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ReserveInventory",
+              "Comment": "Reserve items for this order",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "VerifyPaymentMethod",
+          "States": {
+            "VerifyPaymentMethod": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:VerifyPayment",
+              "Comment": "Verify customer payment method",
+              "Next": "CheckFraudScore"
+            },
+            "CheckFraudScore": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123456789012:function:FraudCheck",
+              "Comment": "Check for fraudulent activity",
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "EvaluateParallelResults",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "InventoryOrPaymentFailed"
+        }
+      ]
+    },
+    "EvaluateParallelResults": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:EvaluateResults",
+      "Comment": "Evaluate results from parallel checks",
+      "Next": "CheckOrderAmount"
+    },
+    "CheckOrderAmount": {
+      "Type": "Choice",
+      "Comment": "Route based on order total amount",
+      "Choices": [
+        {
+          "Variable": "$.orderTotal",
+          "NumericGreaterThan": 1000,
+          "Next": "RequireManagerApproval"
+        },
+        {
+          "Variable": "$.orderTotal",
+          "NumericGreaterThan": 500,
+          "Next": "RequireSeniorApproval"
+        }
+      ],
+      "Default": "ProcessPayment"
+    },
+    "RequireManagerApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Comment": "High-value order requires manager approval",
+      "Next": "WaitForManagerApproval"
+    },
+    "WaitForManagerApproval": {
+      "Type": "Wait",
+      "Seconds": 300,
+      "Comment": "Wait up to 5 minutes for manager approval",
+      "Next": "CheckApprovalStatus"
+    },
+    "CheckApprovalStatus": {
+      "Type": "Choice",
+      "Comment": "Check if order was approved",
+      "Choices": [
+        {
+          "Variable": "$.approved",
+          "BooleanEquals": true,
+          "Next": "ProcessPayment"
+        }
+      ],
+      "Default": "OrderRejected"
+    },
+    "RequireSeniorApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Comment": "Medium-value order requires senior approval",
+      "Next": "ProcessPayment"
+    },
+    "ProcessPayment": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ProcessPayment",
+      "Comment": "Charge customer's payment method",
+      "Next": "PaymentSuccessCheck",
+      "Retry": [
+        {
+          "ErrorEquals": ["PaymentGatewayTimeout"],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 5,
+          "BackoffRate": 1.5
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["PaymentDeclined"],
+          "Next": "PaymentDeclined"
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "PaymentFailed"
+        }
+      ]
+    },
+    "PaymentSuccessCheck": {
+      "Type": "Choice",
+      "Comment": "Verify payment was successful",
+      "Choices": [
+        {
+          "Variable": "$.paymentStatus",
+          "StringEquals": "success",
+          "Next": "CalculateShipping"
+        }
+      ],
+      "Default": "PaymentFailed"
+    },
+    "CalculateShipping": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:CalculateShipping",
+      "Comment": "Calculate shipping cost and delivery time",
+      "Next": "SelectShippingMethod"
+    },
+    "SelectShippingMethod": {
+      "Type": "Choice",
+      "Comment": "Select shipping carrier based on delivery requirements",
+      "Choices": [
+        {
+          "Variable": "$.shippingSpeed",
+          "StringEquals": "express",
+          "Next": "ExpressShipping"
+        },
+        {
+          "Variable": "$.shippingSpeed",
+          "StringEquals": "overnight",
+          "Next": "OvernightShipping"
+        },
+        {
+          "Variable": "$.shippingSpeed",
+          "StringEquals": "international",
+          "Next": "InternationalShipping"
+        }
+      ],
+      "Default": "StandardShipping"
+    },
+    "ExpressShipping": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ExpressShipment",
+      "Comment": "Process express shipping (2-day delivery)",
+      "Next": "GenerateShippingLabel"
+    },
+    "OvernightShipping": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:OvernightShipment",
+      "Comment": "Process overnight shipping",
+      "Next": "GenerateShippingLabel"
+    },
+    "InternationalShipping": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:InternationalShipment",
+      "Comment": "Process international shipping with customs",
+      "Next": "GenerateCustomsDocuments"
+    },
+    "GenerateCustomsDocuments": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:CustomsDocs",
+      "Comment": "Generate customs declaration documents",
+      "Next": "GenerateShippingLabel"
+    },
+    "StandardShipping": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:StandardShipment",
+      "Comment": "Process standard shipping (5-7 days)",
+      "Next": "GenerateShippingLabel"
+    },
+    "GenerateShippingLabel": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:GenerateLabel",
+      "Comment": "Generate shipping label and tracking number",
+      "Next": "NotifyWarehouse"
+    },
+    "NotifyWarehouse": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:NotifyWarehouse",
+      "Comment": "Send order details to warehouse for fulfillment",
+      "Next": "CreateInvoice"
+    },
+    "CreateInvoice": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:CreateInvoice",
+      "Comment": "Generate invoice for the order",
+      "Next": "SendConfirmationEmail"
+    },
+    "SendConfirmationEmail": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SendEmail",
+      "Comment": "Send order confirmation email to customer",
+      "Next": "UpdateCRMSystem"
+    },
+    "UpdateCRMSystem": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:UpdateCRM",
+      "Comment": "Update customer relationship management system",
+      "Next": "LogAnalytics"
+    },
+    "LogAnalytics": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:LogAnalytics",
+      "Comment": "Log order data for analytics and reporting",
+      "Next": "CheckLoyaltyPoints"
+    },
+    "CheckLoyaltyPoints": {
+      "Type": "Choice",
+      "Comment": "Check if customer is enrolled in loyalty program",
+      "Choices": [
+        {
+          "Variable": "$.loyaltyMember",
+          "BooleanEquals": true,
+          "Next": "AwardLoyaltyPoints"
+        }
+      ],
+      "Default": "OrderCompleteSuccess"
+    },
+    "AwardLoyaltyPoints": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:AwardPoints",
+      "Comment": "Award loyalty points to customer",
+      "Next": "OrderCompleteSuccess"
+    },
+    "OrderCompleteSuccess": {
+      "Type": "Succeed",
+      "Comment": "Order processing completed successfully"
+    },
+    "OrderValidationFailed": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:LogError",
+      "Comment": "Log validation failure",
+      "Next": "NotifyCustomerValidationFailed"
+    },
+    "NotifyCustomerValidationFailed": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SendEmail",
+      "Comment": "Notify customer of validation failure",
+      "Next": "OrderFailed"
+    },
+    "InventoryOrPaymentFailed": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:LogError",
+      "Comment": "Log inventory or payment verification failure",
+      "Next": "RefundIfNecessary"
+    },
+    "RefundIfNecessary": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ProcessRefund",
+      "Comment": "Process refund if payment was already captured",
+      "Next": "NotifyCustomerOutOfStock"
+    },
+    "NotifyCustomerOutOfStock": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SendEmail",
+      "Comment": "Notify customer that items are out of stock",
+      "Next": "OrderFailed"
+    },
+    "PaymentDeclined": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:LogError",
+      "Comment": "Log payment declined",
+      "Next": "ReleaseInventory"
+    },
+    "ReleaseInventory": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ReleaseInventory",
+      "Comment": "Release reserved inventory items",
+      "Next": "NotifyCustomerPaymentDeclined"
+    },
+    "NotifyCustomerPaymentDeclined": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SendEmail",
+      "Comment": "Notify customer of payment decline",
+      "Next": "OrderFailed"
+    },
+    "PaymentFailed": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:LogError",
+      "Comment": "Log payment processing failure",
+      "Next": "ReleaseInventory"
+    },
+    "OrderRejected": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:ProcessRefund",
+      "Comment": "Process refund for rejected order",
+      "Next": "NotifyCustomerRejection"
+    },
+    "NotifyCustomerRejection": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123456789012:function:SendEmail",
+      "Comment": "Notify customer that order was rejected",
+      "Next": "OrderFailed"
+    },
+    "OrderFailed": {
+      "Type": "Fail",
+      "Error": "OrderProcessingFailed",
+      "Cause": "Order could not be processed successfully"
+    }
+  }
+}
