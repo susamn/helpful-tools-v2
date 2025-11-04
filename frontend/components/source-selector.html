@@ -1015,6 +1015,38 @@
     display: inline-block;
 }
 
+/* Folder sync button */
+.folder-sync-btn {
+    opacity: 0;
+    visibility: hidden;
+    background: transparent;
+    border: none;
+    padding: 2px 6px;
+    margin-left: 4px;
+    margin-right: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 3px;
+    transition: opacity 0.2s ease, visibility 0.2s ease, background-color 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.tree-item.directory:hover .folder-sync-btn {
+    opacity: 1;
+    visibility: visible;
+}
+
+.folder-sync-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.folder-sync-btn:active {
+    background: rgba(0, 0, 0, 0.15);
+}
+
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }

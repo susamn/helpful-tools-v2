@@ -1864,9 +1864,14 @@ def browse_source_directory_paginated(source_id):
                 error_msg = f"Source type '{source_type}' does not support directory listing."
             return jsonify({'success': False, 'error': error_msg}), 400
 
-        # If refresh parameter is present, clear all cache to ensure fresh data
+        # If refresh parameter is present, clear cache for the specific path
         if refresh:
-            source_instance._cache.clear()  # Clear all cache for reliable refresh
+            if path:
+                # Clear cache only for the specific folder path
+                source_instance.refresh_folder(path)
+            else:
+                # Clear all cache if refreshing root
+                source_instance._cache.clear()
 
         # Get paginated results using lazy loading
         paginated_result = source_instance.explore_directory_lazy(path if path else None, pagination)

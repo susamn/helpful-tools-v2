@@ -978,6 +978,7 @@ class SourceSelector {
                         ${isDirectory ? `<span class="tree-toggle">${hasChildren ? '+' : ''}</span>` : '<span class="tree-toggle-placeholder"></span>'}
                         <span class="tree-icon">${icon}</span>
                         <span class="tree-name">${this.escapeHtml(item.name)}</span>
+                        ${isDirectory ? `<button class="folder-sync-btn" title="Refresh this folder" data-path="${item.path}">🔄</button>` : ''}
                         <div class="tree-metadata">
                             ${sizeText ? `<div class="tree-size">${sizeText}</div>` : ''}
                             ${dateText ? `<div class="tree-date">${dateText}</div>` : ''}
@@ -1010,6 +1011,14 @@ class SourceSelector {
             toggle.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 await this.handleTreeToggle(toggle, source);
+            });
+        });
+
+        // Add sync button handlers for folders
+        container.querySelectorAll('.folder-sync-btn').forEach(syncBtn => {
+            syncBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.refreshFolder(syncBtn.dataset.path, source, syncBtn);
             });
         });
 
@@ -1520,6 +1529,114 @@ showExplorerPanel(source, directoryData, isUserInitiated = true) {
                 // Remove spinning animation
                 button.classList.remove('spinning');
             }
+        }
+    }
+
+    /**
+     * Refresh a specific folder in the explorer
+     */
+    async refreshFolder(folderPath, source, button) {
+        if (!source || !folderPath) {
+            console.error('Invalid source or folder path for refresh');
+            return;
+        }
+
+        const sourceId = source.id;
+
+        // Add spinning animation
+        button.classList.add('spinning');
+
+        try {
+            // Clear cache for this specific folder
+            const cacheKey = `folder_${sourceId}_${folderPath}_`;
+            for (let i = sessionStorage.length - 1; i >= 0; i--) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith(cacheKey)) {
+                    sessionStorage.removeItem(key);
+                }
+            }
+
+            // Clear loaded data from explorer state for this path
+            const explorerState = this.state.getExplorerState(sourceId);
+            explorerState.loadedData.delete(folderPath);
+
+            // Convert absolute path to relative path from source's base
+            let relativePath = folderPath;
+            const basePath = this.resolveSourcePath(source);
+            if (folderPath.startsWith(basePath)) {
+                relativePath = folderPath.substring(basePath.length);
+                // Remove leading slash
+                if (relativePath.startsWith('/')) {
+                    relativePath = relativePath.substring(1);
+                }
+            }
+
+            console.log(`Refreshing folder: ${folderPath} -> relative: ${relativePath}`);
+
+            // Call the backend API to refresh folder
+            const cacheBuster = Date.now();
+            const response = await fetch(`/api/sources/${sourceId}/browse-paginated?path=${encodeURIComponent(relativePath)}&page=1&limit=50&sort_by=name&sort_order=asc&refresh=${cacheBuster}`);
+
+            if (response.ok) {
+                const result = await response.json();
+
+                console.log('Refresh folder response:', result);
+                console.log('Items count:', result.items ? result.items.length : 0);
+
+                if (result.success && result.items) {
+                    // Find the folder in the tree and update its children
+                    const treeItem = button.closest('.tree-item-container');
+                    if (!treeItem) {
+                        console.error('Could not find tree item container');
+                        throw new Error('Could not find folder in tree');
+                    }
+
+                    let childrenContainer = treeItem.querySelector('.tree-children');
+
+                    // If children container doesn't exist, create it
+                    if (!childrenContainer) {
+                        console.log('Creating children container for folder');
+                        childrenContainer = document.createElement('div');
+                        childrenContainer.className = 'tree-children';
+                        childrenContainer.dataset.loaded = 'false';
+                        treeItem.appendChild(childrenContainer);
+                    }
+
+                    // Render the refreshed items
+                    const currentLevel = this.getCurrentLevel(treeItem.querySelector('.tree-item'));
+                    console.log('Rendering items at level:', currentLevel + 1);
+                    this.renderFileTree(result.items, childrenContainer, source, currentLevel + 1);
+
+                    // Mark as loaded
+                    childrenContainer.dataset.loaded = 'true';
+
+                    // Expand the folder
+                    childrenContainer.classList.remove('collapsed');
+                    const toggle = treeItem.querySelector('.tree-toggle');
+                    if (toggle) {
+                        toggle.textContent = '-';
+                    }
+
+                    // Update explorer state
+                    explorerState.addExpandedPath(folderPath);
+                    explorerState.setLoadedData(folderPath, result.items);
+                    this.persistentCache.saveState(this.state);
+
+                    console.log(`✅ Folder refreshed: ${folderPath} (${result.items.length} items)`);
+                } else {
+                    console.error('Invalid response:', result);
+                    throw new Error(result.error || 'Failed to refresh folder');
+                }
+            } else {
+                const errorResult = await response.json();
+                throw new Error(errorResult.error || `HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error refreshing folder:', error);
+            alert(`Failed to refresh folder: ${error.message}`);
+        } finally {
+            // Remove spinning animation
+            button.classList.remove('spinning');
         }
     }
 

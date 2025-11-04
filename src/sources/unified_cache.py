@@ -237,6 +237,29 @@ class UnifiedSourceCache:
         """Clear all cached data for this source (alias for compatibility)."""
         self.clear_cache()
 
+    def clear_path_cache(self, path: str):
+        """Clear cached data for a specific path and its children."""
+        cache = self.get_cache()
+        normalized_path = path or ""
+
+        # Remove the specific path from cache
+        if normalized_path in cache.tree_cache:
+            del cache.tree_cache[normalized_path]
+
+        # Also remove any child paths that start with this path
+        # (for nested directories)
+        if normalized_path:
+            prefix = normalized_path if normalized_path.endswith('/') else normalized_path + '/'
+            paths_to_remove = [
+                p for p in cache.tree_cache.keys()
+                if p.startswith(prefix)
+            ]
+            for p in paths_to_remove:
+                del cache.tree_cache[p]
+
+        cache.last_accessed = datetime.now().isoformat()
+        self._save_cache()
+
     def delete_cache(self):
         """Delete the cache file entirely."""
         if self.cache_file.exists():

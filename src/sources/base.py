@@ -812,6 +812,27 @@ class BaseDataSource(DataSourceInterface):
         else:
             return items
 
+    def refresh_folder(self, path: Optional[str] = None) -> bool:
+        """
+        Refresh cache for a specific folder path.
+
+        This is a common method that clears the cache for a specific folder,
+        allowing sources to override for source-specific refresh behavior.
+
+        Args:
+            path: Optional folder path to refresh (None for root)
+
+        Returns:
+            True if refresh successful
+        """
+        try:
+            # Clear cache for the specific path
+            if hasattr(self, '_cache'):
+                self._cache.clear_path_cache(path or '')
+            return True
+        except Exception:
+            return False
+
     def __enter__(self):
         """Context manager entry."""
         return self
