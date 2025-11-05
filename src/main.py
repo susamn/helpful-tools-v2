@@ -103,6 +103,14 @@ def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
 # Store for tools configuration
 TOOLS = [
     {
+        "name": "Scratchpad",
+        "description": "Simple note-taking tool for viewing and storing data with history tracking",
+        "path": "/tools/scratchpad",
+        "tags": ["notes", "text", "viewer", "scratchpad"],
+        "has_history": True,
+        "icon": "📝"
+    },
+    {
         "name": "JSON Tool",
         "description": "Format, validate, and minify JSON data with history tracking",
         "path": "/tools/json-tool",
