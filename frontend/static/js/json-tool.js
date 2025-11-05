@@ -854,19 +854,37 @@ class JsonTool {
         expression = expression.trim();
         console.log('Parsing expression:', expression);
 
-        // Check for chained functions FIRST: $.path | func1() | func2()
+        // Check for chained functions FIRST: $.path | func1() | func2('param') | $.nextPath
         // This needs to be checked before single pipe to avoid incorrect matching
         if (expression.includes('|')) {
             const parts = expression.split('|').map(p => p.trim());
 
-            // Check if all parts after the first are functions (end with ())
-            const allFunctions = parts.slice(1).every(p => /^\w+\s*\(\s*\)$/.test(p));
+            // Separate functions from paths
+            const path = parts[0];
+            const functions = [];
+            let nextPath = null;
 
-            if (allFunctions && parts.length > 1) {
-                const path = parts[0];
-                const functions = parts.slice(1).map(f => f.replace(/\s*\(\s*\)/, '').trim());
-                const result = { path, functions };
-                console.log('Matched pipe syntax (possibly chained):', result);
+            for (let i = 1; i < parts.length; i++) {
+                const part = parts[i];
+                // Check if this part is a function (has function pattern with parentheses)
+                const funcMatch = part.match(/^(\w+)\s*\(([^)]*)\)$/);
+                if (funcMatch) {
+                    const funcName = funcMatch[1].trim();
+                    const funcParams = funcMatch[2].trim();
+                    // Parse parameters - handle quoted strings
+                    const params = funcParams ? this.parseFunctionParams(funcParams) : [];
+                    functions.push({ name: funcName, params });
+                } else {
+                    // This is a JSONPath, not a function
+                    // Everything from here onwards is the next path
+                    nextPath = parts.slice(i).join('|').trim();
+                    break;
+                }
+            }
+
+            if (functions.length > 0 || nextPath) {
+                const result = { path, functions, nextPath };
+                console.log('Matched pipe syntax:', result);
                 return result;
             }
         }
@@ -876,7 +894,8 @@ class JsonTool {
         if (funcMatch) {
             const result = {
                 path: funcMatch[2].trim(),
-                functions: [funcMatch[1]]
+                functions: [{ name: funcMatch[1], params: [] }],
+                nextPath: null
             };
             console.log('Matched function syntax:', result);
             return result;
@@ -885,22 +904,60 @@ class JsonTool {
         // No functions, just a path
         const result = {
             path: expression,
-            functions: []
+            functions: [],
+            nextPath: null
         };
         console.log('No functions, plain path:', result);
         return result;
     }
 
     /**
-     * Apply function to JSONPath results
+     * Parse function parameters from string
+     * Handles quoted strings like 'key' or "key"
      */
-    applyFunction(funcName, data) {
+    parseFunctionParams(paramsStr) {
+        if (!paramsStr) return [];
+
+        const params = [];
+        // Match quoted strings or unquoted values
+        const matches = paramsStr.match(/(['"])([^\1]*?)\1|([^,\s]+)/g);
+
+        if (matches) {
+            matches.forEach(match => {
+                // Remove quotes if present
+                if ((match.startsWith("'") && match.endsWith("'")) ||
+                    (match.startsWith('"') && match.endsWith('"'))) {
+                    params.push(match.slice(1, -1));
+                } else {
+                    params.push(match);
+                }
+            });
+        }
+
+        return params;
+    }
+
+    /**
+     * Apply function to JSONPath results
+     * Handles both old format (string) and new format (object with name and params)
+     */
+    applyFunction(func, data) {
+        // Handle both old string format and new object format
+        let funcName, params;
+        if (typeof func === 'string') {
+            funcName = func;
+            params = [];
+        } else {
+            funcName = func.name;
+            params = func.params || [];
+        }
+
         switch(funcName.toLowerCase()) {
             case 'list':
                 return this.functionList(data);
             case 'uniq':
             case 'unique':
-                return this.functionUniq(data);
+                return this.functionUniq(data, params[0]);
             case 'count':
                 return this.functionCount(data);
             case 'flatten':
@@ -931,9 +988,11 @@ class JsonTool {
     }
 
     /**
-     * uniq() - Get unique values
+     * uniq(key?) - Get unique values
+     * @param {Array} data - The data to filter
+     * @param {string} key - Optional key to use for uniqueness in objects
      */
-    functionUniq(data) {
+    functionUniq(data, key = null) {
         if (!Array.isArray(data)) return data;
 
         // Handle arrays of primitives
@@ -941,12 +1000,34 @@ class JsonTool {
             return [...new Set(data)];
         }
 
-        // Handle arrays of objects - compare by JSON string
+        // If key is provided, validate it exists in at least one object
+        if (key) {
+            const hasKey = data.some(item =>
+                typeof item === 'object' &&
+                item !== null &&
+                item.hasOwnProperty(key)
+            );
+
+            if (!hasKey) {
+                console.warn(`uniq('${key}'): Key '${key}' does not exist in any objects. Returning empty array.`);
+                return [];
+            }
+        }
+
+        // Handle arrays of objects
         const seen = new Set();
         return data.filter(item => {
-            const key = JSON.stringify(item);
-            if (seen.has(key)) return false;
-            seen.add(key);
+            // If key is provided and item is an object, use that key for uniqueness
+            let uniqueValue;
+            if (key && typeof item === 'object' && item !== null) {
+                uniqueValue = item[key];
+            } else {
+                // Otherwise compare by entire object (JSON string)
+                uniqueValue = JSON.stringify(item);
+            }
+
+            if (seen.has(uniqueValue)) return false;
+            seen.add(uniqueValue);
             return true;
         });
     }
@@ -1059,12 +1140,12 @@ class JsonTool {
 
         try {
             // Parse expression for functions
-            const { path, functions } = this.parseJsonPathWithFunctions(expression);
+            const { path, functions, nextPath } = this.parseJsonPathWithFunctions(expression);
 
             // Check if the current data is JSONL
             const inputText = this.elements.jsonInput.value.trim();
             if (this.isJsonl(inputText)) {
-                this.performJsonlPathLookup(path, functions);
+                this.performJsonlPathLookup(path, functions, nextPath);
             } else {
                 // Regular JSON path lookup
                 const parsed = JSON.parse(outputText);
@@ -1101,7 +1182,8 @@ class JsonTool {
                 if (allResults !== undefined && allResults !== null) {
                     // Display result in output window
                     const formattedResult = this.formatJsonWithIndent(allResults);
-                    const funcInfo = functions.length > 0 ? ` (with ${functions.join(', ')})` : '';
+                    const funcNames = functions.map(f => typeof f === 'string' ? f : `${f.name}(${f.params.map(p => `'${p}'`).join(', ')})`);
+                    const funcInfo = functions.length > 0 ? ` (with ${funcNames.join(', ')})` : '';
                     this.displayOutput(formattedResult, allResults, true);  // Mark as JSONPath result
                     this.highlightJsonPath(path);
                     this.showMessage(`JSONPath result displayed${funcInfo}`, 'success');
@@ -1243,15 +1325,44 @@ class JsonTool {
     /**
      * Perform JSONPath lookup on JSONL data
      */
-    performJsonlPathLookup(path, functions = []) {
+    performJsonlPathLookup(path, functions = [], nextPath = null) {
         try {
             const inputText = this.elements.jsonInput.value.trim();
             const jsonObjects = this.parseJsonlObjects(inputText);
             const results = [];
             const paths = path.split(',').map(p => p.trim());
 
-            console.log('JSONL Lookup - Path:', path, 'Functions:', functions);
+            console.log('JSONL Lookup - Path:', path, 'Functions:', functions, 'NextPath:', nextPath);
             console.log('JSONL Objects count:', jsonObjects.length);
+
+            // Check if user wants to convert JSONL to array first with list($)
+            const hasListFunction = functions.some(f => (typeof f === 'string' ? f : f.name) === 'list');
+            if (path.trim() === '$' && hasListFunction) {
+                console.log('Converting JSONL to array with list($)');
+
+                // If there's a nextPath, apply it to the array
+                if (nextPath) {
+                    console.log('Applying nextPath to converted array:', nextPath);
+                    const evalResult = this.evaluateJsonPath(jsonObjects, nextPath);
+
+                    if (evalResult.error) {
+                        this.showMessage(`Invalid JSONPath expression: ${evalResult.error}`, 'error');
+                        return;
+                    }
+
+                    const result = evalResult.result && evalResult.result.length > 0 ? evalResult.result : [];
+                    const formattedResult = this.formatJsonWithIndent(result);
+                    this.displayOutput(formattedResult, result, true);
+                    this.showMessage(`JSONL converted to array and path applied: ${nextPath}`, 'success');
+                    return;
+                } else {
+                    // No nextPath, just return the array
+                    const formattedResult = this.formatJsonWithIndent(jsonObjects);
+                    this.displayOutput(formattedResult, jsonObjects, true);
+                    this.showMessage(`JSONL converted to array (${jsonObjects.length} objects)`, 'success');
+                    return;
+                }
+            }
 
             jsonObjects.forEach((obj, index) => {
                 let combinedResult = {};
@@ -1310,11 +1421,27 @@ class JsonTool {
                 // Apply functions to combined values
                 try {
                     for (const func of functions) {
-                        console.log(`Applying function: ${func}`);
+                        const funcName = typeof func === 'string' ? func : func.name;
+                        const funcParams = typeof func === 'string' ? [] : func.params;
+                        console.log(`Applying function: ${funcName}`, funcParams.length > 0 ? `with params: ${funcParams}` : '');
                         allValues = this.applyFunction(func, allValues);
                         console.log('Result after function:', allValues);
                     }
                     finalResults = allValues;
+
+                    // Apply nextPath if provided (for cases like $.products | list() | $[*].price)
+                    if (nextPath) {
+                        console.log('Applying nextPath to function results:', nextPath);
+                        const evalResult = this.evaluateJsonPath(finalResults, nextPath);
+
+                        if (evalResult.error) {
+                            this.showMessage(`Invalid nextPath expression: ${evalResult.error}`, 'error');
+                            return;
+                        }
+
+                        finalResults = evalResult.result && evalResult.result.length > 0 ? evalResult.result : [];
+                        console.log('Result after nextPath:', finalResults);
+                    }
                 } catch (funcError) {
                     console.error('Function error:', funcError);
                     this.showMessage(`Function error: ${funcError.message}`, 'error');
@@ -1325,10 +1452,12 @@ class JsonTool {
             console.log('Final results:', finalResults);
 
             if (finalResults && (Array.isArray(finalResults) ? finalResults.length > 0 : finalResults !== null)) {
-                const funcInfo = functions.length > 0 ? ` (with ${functions.join(', ')})` : '';
+                const funcNames = functions.map(f => typeof f === 'string' ? f : `${f.name}(${f.params.map(p => `'${p}'`).join(', ')})`);
+                const pathInfo = nextPath ? ` | ${nextPath}` : '';
+                const funcInfo = functions.length > 0 ? ` (with ${funcNames.join(', ')}${pathInfo})` : '';
 
-                if (functions.length > 0) {
-                    // Display simplified result when functions are applied
+                if (functions.length > 0 || nextPath) {
+                    // Display simplified result when functions or nextPath are applied
                     const formattedResult = this.formatJsonWithIndent(finalResults);
                     this.displayOutput(formattedResult, finalResults, true);
                     this.showMessage(`JSONPath result displayed${funcInfo}`, 'success');
@@ -1428,41 +1557,46 @@ class JsonTool {
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$..name | uniq()</td>
             </tr>
             <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><code>uniq('key')</code></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Get unique objects by key field</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.products | uniq('code')</td>
+            </tr>
+            <tr style="background: #fafafa;">
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>count()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Count elements or object keys</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | count()</td>
             </tr>
-            <tr style="background: #fafafa;">
+            <tr>
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>flatten()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Flatten nested arrays</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.data | flatten()</td>
             </tr>
-            <tr>
+            <tr style="background: #fafafa;">
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>keys()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Get object keys</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.object | keys()</td>
             </tr>
-            <tr style="background: #fafafa;">
+            <tr>
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>values()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Get object values</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.object | values()</td>
             </tr>
-            <tr>
+            <tr style="background: #fafafa;">
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>sort()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Sort array</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | sort()</td>
             </tr>
-            <tr style="background: #fafafa;">
+            <tr>
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>reverse()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Reverse array</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | reverse()</td>
             </tr>
-            <tr>
+            <tr style="background: #fafafa;">
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>first()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Get first element</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | first()</td>
             </tr>
-            <tr style="background: #fafafa;">
+            <tr>
                 <td style="padding: 8px; border: 1px solid #ddd;"><code>last()</code></td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Get last element</td>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace; font-size: 11px;">$.items | last()</td>
@@ -1659,18 +1793,38 @@ class JsonTool {
                 <td style="padding: 8px; border: 1px solid #ddd;">Unique names</td>
             </tr>
             <tr>
+                <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$ | list() | $.products[*] | flatten() | uniq('code')</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">Unique products by code (JSONL)</td>
+            </tr>
+            <tr style="background: #f5f5f5;">
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$[?(!@.email)] | count()</td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Count items without email</td>
             </tr>
-            <tr style="background: #f5f5f5;">
+            <tr>
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$.prices[*] | sort() | first()</td>
                 <td style="padding: 8px; border: 1px solid #ddd;">Lowest price</td>
             </tr>
-            <tr>
+            <tr style="background: #f5f5f5;">
                 <td style="padding: 8px; border: 1px solid #ddd; font-family: monospace;">$..city | uniq() | sort()</td>
                 <td style="padding: 8px; border: 1px solid #ddd;">All unique cities, sorted</td>
             </tr>
         </table>
+    </div>
+
+    <div style="background: #fff3e0; padding: 12px; border-radius: 4px; margin-top: 20px; margin-bottom: 15px;">
+        <strong style="color: #e65100;">🔄 JSONL Workflow:</strong>
+        <div style="color: #555; font-size: 12px; margin-top: 8px; line-height: 1.6;">
+            <strong>Two-step approach:</strong><br>
+            <strong>Step 1:</strong> Convert JSONL to array: <code style="background: #fff; padding: 2px 6px; border-radius: 2px;">$ | list()</code><br>
+            <strong>Step 2:</strong> Then apply filters on the array: <code style="background: #fff; padding: 2px 6px; border-radius: 2px;">$[?(!@.email)]</code><br>
+            <br>
+            <strong>Single-line approach:</strong><br>
+            Chain it all together: <code style="background: #fff; padding: 2px 6px; border-radius: 2px;">$ | list() | $.order_id</code><br>
+            Or with filters: <code style="background: #fff; padding: 2px 6px; border-radius: 2px;">$ | list() | $[?(!@.email)]</code><br>
+            <span style="font-style: italic; color: #777; display: block; margin-top: 4px;">
+                This converts independent JSONL documents into a single JSON array for powerful filtering and querying!
+            </span>
+        </div>
     </div>
 
     <div style="background: #e3f2fd; padding: 12px; border-radius: 4px; margin-top: 20px;">
@@ -1762,6 +1916,7 @@ class JsonTool {
         return [
             { name: 'list()', description: 'Ensure result is an array' },
             { name: 'uniq()', description: 'Get unique values' },
+            { name: "uniq('key')", description: 'Get unique objects by key field' },
             { name: 'unique()', description: 'Get unique values (alias)' },
             { name: 'count()', description: 'Count elements' },
             { name: 'flatten()', description: 'Flatten nested arrays' },
@@ -1823,8 +1978,8 @@ class JsonTool {
 
         dropdown.style.display = 'block';
 
-        // Track selected index
-        let selectedIndex = 0;
+        // Track selected index (-1 means nothing selected)
+        let selectedIndex = -1;
 
         const updateSelection = () => {
             dropdown.querySelectorAll('.func-item').forEach((item, idx) => {
@@ -1836,8 +1991,7 @@ class JsonTool {
             });
         };
 
-        // Initial selection
-        updateSelection();
+        // No initial selection - user must use arrow keys to select
 
         // Add click handlers
         dropdown.querySelectorAll('.func-item').forEach((item, index) => {

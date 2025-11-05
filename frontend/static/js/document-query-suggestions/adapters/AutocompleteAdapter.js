@@ -314,10 +314,8 @@ class AutocompleteAdapter {
             this.dropdown.appendChild(item);
         });
 
-        // Select first item by default
-        if (this.currentSuggestions.length > 0) {
-            this.setSelected(0);
-        }
+        // Don't select anything by default - user must use arrow keys
+        this.selectedIndex = -1;
     }
 
     /**
