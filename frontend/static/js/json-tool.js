@@ -14,6 +14,14 @@ class JsonTool {
         this.fontSize = parseInt(localStorage.getItem(`${this.toolName}-fontSize`) || '12');
         this.currentSource = null;  // Track current source for validation
         this.autocompleteAdapter = null;  // Generic autocomplete adapter
+
+        // Initialize web worker for heavy processing
+        this.workerManager = null;
+        this.useWorker = true; // Enable/disable worker usage
+        this.workerThreshold = 500000; // Characters threshold to use worker (500KB)
+        this.maxFileSize = 9900000; // Maximum file size to process (9900KB)
+        this.initializeWorker();
+
         this.initializeElements();
         this.overrideGlobalNotifications(); // Override big notifications with small ones
         this.attachEventListeners();
@@ -87,6 +95,47 @@ class JsonTool {
         window.showStatusMessage = function(message, type = 'info', duration = 3000) {
             jsonTool.showMessage(message, type);
         };
+    }
+
+    /**
+     * Initialize web worker for heavy processing
+     */
+    initializeWorker() {
+        try {
+            if (typeof WorkerManager !== 'undefined') {
+                this.workerManager = new WorkerManager('/static/js/workers/json-worker.js');
+                console.log('Web Worker initialized for JSON processing');
+            } else {
+                console.warn('WorkerManager not available, using synchronous processing');
+                this.useWorker = false;
+            }
+        } catch (error) {
+            console.error('Failed to initialize worker:', error);
+            this.useWorker = false;
+        }
+    }
+
+    /**
+     * Check if worker should be used for given data size
+     */
+    shouldUseWorker(dataSize) {
+        return this.useWorker &&
+               this.workerManager &&
+               this.workerManager.isReady() &&
+               dataSize > this.workerThreshold;
+    }
+
+    /**
+     * Check if file is too large to process safely
+     */
+    isFileTooLarge(dataSize) {
+        if (dataSize > this.maxFileSize) {
+            const sizeMB = (dataSize / 1024 / 1024).toFixed(2);
+            const maxSizeMB = (this.maxFileSize / 1024 / 1024).toFixed(2);
+            this.showMessage(`File too large (${sizeMB}MB). Maximum supported size is ${maxSizeMB}MB. Please use a smaller file.`, 'error');
+            return true;
+        }
+        return false;
     }
 
     attachEventListeners() {
@@ -171,11 +220,16 @@ class JsonTool {
     /**
      * Format JSON with proper indentation and validation
      */
-    formatJson() {
+    async formatJson() {
         const input = this.elements.jsonInput.value.trim();
-        
+
         if (!input) {
             this.showMessage('Please enter JSON or JSONL data to format.', 'warning');
+            return;
+        }
+
+        // Check file size limit
+        if (this.isFileTooLarge(input.length)) {
             return;
         }
 
@@ -184,17 +238,47 @@ class JsonTool {
             if (this.isJsonl(input)) {
                 this.formatJsonlData(input);
             } else {
-                // Regular JSON formatting
-                const parsed = JSON.parse(input);
-                const formatted = this.formatJsonWithIndent(parsed);
-                
-                this.displayOutput(formatted, parsed);
-                this.showMessage('JSON formatted successfully!', 'success');
-                this.saveToHistory(input, 'format');
+                // Check if we should use worker for large files
+                if (this.shouldUseWorker(input.length)) {
+                    this.showMessage('Processing large file...', 'info');
+
+                    try {
+                        const result = await this.workerManager.execute('format', {
+                            text: input,
+                            indentType: this.indentPrefs.type,
+                            indentSize: this.indentPrefs.size
+                        });
+
+                        // Parse the result to get the object for storage
+                        const parsed = JSON.parse(input);
+                        this.displayOutput(result.formatted, parsed);
+                        this.showMessage(`JSON formatted successfully! (${result.stats.lines} lines, ${result.stats.size} chars)`, 'success');
+                        this.saveToHistory(input, 'format');
+                    } catch (workerError) {
+                        console.warn('Worker failed, falling back to synchronous:', workerError);
+                        // Fall back to synchronous processing
+                        this.formatJsonSync(input);
+                    }
+                } else {
+                    // Small files use synchronous processing
+                    this.formatJsonSync(input);
+                }
             }
         } catch (error) {
             this.handleJsonError(error);
         }
+    }
+
+    /**
+     * Synchronous JSON formatting (fallback and for small files)
+     */
+    formatJsonSync(input) {
+        const parsed = JSON.parse(input);
+        const formatted = this.formatJsonWithIndent(parsed);
+
+        this.displayOutput(formatted, parsed);
+        this.showMessage('JSON formatted successfully!', 'success');
+        this.saveToHistory(input, 'format');
     }
 
     /**
@@ -263,9 +347,14 @@ class JsonTool {
      */
     minifyJson() {
         const input = this.elements.jsonInput.value.trim();
-        
+
         if (!input) {
             this.showMessage('Please enter JSON data to minify.', 'warning');
+            return;
+        }
+
+        // Check file size limit
+        if (this.isFileTooLarge(input.length)) {
             return;
         }
 
@@ -437,18 +526,43 @@ class JsonTool {
     /**
      * Minify single JSON object
      */
-    minifySingleJson(input) {
+    async minifySingleJson(input) {
         try {
-            const parsed = JSON.parse(input);
-            const minified = JSON.stringify(parsed);
-            
-            this.displayOutput(minified, parsed);
-            this.showMessage(`JSON minified successfully! Reduced from ${input.length} to ${minified.length} characters.`, 'success');
-            this.saveToHistory(input, 'minify');
-            
+            // Check if we should use worker for large files
+            if (this.shouldUseWorker(input.length)) {
+                this.showMessage('Minifying large file...', 'info');
+
+                try {
+                    const result = await this.workerManager.execute('minify', {
+                        text: input
+                    });
+
+                    const parsed = JSON.parse(input);
+                    this.displayOutput(result.minified, parsed);
+                    this.showMessage(`JSON minified successfully! Reduced from ${result.stats.originalSize} to ${result.stats.minifiedSize} characters (${result.stats.reduction}% reduction).`, 'success');
+                    this.saveToHistory(input, 'minify');
+                } catch (workerError) {
+                    console.warn('Worker failed, falling back to synchronous:', workerError);
+                    this.minifySingleJsonSync(input);
+                }
+            } else {
+                this.minifySingleJsonSync(input);
+            }
         } catch (error) {
             this.handleJsonError(error);
         }
+    }
+
+    /**
+     * Synchronous minify (fallback and for small files)
+     */
+    minifySingleJsonSync(input) {
+        const parsed = JSON.parse(input);
+        const minified = JSON.stringify(parsed);
+
+        this.displayOutput(minified, parsed);
+        this.showMessage(`JSON minified successfully! Reduced from ${input.length} to ${minified.length} characters.`, 'success');
+        this.saveToHistory(input, 'minify');
     }
 
     /**
@@ -493,9 +607,14 @@ class JsonTool {
      */
     stringifyJson() {
         const input = this.elements.jsonInput.value.trim();
-        
+
         if (!input) {
             this.showMessage('Please enter JSON data to stringify.', 'warning');
+            return;
+        }
+
+        // Check file size limit
+        if (this.isFileTooLarge(input.length)) {
             return;
         }
 
@@ -1124,7 +1243,7 @@ class JsonTool {
     /**
      * Perform JSONPath lookup
      */
-    performJsonPathLookup() {
+    async performJsonPathLookup() {
         const expression = this.elements.jsonPathInput.value.trim();
         if (!expression) {
             this.clearSearch();
@@ -1138,6 +1257,11 @@ class JsonTool {
 
         const outputText = this.originalOutputData.text;
 
+        // Check file size limit
+        if (this.isFileTooLarge(outputText.length)) {
+            return;
+        }
+
         try {
             // Parse expression for functions
             const { path, functions, nextPath } = this.parseJsonPathWithFunctions(expression);
@@ -1147,52 +1271,89 @@ class JsonTool {
             if (this.isJsonl(inputText)) {
                 this.performJsonlPathLookup(path, functions, nextPath);
             } else {
-                // Regular JSON path lookup
-                const parsed = JSON.parse(outputText);
-                const paths = path.split(',').map(p => p.trim());
-                let allResults = [];
-                let error = null;
+                // Check if we should use worker for large files
+                if (this.shouldUseWorker(outputText.length)) {
+                    this.showMessage('Processing JSONPath query on large file...', 'info');
 
-                for (const p of paths) {
-                    const evalResult = this.evaluateJsonPath(parsed, p);
-                    if (evalResult.error) {
-                        error = evalResult.error;
-                        break;
+                    try {
+                        const result = await this.workerManager.execute('jsonpath', {
+                            json: outputText,
+                            path,
+                            functions,
+                            nextPath
+                        });
+
+                        console.log('JSONPath result:', result.result);
+
+                        if (result.result !== undefined && result.result !== null) {
+                            const formattedResult = this.formatJsonWithIndent(result.result);
+                            const funcNames = functions.map(f => typeof f === 'string' ? f : `${f.name}(${f.params.map(p => `'${p}'`).join(', ')})`);
+                            const funcInfo = functions.length > 0 ? ` (with ${funcNames.join(', ')})` : '';
+                            this.displayOutput(formattedResult, result.result, true);
+                            this.highlightJsonPath(path);
+                            this.showMessage(`JSONPath result displayed${funcInfo}`, 'success');
+                        } else {
+                            this.showMessage(`JSONPath not found: ${path}`, 'warning');
+                        }
+                    } catch (workerError) {
+                        console.warn('Worker failed, falling back to synchronous:', workerError);
+                        this.performJsonPathLookupSync(outputText, path, functions, nextPath);
                     }
-                    allResults.push(...evalResult.result);
-                }
-
-                if (error) {
-                    this.showMessage(`Invalid JSONPath expression: ${error}`, 'error');
-                    return;
-                }
-
-                // Apply functions to results
-                try {
-                    for (const func of functions) {
-                        allResults = this.applyFunction(func, allResults);
-                    }
-                } catch (funcError) {
-                    this.showMessage(`Function error: ${funcError.message}`, 'error');
-                    return;
-                }
-
-                console.log('JSONPath result:', allResults);
-
-                if (allResults !== undefined && allResults !== null) {
-                    // Display result in output window
-                    const formattedResult = this.formatJsonWithIndent(allResults);
-                    const funcNames = functions.map(f => typeof f === 'string' ? f : `${f.name}(${f.params.map(p => `'${p}'`).join(', ')})`);
-                    const funcInfo = functions.length > 0 ? ` (with ${funcNames.join(', ')})` : '';
-                    this.displayOutput(formattedResult, allResults, true);  // Mark as JSONPath result
-                    this.highlightJsonPath(path);
-                    this.showMessage(`JSONPath result displayed${funcInfo}`, 'success');
                 } else {
-                    this.showMessage(`JSONPath not found: ${path}`, 'warning');
+                    this.performJsonPathLookupSync(outputText, path, functions, nextPath);
                 }
             }
         } catch (error) {
             this.showMessage(`JSONPath error: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Synchronous JSONPath lookup (fallback and for small files)
+     */
+    performJsonPathLookupSync(outputText, path, functions, nextPath) {
+        // Regular JSON path lookup
+        const parsed = JSON.parse(outputText);
+        const paths = path.split(',').map(p => p.trim());
+        let allResults = [];
+        let error = null;
+
+        for (const p of paths) {
+            const evalResult = this.evaluateJsonPath(parsed, p);
+            if (evalResult.error) {
+                error = evalResult.error;
+                break;
+            }
+            allResults.push(...evalResult.result);
+        }
+
+        if (error) {
+            this.showMessage(`Invalid JSONPath expression: ${error}`, 'error');
+            return;
+        }
+
+        // Apply functions to results
+        try {
+            for (const func of functions) {
+                allResults = this.applyFunction(func, allResults);
+            }
+        } catch (funcError) {
+            this.showMessage(`Function error: ${funcError.message}`, 'error');
+            return;
+        }
+
+        console.log('JSONPath result:', allResults);
+
+        if (allResults !== undefined && allResults !== null) {
+            // Display result in output window
+            const formattedResult = this.formatJsonWithIndent(allResults);
+            const funcNames = functions.map(f => typeof f === 'string' ? f : `${f.name}(${f.params.map(p => `'${p}'`).join(', ')})`);
+            const funcInfo = functions.length > 0 ? ` (with ${funcNames.join(', ')})` : '';
+            this.displayOutput(formattedResult, allResults, true);  // Mark as JSONPath result
+            this.highlightJsonPath(path);
+            this.showMessage(`JSONPath result displayed${funcInfo}`, 'success');
+        } else {
+            this.showMessage(`JSONPath not found: ${path}`, 'warning');
         }
     }
 
