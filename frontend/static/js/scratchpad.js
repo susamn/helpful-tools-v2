@@ -209,6 +209,14 @@ class ScratchpadTool {
         const file = event.target.files[0];
         if (!file) return;
 
+        // Check file size (20MB limit for safe browser handling)
+        const maxUploadSize = 20 * 1024 * 1024; // 20MB
+        if (file.size > maxUploadSize) {
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            this.showMessage(`File too large (${sizeMB}MB). Maximum upload size is 20MB to prevent browser issues.`, 'error');
+            return;
+        }
+
         try {
             const content = await file.text();
             this.elements.scratchpadInput.value = content;

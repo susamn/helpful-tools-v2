@@ -19,7 +19,7 @@ class JsonTool {
         this.workerManager = null;
         this.useWorker = true; // Enable/disable worker usage
         this.workerThreshold = 500000; // Characters threshold to use worker (500KB)
-        this.maxFileSize = 9900000; // Maximum file size to process (9900KB)
+        this.maxFileSize = 20000000; // Maximum file size to process (20MB)
         this.initializeWorker();
 
         this.initializeElements();
@@ -2366,6 +2366,14 @@ class JsonTool {
         // Validate file type
         if (!file.name.toLowerCase().endsWith('.json')) {
             this.showMessage('Please select a valid JSON file (.json extension)', 'error');
+            return;
+        }
+
+        // Check file size (20MB limit for safe browser handling)
+        const maxUploadSize = 20 * 1024 * 1024; // 20MB
+        if (file.size > maxUploadSize) {
+            const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+            this.showMessage(`File too large (${sizeMB}MB). Maximum upload size is 20MB to prevent browser issues.`, 'error');
             return;
         }
 
