@@ -67,11 +67,16 @@ class HistoryManager:
         
         # Add to beginning of list (most recent first)
         self.history_data[tool_name].insert(0, entry)
-        
-        # Maintain history limit
+
+        # Maintain history limit (excluding starred items)
         limit = self._get_history_limit(tool_name)
         if len(self.history_data[tool_name]) > limit:
-            self.history_data[tool_name] = self.history_data[tool_name][:limit]
+            # Separate starred and non-starred items
+            starred_items = [e for e in self.history_data[tool_name] if e.get("starred", False)]
+            non_starred_items = [e for e in self.history_data[tool_name] if not e.get("starred", False)]
+
+            # Keep all starred items + limit number of non-starred items
+            self.history_data[tool_name] = starred_items + non_starred_items[:limit]
         
         # Also add to global history
         global_entry = {
@@ -81,11 +86,16 @@ class HistoryManager:
         }
         
         self.global_history.insert(0, global_entry)
-        
-        # Maintain global history limit (configurable, default 100)
+
+        # Maintain global history limit (excluding starred items, configurable, default 100)
         global_limit = self.config.get("global_history_limit", 100)
         if len(self.global_history) > global_limit:
-            self.global_history = self.global_history[:global_limit]
+            # Separate starred and non-starred items
+            starred_global = [e for e in self.global_history if e.get("starred", False)]
+            non_starred_global = [e for e in self.global_history if not e.get("starred", False)]
+
+            # Keep all starred items + global_limit number of non-starred items
+            self.global_history = starred_global + non_starred_global[:global_limit]
         
         return {
             "success": True,
@@ -97,12 +107,19 @@ class HistoryManager:
         """Get history entries for a tool"""
         if tool_name not in self.history_data:
             return []
-        
+
         history = self.history_data[tool_name]
-        
+
+        # Sort: starred items first (most recently starred on top), then regular items
+        starred_items = [entry for entry in history if entry.get("starred", False)]
+        regular_items = [entry for entry in history if not entry.get("starred", False)]
+
+        # Combine: starred items first, then regular items
+        sorted_history = starred_items + regular_items
+
         if limit:
-            history = history[:limit]
-        
+            sorted_history = sorted_history[:limit]
+
         # Return formatted history
         return [
             {
@@ -113,7 +130,7 @@ class HistoryManager:
                 "formatted_date": self._format_date(entry["timestamp"]),
                 "starred": entry.get("starred", False)
             }
-            for entry in history
+            for entry in sorted_history
         ]
     
     def get_history_entry(self, tool_name: str, entry_id: str) -> Optional[Dict[str, Any]]:
@@ -195,10 +212,17 @@ class HistoryManager:
     def get_global_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get global history entries across all tools"""
         history = self.global_history
-        
+
+        # Sort: starred items first (most recently starred on top), then regular items
+        starred_items = [entry for entry in history if entry.get("starred", False)]
+        regular_items = [entry for entry in history if not entry.get("starred", False)]
+
+        # Combine: starred items first, then regular items
+        sorted_history = starred_items + regular_items
+
         if limit:
-            history = history[:limit]
-        
+            sorted_history = sorted_history[:limit]
+
         # Return formatted global history
         return [
             {
@@ -211,7 +235,7 @@ class HistoryManager:
                 "formatted_date": self._format_date(entry["timestamp"]),
                 "starred": entry.get("starred", False)
             }
-            for entry in history
+            for entry in sorted_history
         ]
     
     def get_global_history_entry(self, entry_id: str) -> Optional[Dict[str, Any]]:
@@ -234,45 +258,55 @@ class HistoryManager:
         """Delete specific history entry for a tool and from global history"""
         if tool_name not in self.history_data:
             return False
-        
+
+        # Check if the entry is starred
+        for entry in self.history_data[tool_name]:
+            if entry["id"] == entry_id and entry.get("starred", False):
+                return False  # Cannot delete starred items
+
         # Delete from local history
         original_local_count = len(self.history_data[tool_name])
         self.history_data[tool_name] = [
-            entry for entry in self.history_data[tool_name] 
+            entry for entry in self.history_data[tool_name]
             if entry["id"] != entry_id
         ]
-        
+
         # Delete from global history (same ID)
         original_global_count = len(self.global_history)
         self.global_history = [
-            entry for entry in self.global_history 
+            entry for entry in self.global_history
             if entry["id"] != entry_id
         ]
-        
+
         # Return True if an entry was actually deleted from either location
-        return (len(self.history_data[tool_name]) < original_local_count or 
+        return (len(self.history_data[tool_name]) < original_local_count or
                 len(self.global_history) < original_global_count)
     
     def delete_global_history_entry(self, entry_id: str) -> bool:
         """Delete specific global history entry and from all local histories"""
+        # Check if the entry is starred in global history
+        for entry in self.global_history:
+            if entry["id"] == entry_id and entry.get("starred", False):
+                return False  # Cannot delete starred items
+
         # Delete from global history
         original_global_count = len(self.global_history)
         self.global_history = [
-            entry for entry in self.global_history 
+            entry for entry in self.global_history
             if entry["id"] != entry_id
         ]
-        
+
         # Delete from all local histories (same ID might exist in any tool)
         deleted_from_local = False
         for tool_name in self.history_data:
             original_local_count = len(self.history_data[tool_name])
             self.history_data[tool_name] = [
-                entry for entry in self.history_data[tool_name] 
+                entry for entry in self.history_data[tool_name]
                 if entry["id"] != entry_id
             ]
             if len(self.history_data[tool_name]) < original_local_count:
                 deleted_from_local = True
-        
+
         # Return True if an entry was actually deleted from either location
         return (len(self.global_history) < original_global_count or deleted_from_local)
 
@@ -290,43 +324,64 @@ class HistoryManager:
         if tool_name not in self.history_data:
             return False
 
-        # Update in local history
+        # Update in local history and move to top if starred
         local_updated = False
-        for entry in self.history_data[tool_name]:
+        starred_entry = None
+        for i, entry in enumerate(self.history_data[tool_name]):
             if entry["id"] == entry_id:
                 entry["starred"] = starred
                 local_updated = True
+                if starred:
+                    # Remove from current position
+                    starred_entry = self.history_data[tool_name].pop(i)
+                    # Insert at the beginning
+                    self.history_data[tool_name].insert(0, starred_entry)
                 break
 
-        # Update in global history
+        # Update in global history and move to top if starred
         global_updated = False
-        for entry in self.global_history:
+        for i, entry in enumerate(self.global_history):
             if entry["id"] == entry_id:
                 entry["starred"] = starred
                 global_updated = True
+                if starred:
+                    # Remove from current position
+                    starred_entry = self.global_history.pop(i)
+                    # Insert at the beginning
+                    self.global_history.insert(0, starred_entry)
                 break
 
         return local_updated or global_updated
 
     def update_global_star_status(self, entry_id: str, starred: bool) -> bool:
         """Update star status for a global history entry and sync with local histories"""
-        # Update in global history
+        # Update in global history and move to top if starred
         global_updated = False
         tool_name = None
-        for entry in self.global_history:
+        for i, entry in enumerate(self.global_history):
             if entry["id"] == entry_id:
                 entry["starred"] = starred
                 tool_name = entry["tool_name"]
                 global_updated = True
+                if starred:
+                    # Remove from current position
+                    starred_entry = self.global_history.pop(i)
+                    # Insert at the beginning
+                    self.global_history.insert(0, starred_entry)
                 break
 
-        # Update in local history if tool exists
+        # Update in local history if tool exists and move to top if starred
         local_updated = False
         if tool_name and tool_name in self.history_data:
-            for entry in self.history_data[tool_name]:
+            for i, entry in enumerate(self.history_data[tool_name]):
                 if entry["id"] == entry_id:
                     entry["starred"] = starred
                     local_updated = True
+                    if starred:
+                        # Remove from current position
+                        starred_entry = self.history_data[tool_name].pop(i)
+                        # Insert at the beginning
+                        self.history_data[tool_name].insert(0, starred_entry)
                     break
 
         return global_updated or local_updated

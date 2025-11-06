@@ -491,8 +491,22 @@ def get_history_entry(tool_name, entry_id):
 def delete_history_entry(tool_name, entry_id):
     if not validate_tool_name(tool_name):
         return jsonify({'error': 'Invalid tool name'}), 400
-    
+
     try:
+        # Check if entry is starred before attempting delete
+        entry = history_manager.get_history_entry(tool_name, entry_id)
+        if entry:
+            # Get the full entry to check starred status
+            full_entry = None
+            if tool_name in history_manager.history_data:
+                for e in history_manager.history_data[tool_name]:
+                    if e["id"] == entry_id:
+                        full_entry = e
+                        break
+
+            if full_entry and full_entry.get("starred", False):
+                return jsonify({'error': 'Cannot delete starred items. Remove the star first.'}), 403
+
         success = history_manager.delete_history_entry(tool_name, entry_id)
         if success:
             return jsonify({'success': True, 'message': 'History entry deleted'})
@@ -569,6 +583,19 @@ def get_global_history_entry(entry_id):
 def delete_global_history_entry(entry_id):
     """Delete specific global history entry"""
     try:
+        # Check if entry is starred before attempting delete
+        entry = history_manager.get_global_history_entry(entry_id)
+        if entry:
+            # Get the full entry to check starred status
+            full_entry = None
+            for e in history_manager.global_history:
+                if e["id"] == entry_id:
+                    full_entry = e
+                    break
+
+            if full_entry and full_entry.get("starred", False):
+                return jsonify({'error': 'Cannot delete starred items. Remove the star first.'}), 403
+
         success = history_manager.delete_global_history_entry(entry_id)
         if success:
             return jsonify({'success': True, 'message': 'Global history entry deleted'})

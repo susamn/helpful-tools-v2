@@ -288,13 +288,14 @@ class HistoryManager {
             const response = await fetch(`/api/history/${this.toolName}/${entryId}`, {
                 method: 'DELETE'
             });
-            
+
             if (response.ok) {
                 this.showMessage('History item deleted', 'success');
                 this.loadHistory(); // Refresh local history list
                 this.loadGlobalHistory(); // Refresh global history list
             } else {
-                this.showMessage('Failed to delete history item', 'error');
+                const result = await response.json();
+                this.showMessage(result.error || 'Failed to delete history item', 'error');
             }
         } catch (error) {
             console.error('Error deleting history item:', error);
@@ -310,13 +311,14 @@ class HistoryManager {
             const response = await fetch(`/api/global-history/${entryId}`, {
                 method: 'DELETE'
             });
-            
+
             if (response.ok) {
                 this.showMessage('History item deleted', 'success');
                 this.loadHistory(); // Refresh local history list
                 this.loadGlobalHistory(); // Refresh global history list
             } else {
-                this.showMessage('Failed to delete history item', 'error');
+                const result = await response.json();
+                this.showMessage(result.error || 'Failed to delete history item', 'error');
             }
         } catch (error) {
             console.error('Error deleting global history item:', error);

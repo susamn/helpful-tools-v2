@@ -177,6 +177,28 @@
     color: #333;
 }
 
+.hist-star-btn {
+    background: transparent;
+    color: #888;
+    border: none;
+    padding: 2px 6px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-left: 4px;
+    opacity: 0.7;
+    transition: all 0.2s;
+}
+
+.hist-star-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.hist-star-btn.starred {
+    color: #ffd700;
+    opacity: 1;
+}
+
 .hist-delete-btn {
     background: #ff4444;
     color: white;
