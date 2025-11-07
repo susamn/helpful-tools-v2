@@ -5,7 +5,8 @@
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:coverageIde": "jest --coverage --coverageReporters=lcov --coverageDirectory=coverage"
   },
   "keywords": [
     "json",

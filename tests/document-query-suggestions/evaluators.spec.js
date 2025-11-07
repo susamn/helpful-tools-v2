@@ -158,6 +158,53 @@ describe('Document Query Suggestions - Evaluators', () => {
         };
         await expect(evaluator.evaluate(document, '$.store..invalid-path')).rejects.toThrow('JSONPath evaluation failed: Lexical error on line 1. Unrecognized text.');
     });
+
+    describe('getSuggestions', () => {
+        test('should provide root suggestions for an object', async () => {
+            const suggestions = await evaluator.getSuggestions(document, '$');
+            const suggestionTexts = suggestions.map(s => s.text);
+            expect(suggestionTexts).toContain('$.store');
+            expect(suggestionTexts).toContain('$..*');
+        });
+
+        test('should provide property suggestions after a dot', async () => {
+            const suggestions = await evaluator.getSuggestions(document, '$.store.');
+            const suggestionTexts = suggestions.map(s => s.text);
+            expect(suggestionTexts).toContain('book');
+            expect(suggestionTexts).toContain('bicycle');
+        });
+
+        test('should provide array suggestions after a bracket', async () => {
+            const suggestions = await evaluator.getSuggestions(document, '$.store.book[');
+            const suggestionTexts = suggestions.map(s => s.text);
+            expect(suggestionTexts).toContain('*]');
+            expect(suggestionTexts).toContain('0]');
+            expect(suggestionTexts).toContain('?(@.price > 7.95)]');
+        });
+
+        test('should provide partial property suggestions', async () => {
+            const suggestions = await evaluator.getSuggestions(document, '$.store.b');
+            const suggestionTexts = suggestions.map(s => s.text);
+            expect(suggestionTexts).toContain('book');
+            expect(suggestionTexts).toContain('bicycle');
+        });
+
+        test('should provide pipe function suggestions', async () => {
+            const suggestions = await evaluator.getSuggestions(document, '$.store.book |');
+            const suggestionTexts = suggestions.map(s => s.text);
+            expect(suggestionTexts).toContain('filter()');
+            expect(suggestionTexts).toContain('sort()');
+        });
+    });
+
+    describe('Metadata functions', () => {
+        test('should return syntax info', () => {
+            const syntaxInfo = evaluator.getSyntaxInfo();
+            expect(syntaxInfo.name).toBe('JSONPathEvaluator');
+            expect(syntaxInfo.operators).toBeInstanceOf(Array);
+            expect(syntaxInfo.examples).toBeInstanceOf(Array);
+        });
+    });
   });
 
   describe('YQEvaluator', () => {

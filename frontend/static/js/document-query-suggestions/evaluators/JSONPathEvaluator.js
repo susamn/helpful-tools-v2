@@ -275,65 +275,63 @@ class JSONPathEvaluator extends QueryEvaluator {
 
                 // Add filter suggestions if array contains objects
                 if (target.length > 0 && typeof target[0] === 'object' && target[0] !== null) {
-                    const sampleKeys = Object.keys(target[0]).slice(0, 3);
-                    sampleKeys.forEach(key => {
-                        suggestions.push({
-                            text: `?(@.${key})]`,
-                            insertText: partialQuery + `?(@.${key})]`,
-                            type: 'filter',
-                            description: `Filter by ${key} existence`
-                        });
-
-                        const sampleValue = target[0][key];
-                        if (typeof sampleValue === 'string') {
-                            suggestions.push({
-                                text: `?(@.${key} == '${sampleValue}')]`,
-                                insertText: partialQuery + `?(@.${key} == '${sampleValue}')]`,
-                                type: 'filter',
-                                description: `Filter by ${key} equals '${sampleValue}'`
-                            });
-                        } else if (typeof sampleValue === 'number') {
-                            suggestions.push({
-                                text: `?(@.${key} > ${sampleValue - 1})]`,
-                                insertText: partialQuery + `?(@.${key} > ${sampleValue - 1})]`,
-                                type: 'filter',
-                                description: `Filter by ${key} greater than ${sampleValue - 1}`
-                            });
-                        }
-                    });
-                }
-
-                // Add slice suggestions
-                if (target.length > 2) {
-                    suggestions.push(
-                        {
-                            text: '0:2]',
-                            insertText: partialQuery + '0:2]',
-                            type: 'slice',
-                            description: 'First 2 elements (slice)'
-                        },
-                        {
-                            text: '1:]',
-                            insertText: partialQuery + '1:]',
-                            type: 'slice',
-                            description: 'All except first element'
-                        },
-                        {
-                            text: ':3]',
-                            insertText: partialQuery + ':3]',
-                            type: 'slice',
-                            description: 'First 3 elements'
-                        }
-                    );
-                }
-            }
-
-            return suggestions;
-        } catch (error) {
-            return [];
-        }
-    }
-
+                                        const sampleKeys = Object.keys(target[0]);
+                                        sampleKeys.forEach(key => {
+                                            suggestions.push({
+                                                text: `?(@.${key})]`,
+                                                insertText: partialQuery + `?(@.${key})]`,
+                                                type: 'filter',
+                                                description: `Filter by ${key} existence`
+                                            });
+                    
+                                            const sampleValue = target[0][key];
+                                            if (typeof sampleValue === 'string') {
+                                                suggestions.push({
+                                                    text: `?(@.${key} == '${sampleValue}')]`,
+                                                    insertText: partialQuery + `?(@.${key} == '${sampleValue}')]`,
+                                                    type: 'filter',
+                                                    description: `Filter by ${key} equals '${sampleValue}'`
+                                                });
+                                                                    } else if (typeof sampleValue === 'number') {
+                                                                        suggestions.push({
+                                                                            text: `?(@.${key} > ${(sampleValue - 1).toFixed(2)})]`,
+                                                                            insertText: partialQuery + `?(@.${key} > ${(sampleValue - 1).toFixed(2)})]`,
+                                                                            type: 'filter',
+                                                                            description: `Filter by ${key} greater than ${(sampleValue - 1).toFixed(2)}`
+                                                                        });
+                                                                    }
+                                                                });
+                                                            }
+                                            
+                                                            // Add slice suggestions
+                                                            if (target.length > 2) {
+                                                                suggestions.push(
+                                                                    {
+                                                                        text: '0:2]',
+                                                                        insertText: partialQuery + '0:2]',
+                                                                        type: 'slice',
+                                                                        description: 'First 2 elements (slice)'
+                                                                    },
+                                                                    {
+                                                                        text: '1:]',
+                                                                        insertText: partialQuery + '1:]',
+                                                                        type: 'slice',
+                                                                        description: 'All except first element'
+                                                                    },
+                                                                    {
+                                                                        text: ':3]',
+                                                                        insertText: partialQuery + ':3]',
+                                                                        type: 'slice',
+                                                                        description: 'First 3 elements'
+                                                                    }
+                                                                );
+                                                            }
+                                                        }
+                                                        return suggestions;
+                                                    } catch (error) {
+                                                        return [];
+                                                    }
+                                                }
     /**
      * Calculate fuzzy match score between input and target
      */
