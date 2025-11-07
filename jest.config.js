@@ -2,7 +2,7 @@ module.exports = {
   testEnvironment: 'jsdom',
   testMatch: [
     '**/tests/**/*.spec.js',
-    '**/tests/**/*.test.js',
+    '!**/tests/**/*.test.js',  // Exclude .test.js files (they use custom TestRunner)
     '!**/tests/**/*.html'
   ],
   collectCoverageFrom: [

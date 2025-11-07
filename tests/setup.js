@@ -43,4 +43,28 @@ global.validationUtils = {
   validateJson: jest.fn()
 };
 
+// Mock WorkerManager for web workers
+global.WorkerManager = class WorkerManager {
+  constructor(workerPath) {
+    this.ready = true;
+  }
+  isReady() {
+    return this.ready;
+  }
+  postMessage() {
+    return Promise.resolve();
+  }
+  terminate() {}
+};
+
+// Mock AutocompleteAdapter for JSONPath autocomplete
+global.AutocompleteAdapter = class AutocompleteAdapter {
+  constructor(element, options) {
+    this.element = element;
+    this.options = options;
+  }
+  updateDocument() {}
+  destroy() {}
+};
+
 console.log('✅ Jest setup complete - globals and mocks ready');
