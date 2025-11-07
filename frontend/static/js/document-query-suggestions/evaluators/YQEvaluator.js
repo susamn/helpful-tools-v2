@@ -44,6 +44,15 @@ class YQEvaluator extends QueryEvaluator {
     }
 
     /**
+     * Evaluate union (comma-separated) yq queries
+     */
+    evaluateUnionQuery(document, query) {
+        const expressions = this.splitUnionQuery(query);
+        const results = expressions.map(expr => this.evaluateSingleQuery(document, expr));
+        return this.combineUnionResults(results);
+    }
+
+    /**
      * Evaluate pipe-based yq query
      */
     evaluatePipeQuery(document, query) {
@@ -123,15 +132,27 @@ class YQEvaluator extends QueryEvaluator {
             if (!cleanPath) return [document];
 
             const parts = this.parsePath(cleanPath);
-            let result = document;
+            let results = [document];
 
             for (const part of parts) {
-                result = this.applyPathPart(result, part);
-                if (result === undefined) break;
+                let nextResults = [];
+                for (const item of results) {
+                    const res = this.applyPathPart(item, part);
+                    if (res !== undefined) {
+                        if (Array.isArray(res) && (part.value === '[]' || part.value.includes(':'))) {
+                             nextResults.push(...res);
+                        } else {
+                            nextResults.push(res);
+                        }
+                    }
+                }
+                results = nextResults;
             }
-
-            return result !== undefined ? (Array.isArray(result) ? result : [result]) : [];
+            return results;
         } catch (error) {
+            if (error.message.startsWith("Invalid path:")) {
+                throw error;
+            }
             return [];
         }
     }
@@ -140,6 +161,9 @@ class YQEvaluator extends QueryEvaluator {
      * Parse yq path into components
      */
     parsePath(path) {
+        if (path.includes('..')) {
+            throw new Error("Invalid path: unexpected '..'");
+        }
         const parts = [];
         let current = '';
         let inBrackets = false;
@@ -168,6 +192,11 @@ class YQEvaluator extends QueryEvaluator {
                 if (current) {
                     parts.push({ type: 'property', value: current });
                     current = '';
+                } else {
+                    const lastPart = parts[parts.length - 1];
+                    if (!lastPart || lastPart.type !== 'array') {
+                        throw new Error("Invalid path: unexpected '..'");
+                    }
                 }
             } else {
                 current += char;
@@ -186,6 +215,9 @@ class YQEvaluator extends QueryEvaluator {
      */
     applyPathPart(obj, part) {
         if (part.type === 'property') {
+            if (Array.isArray(obj)) {
+                return obj.map(item => this.applyPathPart(item, part)).filter(i => i !== undefined);
+            }
             return obj && typeof obj === 'object' ? obj[part.value] : undefined;
         } else if (part.type === 'array') {
             const indexStr = part.value.slice(1, -1); // Remove brackets
