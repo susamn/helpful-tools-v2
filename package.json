@@ -1,0 +1,25 @@
+{
+  "name": "helpful-tools-v2",
+  "version": "1.0.0",
+  "description": "JSON/YAML/XML tools with advanced querying and validation",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "keywords": [
+    "json",
+    "yaml",
+    "xml",
+    "jsonpath",
+    "testing"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@jest/globals": "^30.2.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "jsonpath": "^1.1.1"
+  }
+}

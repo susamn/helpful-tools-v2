@@ -96,6 +96,11 @@ class JSONPathEvaluator extends QueryEvaluator {
                 return this.getRootSuggestions(document);
             }
 
+            // Pipe function suggestions (after |)
+            if (partialQuery.includes('|') && this.options.enableFunctions) {
+                return this.getPipeFunctionSuggestions(document, partialQuery, context);
+            }
+
             // Property access (ends with .)
             if (partialQuery.endsWith('.')) {
                 return this.getPropertySuggestions(document, partialQuery, context);
@@ -522,6 +527,50 @@ class JSONPathEvaluator extends QueryEvaluator {
             { name: 'keys', description: 'Object keys' },
             { name: 'values', description: 'Object values' }
         ];
+    }
+
+    /**
+     * Get pipe function suggestions
+     */
+    getPipeFunctionSuggestions(document, partialQuery, context) {
+        const suggestions = [];
+
+        // Extract the part after the last pipe
+        const lastPipeIndex = partialQuery.lastIndexOf('|');
+        const afterPipe = partialQuery.substring(lastPipeIndex + 1).trim();
+
+        // Available functions for JSONPath piping
+        const functions = [
+            { name: 'list', description: 'Convert to array (useful for JSONL)' },
+            { name: 'filter', description: 'Filter array elements by expression', hasParam: true },
+            { name: 'uniq', description: 'Get unique values', hasParam: false },
+            { name: 'count', description: 'Count elements' },
+            { name: 'flatten', description: 'Flatten nested arrays' },
+            { name: 'keys', description: 'Get object keys' },
+            { name: 'values', description: 'Get object values' },
+            { name: 'sort', description: 'Sort array' },
+            { name: 'reverse', description: 'Reverse array' },
+            { name: 'first', description: 'Get first element' },
+            { name: 'last', description: 'Get last element' }
+        ];
+
+        // If there's text after the pipe, filter functions that match
+        const filtered = afterPipe
+            ? functions.filter(f => f.name.toLowerCase().startsWith(afterPipe.toLowerCase()))
+            : functions;
+
+        filtered.forEach(func => {
+            const funcText = func.hasParam ? `${func.name}()` : `${func.name}()`;
+            suggestions.push({
+                text: funcText,
+                displayText: funcText,
+                type: 'function',
+                description: func.description,
+                insertText: partialQuery.substring(0, lastPipeIndex + 1) + ' ' + funcText
+            });
+        });
+
+        return suggestions;
     }
 
     /**
