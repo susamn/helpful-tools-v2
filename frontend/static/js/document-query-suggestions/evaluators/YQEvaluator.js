@@ -289,6 +289,9 @@ class YQEvaluator extends QueryEvaluator {
 
             // Handle pipe operations
             if (partialQuery.includes('|')) {
+                if (this.isFunctionContext(partialQuery)) {
+                    return this.getFunctionSuggestions(document, partialQuery, context);
+                }
                 return this.getPipeSuggestions(document, partialQuery, context);
             }
 
