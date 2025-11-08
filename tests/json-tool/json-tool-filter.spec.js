@@ -14,14 +14,17 @@ document.body.innerHTML = `
   <button id="minifyBtn"></button>
   <button id="stringifyBtn"></button>
   <button id="clearBtn"></button>
+  <button id="saveBtn"></button>
+  <div id="saveTooltip">
+    <input id="saveDescriptionInput" />
+    <button id="saveTooltipSave"></button>
+    <button id="saveTooltipCancel"></button>
+  </div>
   <button id="copyBtn"></button>
-  <button id="copyFormattedBtn"></button>
   <button id="loadFromSourceBtn"></button>
   <input id="fileInput">
   <button id="uploadFileBtn"></button>
   <span id="filePathLabel"></span>
-  <button id="expandAllBtn"></button>
-  <button id="collapseAllBtn"></button>
   <button id="toggleMarkupBtn"></button>
   <select id="indentType"></select>
   <select id="indentSize"></select>
@@ -41,6 +44,11 @@ document.body.innerHTML = `
   <div id="jsonArrays"></div>
   <div id="jsonProperties"></div>
 `;
+
+// Load shared JSONPath functions first
+const sharedFunctions = require('../../frontend/static/js/shared/jsonpath-functions.js');
+// Make shared functions globally available (as they would be in browser)
+Object.assign(global, sharedFunctions);
 
 // Load JsonTool after DOM setup
 const JsonTool = require('../../frontend/static/js/json-tool.js');
@@ -642,7 +650,7 @@ describe('JSON Tool - Filter Function', () => {
 
   describe('Full Pipeline Integration Tests', () => {
     // Helper to process full JSONPath expression with functions
-    function processFullExpression(jsonlData, expression) {
+    async function processFullExpression(jsonlData, expression) {
       // Parse JSONL into objects
       const lines = jsonlData.trim().split('\n');
       const jsonObjects = lines.map(line => JSON.parse(line.trim()));
@@ -664,7 +672,7 @@ describe('JSON Tool - Filter Function', () => {
         });
 
         for (const func of otherFunctions) {
-          result = formatter.applyFunction(func, result);
+          result = await formatter.applyFunction(func, result);
         }
         return result;
       } else {
@@ -687,82 +695,82 @@ describe('JSON Tool - Filter Function', () => {
         // Apply functions
         let result = allValues;
         for (const func of functions) {
-          result = formatter.applyFunction(func, result);
+          result = await formatter.applyFunction(func, result);
         }
 
         return result;
       }
     }
 
-    test('should work with flatten() and filter(contains()) on JSONL data', () => {
+    test('should work with flatten() and filter(contains()) on JSONL data', async () => {
       const jsonlData = `{"order_id": "O1001", "products": [{"code": "P001", "name": "Wireless Mouse", "price": 25.99}, {"code": "P002", "name": "Mechanical Keyboard", "price": 79.50}]}
 {"order_id": "O1002", "products": [{"code": "P003", "name": "USB-C Cable", "price": 9.99}]}
 {"order_id": "O1003", "products": [{"code": "P005", "name": "Bluetooth Headphones", "price": 59.99}]}`;
 
-      const result = processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"Bluetooth"))');
+      const result = await processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"Bluetooth"))');
 
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Bluetooth Headphones');
       expect(result[0].code).toBe('P005');
     });
 
-    test('should find multiple products with substring match', () => {
+    test('should find multiple products with substring match', async () => {
       const jsonlData = `{"order_id": "O1001", "products": [{"code": "P001", "name": "Wireless Mouse", "price": 25.99}]}
 {"order_id": "O1002", "products": [{"code": "P007", "name": "Mouse Pad", "price": 7.99}]}
 {"order_id": "O1003", "products": [{"code": "P003", "name": "Keyboard", "price": 79.50}]}`;
 
-      const result = processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"Mouse"))');
+      const result = await processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"Mouse"))');
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toContain('Mouse');
       expect(result[1].name).toContain('Mouse');
     });
 
-    test('should work with case-insensitive search', () => {
+    test('should work with case-insensitive search', async () => {
       const jsonlData = `{"order_id": "O1001", "products": [{"code": "P001", "name": "USB-C Cable", "price": 9.99}]}
 {"order_id": "O1002", "products": [{"code": "P002", "name": "USB Hub", "price": 29.99}]}`;
 
-      const result = processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"usb"))');
+      const result = await processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"usb"))');
 
       expect(result).toHaveLength(2);
     });
 
-    test('should return empty array when no matches found', () => {
+    test('should return empty array when no matches found', async () => {
       const jsonlData = `{"order_id": "O1001", "products": [{"code": "P001", "name": "Mouse", "price": 25.99}]}
 {"order_id": "O1002", "products": [{"code": "P002", "name": "Keyboard", "price": 79.50}]}`;
 
-      const result = processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"Bluetooth"))');
+      const result = await processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"Bluetooth"))');
 
       expect(result).toHaveLength(0);
     });
 
-    test('should handle special characters in search term', () => {
+    test('should handle special characters in search term', async () => {
       const jsonlData = `{"order_id": "O1001", "products": [{"code": "P001", "name": "USB-C Cable", "price": 9.99}]}
 {"order_id": "O1002", "products": [{"code": "P002", "name": "USB Hub", "price": 29.99}]}`;
 
-      const result = processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"USB-C"))');
+      const result = await processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.name,"USB-C"))');
 
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('USB-C Cable');
     });
 
-    test('should work with numeric exact match in pipeline', () => {
+    test('should work with numeric exact match in pipeline', async () => {
       const jsonlData = `{"order_id": "O1001", "products": [{"code": "P001", "name": "Mouse", "price": 25.99}]}
 {"order_id": "O1002", "products": [{"code": "P002", "name": "Keyboard", "price": 79.50}]}
 {"order_id": "O1003", "products": [{"code": "P003", "name": "Cable", "price": 25.99}]}`;
 
-      const result = processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.price,25.99))');
+      const result = await processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.price,25.99))');
 
       expect(result).toHaveLength(2);
       expect(result.every(p => p.price === 25.99)).toBe(true);
     });
 
-    test('should work with product code exact match', () => {
+    test('should work with product code exact match', async () => {
       const jsonlData = `{"order_id": "O1001", "products": [{"code": "P001", "name": "Mouse"}]}
 {"order_id": "O1002", "products": [{"code": "P002", "name": "Keyboard"}]}
 {"order_id": "O1003", "products": [{"code": "P001", "name": "Mouse"}]}`;
 
-      const result = processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.code,"P001"))');
+      const result = await processFullExpression(jsonlData, '$.products| flatten()|filter(contains($.code,"P001"))');
 
       expect(result).toHaveLength(2);
       expect(result.every(p => p.code === 'P001')).toBe(true);

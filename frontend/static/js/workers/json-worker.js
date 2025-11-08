@@ -6,6 +6,9 @@
 // Import JSONPath library for worker context
 importScripts('https://cdn.jsdelivr.net/npm/jsonpath@1.1.1/jsonpath.min.js');
 
+// Import shared JSONPath functions
+importScripts('../shared/jsonpath-functions.js');
+
 /**
  * Message handler - receives tasks from main thread
  */
@@ -327,111 +330,9 @@ function applyFunction(func, data) {
 }
 
 /**
- * Function implementations
+ * Note: Simple functions (list, uniq, count, flatten, keys, values, sort, reverse, first, last)
+ * are now loaded from shared/jsonpath-functions.js via importScripts()
  */
-function functionList(data) {
-    if (Array.isArray(data)) return data;
-    return [data];
-}
-
-function functionUniq(data, key = null) {
-    if (!Array.isArray(data)) return data;
-
-    if (data.length === 0 || typeof data[0] !== 'object') {
-        return [...new Set(data)];
-    }
-
-    if (key) {
-        const hasKey = data.some(item =>
-            typeof item === 'object' &&
-            item !== null &&
-            item.hasOwnProperty(key)
-        );
-
-        if (!hasKey) {
-            return [];
-        }
-    }
-
-    const seen = new Set();
-    return data.filter(item => {
-        let uniqueValue;
-        if (key && typeof item === 'object' && item !== null) {
-            uniqueValue = item[key];
-        } else {
-            uniqueValue = JSON.stringify(item);
-        }
-
-        if (seen.has(uniqueValue)) return false;
-        seen.add(uniqueValue);
-        return true;
-    });
-}
-
-function functionCount(data) {
-    if (Array.isArray(data)) {
-        return { count: data.length };
-    } else if (typeof data === 'object' && data !== null) {
-        return { count: Object.keys(data).length };
-    }
-    return { count: 1 };
-}
-
-function functionFlatten(data) {
-    if (!Array.isArray(data)) return data;
-    return data.flat(Infinity);
-}
-
-function functionKeys(data) {
-    if (Array.isArray(data)) {
-        return data.map(item =>
-            typeof item === 'object' && item !== null ? Object.keys(item) : []
-        ).flat();
-    } else if (typeof data === 'object' && data !== null) {
-        return Object.keys(data);
-    }
-    return [];
-}
-
-function functionValues(data) {
-    if (Array.isArray(data)) {
-        return data.map(item =>
-            typeof item === 'object' && item !== null ? Object.values(item) : item
-        ).flat();
-    } else if (typeof data === 'object' && data !== null) {
-        return Object.values(data);
-    }
-    return [data];
-}
-
-function functionSort(data) {
-    if (!Array.isArray(data)) return data;
-    return [...data].sort((a, b) => {
-        if (typeof a === 'string' && typeof b === 'string') {
-            return a.localeCompare(b);
-        }
-        return a < b ? -1 : a > b ? 1 : 0;
-    });
-}
-
-function functionReverse(data) {
-    if (!Array.isArray(data)) return data;
-    return [...data].reverse();
-}
-
-function functionFirst(data) {
-    if (Array.isArray(data) && data.length > 0) {
-        return data[0];
-    }
-    return data;
-}
-
-function functionLast(data) {
-    if (Array.isArray(data) && data.length > 0) {
-        return data[data.length - 1];
-    }
-    return data;
-}
 
 /**
  * filter(expression) - Filter array elements based on an expression

@@ -171,6 +171,13 @@ class JSONDocumentParser extends DocumentParser {
 
 
     /**
+     * Get root level suggestions for a document
+     */
+    getRootSuggestions(document) {
+        return this.generateSuggestionsForValue(document, '$');
+    }
+
+    /**
      * Get suggestions for a specific path
      */
     getPathSuggestions(document, path) {

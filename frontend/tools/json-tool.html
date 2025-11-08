@@ -946,12 +946,6 @@
         <button id="stringifyBtn">Stringify</button>
         <div class="separator"></div>
         <button id="clearBtn">Clear</button>
-        <button id="copyFormattedBtn">Copy Formatted</button>
-        <div class="separator"></div>
-        <button id="expandAllBtn">Expand All</button>
-        <button id="collapseAllBtn">Collapse All</button>
-        <div class="separator"></div>
-        <button id="toggleMarkupBtn">Remove Markup</button>
         <div class="separator"></div>
         <div class="indent-controls">
             <label>Indent:</label>
@@ -1046,6 +1040,7 @@ Example:
                             </div>
                         </div>
                         <button class="copy-btn" id="copyBtn">📋 Copy</button>
+                        <button class="copy-btn" id="toggleMarkupBtn">Markup</button>
                     </div>
                 </div>
                 <div class="panel-content">
@@ -1127,6 +1122,9 @@ Example:
 
     <!-- Web Worker for heavy processing -->
     <script src="/static/js/worker-manager.js"></script>
+
+    <!-- Shared JSONPath functions -->
+    <script src="/static/js/shared/jsonpath-functions.js"></script>
 
     <script src="/static/js/json-tool.js"></script>
 </body>

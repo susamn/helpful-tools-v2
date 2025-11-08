@@ -50,7 +50,6 @@ class JsonTool {
             saveTooltipSave: document.getElementById('saveTooltipSave'),
             saveTooltipCancel: document.getElementById('saveTooltipCancel'),
             copyBtn: document.getElementById('copyBtn'),
-            copyFormattedBtn: document.getElementById('copyFormattedBtn'),
             loadFromSourceBtn: document.getElementById('loadFromSourceBtn'),
 
             // File upload elements
@@ -60,8 +59,6 @@ class JsonTool {
             filePathTooltip: document.getElementById('filePathTooltip'),
 
             // Collapsible controls
-            expandAllBtn: document.getElementById('expandAllBtn'),
-            collapseAllBtn: document.getElementById('collapseAllBtn'),
             toggleMarkupBtn: document.getElementById('toggleMarkupBtn'),
 
             // Controls
@@ -164,11 +161,8 @@ class JsonTool {
             }
         });
         this.elements.copyBtn.addEventListener('click', () => this.copyOutput());
-        this.elements.copyFormattedBtn.addEventListener('click', () => this.copyFormatted());
 
         // Collapsible controls
-        this.elements.expandAllBtn.addEventListener('click', () => this.expandAll());
-        this.elements.collapseAllBtn.addEventListener('click', () => this.collapseAll());
         this.elements.toggleMarkupBtn.addEventListener('click', () => this.toggleMarkup());
 
         // File path tooltip functionality
@@ -901,8 +895,8 @@ class JsonTool {
      */
     toggleMarkup() {
         this.markupEnabled = !this.markupEnabled;
-        this.elements.toggleMarkupBtn.textContent = this.markupEnabled ? 'Remove Markup' : 'Add Markup';
-        
+        this.elements.toggleMarkupBtn.textContent = this.markupEnabled ? 'Text' : 'Markup';
+
         // Use the stored raw text to avoid corruption
         if (this.lastOutputText) {
             if (this.markupEnabled) {
@@ -915,34 +909,6 @@ class JsonTool {
                 this.elements.jsonOutput.value = this.lastOutputText;
             }
         }
-    }
-
-    /**
-     * Expand all collapsible elements
-     */
-    expandAll() {
-        document.querySelectorAll('.expand-collapse-btn').forEach(btn => {
-            btn.textContent = '-';
-            const content = btn.nextSibling;
-            if (content && content.classList && content.classList.contains('collapsed-content')) {
-                content.style.display = 'inline';
-                content.classList.remove('collapsed-content');
-            }
-        });
-    }
-
-    /**
-     * Collapse all collapsible elements
-     */
-    collapseAll() {
-        document.querySelectorAll('.expand-collapse-btn').forEach(btn => {
-            btn.textContent = '+';
-            const content = btn.nextSibling;
-            if (content) {
-                content.style.display = 'none';
-                content.classList.add('collapsed-content');
-            }
-        });
     }
 
     /**
@@ -1194,176 +1160,39 @@ class JsonTool {
 
         switch(funcName.toLowerCase()) {
             case 'list':
-                return this.functionList(data);
+                return functionList(data);  // Shared function
             case 'uniq':
             case 'unique':
-                return this.functionUniq(data, params[0]);
+                return functionUniq(data, params[0]);  // Shared function
             case 'count':
-                return this.functionCount(data);
+                return functionCount(data);  // Shared function
             case 'flatten':
-                return this.functionFlatten(data);
+                return functionFlatten(data);  // Shared function
             case 'keys':
-                return this.functionKeys(data);
+                return functionKeys(data);  // Shared function
             case 'values':
-                return this.functionValues(data);
+                return functionValues(data);  // Shared function
             case 'sort':
-                return this.functionSort(data);
+                return functionSort(data);  // Shared function
             case 'reverse':
-                return this.functionReverse(data);
+                return functionReverse(data);  // Shared function
             case 'first':
-                return this.functionFirst(data);
+                return functionFirst(data);  // Shared function
             case 'last':
-                return this.functionLast(data);
+                return functionLast(data);  // Shared function
             case 'filter':
-                return this.functionFilter(data, params[0]);
+                return this.functionFilter(data, params[0]);  // Main thread only (uses this)
             case 'compare':
-                return await this.functionCompare(data, params[0], params[1]);
+                return await this.functionCompare(data, params[0], params[1]);  // Main thread only (async/API)
             default:
                 throw new Error(`Unknown function: ${funcName}`);
         }
     }
 
     /**
-     * list() - Ensure result is an array
+     * Note: Simple functions (list, uniq, count, flatten, keys, values, sort, reverse, first, last)
+     * are now loaded from shared/jsonpath-functions.js and called directly (no duplication)
      */
-    functionList(data) {
-        if (Array.isArray(data)) return data;
-        return [data];
-    }
-
-    /**
-     * uniq(key?) - Get unique values
-     * @param {Array} data - The data to filter
-     * @param {string} key - Optional key to use for uniqueness in objects
-     */
-    functionUniq(data, key = null) {
-        if (!Array.isArray(data)) return data;
-
-        // Handle arrays of primitives
-        if (data.length === 0 || typeof data[0] !== 'object') {
-            return [...new Set(data)];
-        }
-
-        // If key is provided, validate it exists in at least one object
-        if (key) {
-            const hasKey = data.some(item =>
-                typeof item === 'object' &&
-                item !== null &&
-                item.hasOwnProperty(key)
-            );
-
-            if (!hasKey) {
-                console.warn(`uniq('${key}'): Key '${key}' does not exist in any objects. Returning empty array.`);
-                return [];
-            }
-        }
-
-        // Handle arrays of objects
-        const seen = new Set();
-        return data.filter(item => {
-            // If key is provided and item is an object, use that key for uniqueness
-            let uniqueValue;
-            if (key && typeof item === 'object' && item !== null) {
-                uniqueValue = item[key];
-            } else {
-                // Otherwise compare by entire object (JSON string)
-                uniqueValue = JSON.stringify(item);
-            }
-
-            if (seen.has(uniqueValue)) return false;
-            seen.add(uniqueValue);
-            return true;
-        });
-    }
-
-    /**
-     * count() - Count elements
-     */
-    functionCount(data) {
-        if (Array.isArray(data)) {
-            return { count: data.length };
-        } else if (typeof data === 'object' && data !== null) {
-            return { count: Object.keys(data).length };
-        }
-        return { count: 1 };
-    }
-
-    /**
-     * flatten() - Flatten nested arrays
-     */
-    functionFlatten(data) {
-        if (!Array.isArray(data)) return data;
-        return data.flat(Infinity);
-    }
-
-    /**
-     * keys() - Get object keys
-     */
-    functionKeys(data) {
-        if (Array.isArray(data)) {
-            return data.map(item =>
-                typeof item === 'object' && item !== null ? Object.keys(item) : []
-            ).flat();
-        } else if (typeof data === 'object' && data !== null) {
-            return Object.keys(data);
-        }
-        return [];
-    }
-
-    /**
-     * values() - Get object values
-     */
-    functionValues(data) {
-        if (Array.isArray(data)) {
-            return data.map(item =>
-                typeof item === 'object' && item !== null ? Object.values(item) : item
-            ).flat();
-        } else if (typeof data === 'object' && data !== null) {
-            return Object.values(data);
-        }
-        return [data];
-    }
-
-    /**
-     * sort() - Sort array
-     */
-    functionSort(data) {
-        if (!Array.isArray(data)) return data;
-        return [...data].sort((a, b) => {
-            if (typeof a === 'string' && typeof b === 'string') {
-                return a.localeCompare(b);
-            }
-            return a < b ? -1 : a > b ? 1 : 0;
-        });
-    }
-
-    /**
-     * reverse() - Reverse array
-     */
-    functionReverse(data) {
-        if (!Array.isArray(data)) return data;
-        return [...data].reverse();
-    }
-
-    /**
-     * first() - Get first element
-     */
-    functionFirst(data) {
-        if (Array.isArray(data) && data.length > 0) {
-            return data[0];
-        }
-        return data;
-    }
-
-    /**
-     * last() - Get last element
-     */
-    functionLast(data) {
-        if (Array.isArray(data) && data.length > 0) {
-            return data[data.length - 1];
-        }
-        return data;
-    }
 
     /**
      * filter(expression) - Filter array elements based on an expression
@@ -3166,12 +2995,11 @@ class JsonTool {
     }
 
     /**
-     * Copy formatted output to clipboard
+     * Copy output to clipboard
      */
-    async copyFormatted() {
-        // Always copy the raw text without markup
-        const output = this.lastOutputText || this.elements.jsonOutput.value;
-            
+    async copyOutput() {
+        const output = this.elements.jsonOutput.value;
+
         if (!output) {
             this.showMessage('No output to copy. Please format some JSON first.', 'warning');
             return;
@@ -3179,21 +3007,12 @@ class JsonTool {
 
         try {
             await navigator.clipboard.writeText(output);
-            this.showMessage('Formatted output copied to clipboard (markup removed)!', 'success');
+            this.showMessage('Output copied to clipboard!', 'success');
         } catch (error) {
             // Fallback for older browsers
-            try {
-                // Create a temporary textarea with the plain text
-                const textarea = document.createElement('textarea');
-                textarea.value = output;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                this.showMessage('Formatted output copied to clipboard (markup removed)!', 'success');
-            } catch (fallbackError) {
-                this.showMessage('Failed to copy to clipboard', 'error');
-            }
+            this.elements.jsonOutput.select();
+            document.execCommand('copy');
+            this.showMessage('Output copied to clipboard!', 'success');
         }
     }
 
@@ -3322,27 +3141,6 @@ class JsonTool {
         }
     }
 
-    /**
-     * Copy regular output to clipboard
-     */
-    async copyOutput() {
-        const output = this.elements.jsonOutput.value;
-        
-        if (!output) {
-            this.showMessage('No output to copy. Please format some JSON first.', 'warning');
-            return;
-        }
-
-        try {
-            await navigator.clipboard.writeText(output);
-            this.showMessage('Output copied to clipboard!', 'success');
-        } catch (error) {
-            // Fallback for older browsers
-            this.elements.jsonOutput.select();
-            document.execCommand('copy');
-            this.showMessage('Output copied to clipboard!', 'success');
-        }
-    }
 
     /**
      * Handle JSON parsing errors with detailed information
