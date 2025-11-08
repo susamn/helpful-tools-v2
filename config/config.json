@@ -9,6 +9,16 @@
     "scientific-calculator": 25,
     "jwt-decoder": 20
   },
+  "data_limits": {
+    "json-tool": 50,
+    "yaml-tool": 50,
+    "json-yaml-xml-converter": 40,
+    "text-diff": 25,
+    "regex-tester": 30,
+    "cron-parser": 20,
+    "scientific-calculator": 25,
+    "jwt-decoder": 20
+  },
   "global_history_limit": 100,
   "ui_config": {
     "history_button_position": "top-right",

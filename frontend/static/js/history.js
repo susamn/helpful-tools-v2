@@ -473,7 +473,7 @@ class HistoryManager {
      */
     switchHistoryTab(event) {
         const tabName = event.target.dataset.tab;
-        
+
         // Update tab buttons
         document.querySelectorAll('.hist-tab').forEach(tab => {
             tab.classList.remove('active');
@@ -482,15 +482,17 @@ class HistoryManager {
 
         // Update tab content
         const historyTab = document.getElementById('historyTab');
-        const copyTab = document.getElementById('copyTab');
-        
-        if (historyTab && copyTab) {
+        const dataTab = document.getElementById('dataTab');
+
+        if (historyTab && dataTab) {
             if (tabName === 'history') {
                 historyTab.style.display = 'block';
-                copyTab.style.display = 'none';
-            } else {
+                dataTab.style.display = 'none';
+            } else if (tabName === 'data') {
                 historyTab.style.display = 'none';
-                copyTab.style.display = 'block';
+                dataTab.style.display = 'block';
+                // Load data when tab is opened
+                this.loadData();
             }
         }
     }
@@ -652,10 +654,6 @@ class HistoryManager {
      * Clear all local history for this tool
      */
     async clearHistory() {
-        if (!confirm(`Are you sure you want to clear all ${this.toolName} history?`)) {
-            return;
-        }
-
         try {
             const response = await fetch(`/api/history/${this.toolName}`, {
                 method: 'DELETE'
@@ -671,6 +669,173 @@ class HistoryManager {
             console.error('Error clearing history:', error);
             this.showMessage('Failed to clear history', 'error');
         }
+    }
+
+    // ========== Data Storage Methods ==========
+
+    /**
+     * Add a new data entry with description
+     * @param {string} data - The data to save
+     * @param {string} description - User-provided description
+     */
+    async addDataEntry(data, description) {
+        try {
+            const response = await fetch(`/api/data/${this.toolName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    data: data,
+                    description: description
+                })
+            });
+
+            if (response.ok) {
+                this.showMessage('Data saved successfully!', 'success');
+                this.loadData(); // Refresh data display
+                return true;
+            } else {
+                const error = await response.json();
+                this.showMessage(error.error || 'Failed to save data', 'error');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error saving data:', error);
+            this.showMessage('Failed to save data', 'error');
+            return false;
+        }
+    }
+
+    /**
+     * Load and display saved data entries
+     */
+    async loadData() {
+        const dataList = document.getElementById('dataList');
+        if (!dataList) return;
+
+        try {
+            const response = await fetch(`/api/data/${this.toolName}?limit=20`);
+            const result = await response.json();
+
+            this.displayData(result.data || []);
+        } catch (error) {
+            console.error('Error loading data:', error);
+            dataList.innerHTML = '<div class="hist-item">Failed to load data</div>';
+        }
+    }
+
+    /**
+     * Display data items in the data tab
+     */
+    displayData(dataItems) {
+        const dataList = document.getElementById('dataList');
+        if (!dataList) return;
+
+        if (dataItems.length === 0) {
+            dataList.innerHTML = '<div class="hist-item hist-empty">No saved data available</div>';
+            return;
+        }
+
+        const dataHtml = dataItems.map(item => `
+            <div class="hist-item" data-id="${item.id}">
+                <div class="hist-item-header">
+                    <div class="hist-item-content">
+                        <div class="hist-meta">
+                            <span class="hist-id">ID: ${item.id}</span>
+                            <span class="hist-date">${this.formatTimestamp(item.timestamp)}</span>
+                        </div>
+                        <div class="hist-description">${this.escapeHtml(item.description)}</div>
+                    </div>
+                    <div class="hist-actions">
+                        <button class="hist-delete-btn" onclick="window.historyManager.deleteDataItem('${item.id}'); event.stopPropagation();">×</button>
+                    </div>
+                </div>
+                <div class="hist-preview">${this.escapeHtml(item.preview)}</div>
+            </div>
+        `).join('');
+
+        dataList.innerHTML = dataHtml;
+
+        // Add click handlers for loading data
+        dataList.querySelectorAll('.hist-item').forEach(item => {
+            item.addEventListener('click', () => {
+                this.loadDataEntry(item.dataset.id);
+            });
+        });
+    }
+
+    /**
+     * Load a specific data entry
+     */
+    async loadDataEntry(entryId) {
+        try {
+            const response = await fetch(`/api/data/${this.toolName}/${entryId}`);
+            const entry = await response.json();
+
+            if (entry.data && this.onDataLoad) {
+                this.onDataLoad(entry.data);
+                this.showMessage('Data loaded!', 'success');
+                // Close the popup
+                if (this.elements.historyPopup) {
+                    this.elements.historyPopup.classList.remove('show');
+                }
+            }
+        } catch (error) {
+            console.error('Error loading data entry:', error);
+            this.showMessage('Failed to load data', 'error');
+        }
+    }
+
+    /**
+     * Delete a specific data entry
+     */
+    async deleteDataItem(entryId) {
+        try {
+            const response = await fetch(`/api/data/${this.toolName}/${entryId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showMessage('Data deleted', 'success');
+                this.loadData(); // Refresh display
+            } else {
+                this.showMessage('Failed to delete data', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting data:', error);
+            this.showMessage('Failed to delete data', 'error');
+        }
+    }
+
+    /**
+     * Clear all saved data for this tool
+     */
+    async clearData() {
+        try {
+            const response = await fetch(`/api/data/${this.toolName}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showMessage('All data cleared successfully', 'success');
+                this.loadData(); // Refresh display
+            } else {
+                this.showMessage('Failed to clear data', 'error');
+            }
+        } catch (error) {
+            console.error('Error clearing data:', error);
+            this.showMessage('Failed to clear data', 'error');
+        }
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 }
 

@@ -14,6 +14,7 @@ class HistoryManager:
     def __init__(self):
         self.history_data: Dict[str, List[Dict]] = {}
         self.global_history: List[Dict] = []  # Global history across all tools
+        self.data_storage: Dict[str, List[Dict]] = {}  # Manual data storage per tool
         self.tool_colors: Dict[str, str] = {}  # Color assignments for tool labels
         self.config = self._load_config()
     
@@ -28,6 +29,10 @@ class HistoryManager:
     def _get_history_limit(self, tool_name: str) -> int:
         """Get history limit for a specific tool"""
         return self.config.get("history_limits", {}).get(tool_name, 20)
+
+    def _get_data_limit(self, tool_name: str) -> int:
+        """Get data storage limit for a specific tool"""
+        return self.config.get("data_limits", {}).get(tool_name, 20)
     
     def _get_tool_color(self, tool_name: str) -> str:
         """Get or assign a muted color for a tool label"""
@@ -385,6 +390,98 @@ class HistoryManager:
                     break
 
         return global_updated or local_updated
+
+    # ========== Data Storage Methods ==========
+
+    def add_data_entry(self, tool_name: str, data: str, description: str) -> Dict[str, Any]:
+        """Add a new data entry for a tool with a user-provided description"""
+        if tool_name not in self.data_storage:
+            self.data_storage[tool_name] = []
+
+        entry = {
+            "id": str(uuid.uuid4())[:8],
+            "timestamp": datetime.now().isoformat(),
+            "data": data,
+            "description": description,
+            "preview": self._generate_preview(data)
+        }
+
+        # Add to beginning of list (most recent first)
+        self.data_storage[tool_name].insert(0, entry)
+
+        # Maintain data limit
+        limit = self._get_data_limit(tool_name)
+        if len(self.data_storage[tool_name]) > limit:
+            # Remove oldest entries
+            self.data_storage[tool_name] = self.data_storage[tool_name][:limit]
+
+        return {
+            "success": True,
+            "entry_id": entry["id"],
+            "message": "Data entry added"
+        }
+
+    def get_data(self, tool_name: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get data entries for a tool"""
+        if tool_name not in self.data_storage:
+            return []
+
+        data_list = self.data_storage[tool_name]
+
+        if limit:
+            data_list = data_list[:limit]
+
+        # Return formatted data list
+        return [
+            {
+                "id": entry["id"],
+                "timestamp": entry["timestamp"],
+                "description": entry["description"],
+                "preview": entry["preview"],
+                "formatted_date": self._format_date(entry["timestamp"])
+            }
+            for entry in data_list
+        ]
+
+    def get_data_entry(self, tool_name: str, entry_id: str) -> Optional[Dict[str, Any]]:
+        """Get specific data entry"""
+        if tool_name not in self.data_storage:
+            return None
+
+        for entry in self.data_storage[tool_name]:
+            if entry["id"] == entry_id:
+                return {
+                    "id": entry["id"],
+                    "timestamp": entry["timestamp"],
+                    "data": entry["data"],
+                    "description": entry["description"],
+                    "preview": entry["preview"]
+                }
+
+        return None
+
+    def delete_data_entry(self, tool_name: str, entry_id: str) -> bool:
+        """Delete specific data entry for a tool"""
+        if tool_name not in self.data_storage:
+            return False
+
+        original_count = len(self.data_storage[tool_name])
+        self.data_storage[tool_name] = [
+            entry for entry in self.data_storage[tool_name]
+            if entry["id"] != entry_id
+        ]
+
+        return len(self.data_storage[tool_name]) < original_count
+
+    def clear_data(self, tool_name: str) -> Dict[str, Any]:
+        """Clear all data for a tool"""
+        if tool_name in self.data_storage:
+            del self.data_storage[tool_name]
+
+        return {
+            "success": True,
+            "message": f"Data cleared for {tool_name}"
+        }
 
 # Global instance
 history_manager = HistoryManager()

@@ -652,6 +652,83 @@ def clear_global_history():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+# Data Storage API Routes
+@app.route('/api/data/<tool_name>', methods=['POST'])
+def add_data(tool_name):
+    """Add a new data entry with description"""
+    if not validate_tool_name(tool_name):
+        return jsonify({'error': 'Invalid tool name'}), 400
+
+    try:
+        data = request.json
+        if not data or 'data' not in data or 'description' not in data:
+            return jsonify({'error': 'Missing data or description field'}), 400
+
+        input_data = sanitize_data(data['data'])
+        description = data['description'].strip()
+
+        if not description:
+            return jsonify({'error': 'Description cannot be empty'}), 400
+
+        result = history_manager.add_data_entry(tool_name, input_data, description)
+        return jsonify(result)
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/api/data/<tool_name>', methods=['GET'])
+def get_data(tool_name):
+    """Get all data entries for a tool"""
+    if not validate_tool_name(tool_name):
+        return jsonify({'error': 'Invalid tool name'}), 400
+
+    limit = request.args.get('limit', type=int)
+    data_list = history_manager.get_data(tool_name, limit)
+
+    return jsonify({
+        'tool': tool_name,
+        'data': data_list,
+        'count': len(data_list)
+    })
+
+@app.route('/api/data/<tool_name>/<entry_id>', methods=['GET'])
+def get_data_entry(tool_name, entry_id):
+    """Get specific data entry"""
+    if not validate_tool_name(tool_name):
+        return jsonify({'error': 'Invalid tool name'}), 400
+
+    entry = history_manager.get_data_entry(tool_name, entry_id)
+    if not entry:
+        return jsonify({'error': 'Data entry not found'}), 404
+
+    return jsonify(entry)
+
+@app.route('/api/data/<tool_name>/<entry_id>', methods=['DELETE'])
+def delete_data_entry(tool_name, entry_id):
+    """Delete specific data entry"""
+    if not validate_tool_name(tool_name):
+        return jsonify({'error': 'Invalid tool name'}), 400
+
+    try:
+        success = history_manager.delete_data_entry(tool_name, entry_id)
+        if success:
+            return jsonify({'success': True, 'message': 'Data entry deleted'})
+        else:
+            return jsonify({'error': 'Data entry not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/data/<tool_name>', methods=['DELETE'])
+def clear_data(tool_name):
+    """Clear all data for a tool"""
+    if not validate_tool_name(tool_name):
+        return jsonify({'error': 'Invalid tool name'}), 400
+
+    result = history_manager.clear_data(tool_name)
+    return jsonify(result)
+
 # Regex API Routes
 @app.route('/api/regex/explain', methods=['POST'])
 def explain_regex():
