@@ -96,14 +96,14 @@ class JSONPathEvaluator extends QueryEvaluator {
                 return this.getRootSuggestions(document);
             }
 
+            // Data history suggestions for compare() function - check BEFORE pipe functions
+            if (partialQuery.includes('compare(')) {
+                return await this.getDataHistorySuggestions(document, partialQuery, context);
+            }
+
             // Pipe function suggestions (after |)
             if (partialQuery.includes('|') && this.options.enableFunctions) {
                 return this.getPipeFunctionSuggestions(document, partialQuery, context);
-            }
-
-            // Data history suggestions for compare() function
-            if (partialQuery.includes('compare(')) {
-                return this.getDataHistorySuggestions(document, partialQuery, context);
             }
 
             // Property access (ends with .)
