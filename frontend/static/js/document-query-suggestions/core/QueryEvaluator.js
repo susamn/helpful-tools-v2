@@ -55,6 +55,7 @@ class QueryEvaluator {
      * @returns {Object} Parsed query structure
      */
     parseQuery(query) {
+        console.log('QueryEvaluator.parseQuery is about to throw an error for query:', query);
         throw new Error('parseQuery() method must be implemented by subclass');
     }
 

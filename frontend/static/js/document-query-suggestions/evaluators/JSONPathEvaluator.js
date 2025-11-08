@@ -430,6 +430,9 @@ class JSONPathEvaluator extends QueryEvaluator {
      * Parse JSONPath query structure
      */
     parseQuery(query) {
+        if (query.includes('..')) {
+            throw new Error("Invalid JSONPath: unexpected '..'");
+        }
         const structure = {
             original: query,
             expressions: [],
@@ -449,7 +452,7 @@ class JSONPathEvaluator extends QueryEvaluator {
         // Analyze each expression
         structure.expressions.forEach(expr => {
             if (expr.includes('?')) structure.hasFilters = true;
-            if (expr.includes('..')) structure.hasRecursive = true;
+            if (expr.includes('..')) structure.hasRecursive = true; // This will now be caught by the initial check
             if (expr.includes(':')) structure.hasSlicing = true;
         });
 
