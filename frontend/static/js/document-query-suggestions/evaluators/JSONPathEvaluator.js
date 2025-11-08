@@ -101,6 +101,11 @@ class JSONPathEvaluator extends QueryEvaluator {
                 return this.getPipeFunctionSuggestions(document, partialQuery, context);
             }
 
+            // Data history suggestions for compare() function
+            if (partialQuery.includes('compare(')) {
+                return this.getDataHistorySuggestions(document, partialQuery, context);
+            }
+
             // Property access (ends with .)
             if (partialQuery.endsWith('.')) {
                 return this.getPropertySuggestions(document, partialQuery, context);
@@ -427,6 +432,127 @@ class JSONPathEvaluator extends QueryEvaluator {
     }
 
     /**
+     * Get data history suggestions for compare() function
+     */
+    async getDataHistorySuggestions(document, partialQuery, context) {
+        const suggestions = [];
+
+        try {
+            // Extract what's inside compare(
+            const compareMatch = partialQuery.match(/compare\(["']?([^"']*)/);
+            if (!compareMatch) return suggestions;
+
+            const partialId = compareMatch[1] || '';
+
+            // Get the tool name from context (passed from adapter)
+            const toolName = context?.toolName || 'json-tool';
+
+            // Fetch data history for current tool
+            const response = await fetch(`/api/data/${toolName}?limit=50`);
+            const result = await response.json();
+
+            if (!result.data || result.data.length === 0) {
+                suggestions.push({
+                    text: 'No saved data',
+                    displayText: 'No saved data available',
+                    type: 'data_history_empty',
+                    description: 'Save data using the 💾 Save button first',
+                    insertText: partialQuery
+                });
+                return suggestions;
+            }
+
+            // Filter based on partial ID if user started typing
+            const filteredData = partialId
+                ? result.data.filter(item =>
+                    item.id.toLowerCase().includes(partialId.toLowerCase()) ||
+                    item.description.toLowerCase().includes(partialId.toLowerCase())
+                  )
+                : result.data;
+
+            // Create suggestions for each data entry
+            for (const item of filteredData) {
+                // Determine the insert text based on data type
+                const insertText = await this.buildCompareInsertText(partialQuery, item, toolName);
+
+                suggestions.push({
+                    text: item.id,
+                    displayText: item.id,
+                    type: 'data_history',
+                    description: item.description,
+                    secondaryText: item.formatted_date,
+                    insertText: insertText,
+                    dataId: item.id,
+                    preview: item.preview
+                });
+            }
+
+            return suggestions;
+        } catch (error) {
+            console.error('Error fetching data history suggestions:', error);
+            return suggestions;
+        }
+    }
+
+    /**
+     * Build smart insert text for compare() based on data type
+     */
+    async buildCompareInsertText(partialQuery, dataItem, toolName) {
+        try {
+            // Fetch the full data entry to inspect its type
+            const response = await fetch(`/api/data/${toolName}/${dataItem.id}`);
+            const entry = await response.json();
+
+            if (!entry || !entry.data) {
+                // Fallback: simple completion
+                const beforeCompare = partialQuery.substring(0, partialQuery.indexOf('compare(') + 8);
+                return `${beforeCompare}"${dataItem.id}")`;
+            }
+
+            // Parse the saved data
+            let parsedData;
+            try {
+                parsedData = JSON.parse(entry.data);
+            } catch {
+                // If not valid JSON, just use simple completion
+                const beforeCompare = partialQuery.substring(0, partialQuery.indexOf('compare(') + 8);
+                return `${beforeCompare}"${dataItem.id}")`;
+            }
+
+            // Check if it's an array
+            if (!Array.isArray(parsedData)) {
+                // Not an array, simple completion
+                const beforeCompare = partialQuery.substring(0, partialQuery.indexOf('compare(') + 8);
+                return `${beforeCompare}"${dataItem.id}")`;
+            }
+
+            // Check if array of primitives or objects
+            if (parsedData.length === 0) {
+                const beforeCompare = partialQuery.substring(0, partialQuery.indexOf('compare(') + 8);
+                return `${beforeCompare}"${dataItem.id}")`;
+            }
+
+            const firstItem = parsedData[0];
+            const isPrimitive = typeof firstItem !== 'object' || firstItem === null;
+
+            const beforeCompare = partialQuery.substring(0, partialQuery.indexOf('compare(') + 8);
+
+            if (isPrimitive) {
+                // Array of primitives: simple completion
+                return `${beforeCompare}"${dataItem.id}")`;
+            } else {
+                // Array of objects: add matchBy parameter
+                return `${beforeCompare}"${dataItem.id}", { matchBy: "" })`;
+            }
+        } catch (error) {
+            console.error('Error building insert text:', error);
+            // Fallback
+            const beforeCompare = partialQuery.substring(0, partialQuery.indexOf('compare(') + 8);
+            return `${beforeCompare}"${dataItem.id}")`;
+        }
+    }
+
+    /**
      * Parse JSONPath query structure
      */
     parseQuery(query) {
@@ -544,6 +670,7 @@ class JSONPathEvaluator extends QueryEvaluator {
         const functions = [
             { name: 'list', description: 'Convert to array (useful for JSONL)' },
             { name: 'filter', description: 'Filter array elements by expression', hasParam: true },
+            { name: 'compare', description: 'Compare with saved data from history', hasParam: true },
             { name: 'uniq', description: 'Get unique values', hasParam: false },
             { name: 'count', description: 'Count elements' },
             { name: 'flatten', description: 'Flatten nested arrays' },

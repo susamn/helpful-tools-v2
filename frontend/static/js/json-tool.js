@@ -1181,7 +1181,7 @@ class JsonTool {
      * Apply function to JSONPath results
      * Handles both old format (string) and new format (object with name and params)
      */
-    applyFunction(func, data) {
+    async applyFunction(func, data) {
         // Handle both old string format and new object format
         let funcName, params;
         if (typeof func === 'string') {
@@ -1216,6 +1216,8 @@ class JsonTool {
                 return this.functionLast(data);
             case 'filter':
                 return this.functionFilter(data, params[0]);
+            case 'compare':
+                return await this.functionCompare(data, params[0], params[1]);
             default:
                 throw new Error(`Unknown function: ${funcName}`);
         }
@@ -1398,6 +1400,218 @@ class JsonTool {
             this.showMessage(`filter() error: ${error.message}`, 'error');
             return data;
         }
+    }
+
+    /**
+     * compare() - Compare current data with saved data from history
+     * @param {Array|Object} data - Current data
+     * @param {string} dataId - ID of saved data from history
+     * @param {Object|string} options - Optional comparison options (can be object or JSON string)
+     */
+    async functionCompare(data, dataId, options) {
+        // Validate dataId
+        if (!dataId || typeof dataId !== 'string') {
+            this.showMessage('compare() requires a data history ID as first parameter', 'error');
+            return data;
+        }
+
+        try {
+            // Fetch saved data from history using the historyManager
+            const savedEntry = await this.historyManager.getDataEntry(this.toolName, dataId);
+
+            if (!savedEntry || !savedEntry.data) {
+                this.showMessage(`Data with ID "${dataId}" not found in history`, 'error');
+                return data;
+            }
+
+            // Parse saved data
+            let savedData;
+            try {
+                savedData = JSON.parse(savedEntry.data);
+            } catch (error) {
+                this.showMessage(`Failed to parse saved data: ${error.message}`, 'error');
+                return data;
+            }
+
+            // Parse options if it's a string
+            let parsedOptions = {};
+            if (options) {
+                if (typeof options === 'string') {
+                    try {
+                        parsedOptions = JSON.parse(options);
+                    } catch (e) {
+                        // Try parsing as object literal
+                        try {
+                            parsedOptions = eval('(' + options + ')');
+                        } catch (err) {
+                            console.warn('Could not parse options:', options);
+                        }
+                    }
+                } else if (typeof options === 'object') {
+                    parsedOptions = options;
+                }
+            }
+
+            // Determine comparison type
+            const currentIsArray = Array.isArray(data);
+            const savedIsArray = Array.isArray(savedData);
+
+            if (currentIsArray && savedIsArray) {
+                return this.compareArrays(data, savedData, parsedOptions);
+            } else if (!currentIsArray && !savedIsArray && typeof data === 'object' && typeof savedData === 'object') {
+                return this.compareObjects(data, savedData, parsedOptions);
+            } else {
+                return this.comparePrimitives(data, savedData);
+            }
+        } catch (error) {
+            this.showMessage(`compare() error: ${error.message}`, 'error');
+            return data;
+        }
+    }
+
+    /**
+     * Compare two arrays
+     */
+    compareArrays(current, saved, options) {
+        const matchBy = options.matchBy || null;
+
+        const added = [];
+        const removed = [];
+        const common = [];
+        const modified = [];
+
+        // Find added and common/modified items
+        current.forEach(currentItem => {
+            const match = this.findMatchInArray(currentItem, saved, matchBy);
+            if (!match) {
+                added.push(currentItem);
+            } else if (!this.isDeepEqual(currentItem, match)) {
+                modified.push({
+                    current: currentItem,
+                    saved: match
+                });
+            } else {
+                common.push(currentItem);
+            }
+        });
+
+        // Find removed items
+        saved.forEach(savedItem => {
+            const match = this.findMatchInArray(savedItem, current, matchBy);
+            if (!match) {
+                removed.push(savedItem);
+            }
+        });
+
+        return {
+            type: "array_comparison",
+            current_count: current.length,
+            saved_count: saved.length,
+            added,
+            removed,
+            common,
+            modified,
+            summary: {
+                added_count: added.length,
+                removed_count: removed.length,
+                common_count: common.length,
+                modified_count: modified.length
+            }
+        };
+    }
+
+    /**
+     * Compare two objects
+     */
+    compareObjects(current, saved, options) {
+        const addedKeys = [];
+        const removedKeys = [];
+        const modifiedKeys = {};
+        const unchangedKeys = [];
+
+        const allKeys = new Set([...Object.keys(current), ...Object.keys(saved)]);
+
+        allKeys.forEach(key => {
+            const inCurrent = key in current;
+            const inSaved = key in saved;
+
+            if (inCurrent && !inSaved) {
+                addedKeys.push(key);
+            } else if (!inCurrent && inSaved) {
+                removedKeys.push(key);
+            } else if (!this.isDeepEqual(current[key], saved[key])) {
+                modifiedKeys[key] = {
+                    current: current[key],
+                    saved: saved[key]
+                };
+            } else {
+                unchangedKeys.push(key);
+            }
+        });
+
+        return {
+            type: "object_comparison",
+            added_keys: addedKeys,
+            removed_keys: removedKeys,
+            modified_keys: modifiedKeys,
+            unchanged_keys: unchangedKeys
+        };
+    }
+
+    /**
+     * Compare primitives
+     */
+    comparePrimitives(current, saved) {
+        return {
+            type: "primitive_comparison",
+            current,
+            saved,
+            equal: current === saved
+        };
+    }
+
+    /**
+     * Find matching item in array
+     */
+    findMatchInArray(item, array, matchBy) {
+        if (!matchBy) {
+            // Try to auto-detect matchBy field
+            if (typeof item === 'object' && item !== null) {
+                if ('id' in item) matchBy = 'id';
+                else if ('_id' in item) matchBy = '_id';
+                else if ('key' in item) matchBy = 'key';
+            }
+        }
+
+        if (matchBy && typeof item === 'object' && item !== null) {
+            return array.find(arrItem =>
+                typeof arrItem === 'object' && arrItem !== null && arrItem[matchBy] === item[matchBy]
+            );
+        }
+
+        // Fallback: compare by full object
+        return array.find(arrItem => this.isDeepEqual(arrItem, item));
+    }
+
+    /**
+     * Deep equality check
+     */
+    isDeepEqual(obj1, obj2) {
+        if (obj1 === obj2) return true;
+        if (obj1 == null || obj2 == null) return false;
+        if (typeof obj1 !== 'object' || typeof obj2 !== 'object') return false;
+
+        const keys1 = Object.keys(obj1);
+        const keys2 = Object.keys(obj2);
+
+        if (keys1.length !== keys2.length) return false;
+
+        for (const key of keys1) {
+            if (!keys2.includes(key)) return false;
+            if (!this.isDeepEqual(obj1[key], obj2[key])) return false;
+        }
+
+        return true;
     }
 
     /**
@@ -1897,10 +2111,16 @@ class JsonTool {
             // Check if the current data is JSONL
             const inputText = this.elements.jsonInput.value.trim();
             if (this.isJsonl(inputText)) {
-                this.performJsonlPathLookup(path, functions, nextPath);
+                await this.performJsonlPathLookup(path, functions, nextPath);
             } else {
-                // Check if we should use worker for large files
-                if (this.shouldUseWorker(outputText.length)) {
+                // Check if functions include 'compare' - if so, disable worker as it requires async API calls
+                const hasCompare = functions.some(f => {
+                    const funcName = typeof f === 'string' ? f : f.name;
+                    return funcName.toLowerCase() === 'compare';
+                });
+
+                // Check if we should use worker for large files (but not for compare function)
+                if (!hasCompare && this.shouldUseWorker(outputText.length)) {
                     this.showMessage('Processing JSONPath query on large file...', 'info');
 
                     try {
@@ -1925,10 +2145,10 @@ class JsonTool {
                         }
                     } catch (workerError) {
                         console.warn('Worker failed, falling back to synchronous:', workerError);
-                        this.performJsonPathLookupSync(outputText, path, functions, nextPath);
+                        await this.performJsonPathLookupSync(outputText, path, functions, nextPath);
                     }
                 } else {
-                    this.performJsonPathLookupSync(outputText, path, functions, nextPath);
+                    await this.performJsonPathLookupSync(outputText, path, functions, nextPath);
                 }
             }
         } catch (error) {
@@ -1939,7 +2159,7 @@ class JsonTool {
     /**
      * Synchronous JSONPath lookup (fallback and for small files)
      */
-    performJsonPathLookupSync(outputText, path, functions, nextPath) {
+    async performJsonPathLookupSync(outputText, path, functions, nextPath) {
         // Regular JSON path lookup
         const parsed = JSON.parse(outputText);
         const paths = path.split(',').map(p => p.trim());
@@ -1963,7 +2183,7 @@ class JsonTool {
         // Apply functions to results
         try {
             for (const func of functions) {
-                allResults = this.applyFunction(func, allResults);
+                allResults = await this.applyFunction(func, allResults);
             }
         } catch (funcError) {
             this.showMessage(`Function error: ${funcError.message}`, 'error');
@@ -2114,7 +2334,7 @@ class JsonTool {
     /**
      * Perform JSONPath lookup on JSONL data
      */
-    performJsonlPathLookup(path, functions = [], nextPath = null) {
+    async performJsonlPathLookup(path, functions = [], nextPath = null) {
         try {
             const inputText = this.elements.jsonInput.value.trim();
             const jsonObjects = this.parseJsonlObjects(inputText);
@@ -2142,7 +2362,7 @@ class JsonTool {
 
                 // Apply each function in sequence
                 for (const func of otherFunctions) {
-                    result = this.applyFunction(func, result);
+                    result = await this.applyFunction(func, result);
                 }
 
                 // If there's a nextPath, apply it to the result
@@ -2225,7 +2445,7 @@ class JsonTool {
                         const funcName = typeof func === 'string' ? func : func.name;
                         const funcParams = typeof func === 'string' ? [] : func.params;
                         console.log(`Applying function: ${funcName}`, funcParams.length > 0 ? `with params: ${funcParams}` : '');
-                        allValues = this.applyFunction(func, allValues);
+                        allValues = await this.applyFunction(func, allValues);
                         console.log('Result after function:', allValues);
                     }
                     finalResults = allValues;
@@ -2832,6 +3052,7 @@ class JsonTool {
             this.autocompleteAdapter = new AutocompleteAdapter(this.elements.jsonPathInput, {
                 documentType: 'json',
                 queryLanguage: 'jsonpath',
+                toolName: this.toolName, // Pass toolName for data history suggestions
                 maxSuggestions: 10,
                 debounceMs: 500,
                 showDescriptions: true,

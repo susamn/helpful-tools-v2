@@ -766,6 +766,18 @@ class HistoryManager {
     }
 
     /**
+     * Get a specific data entry (without loading into UI)
+     * Used by compare() function
+     */
+    async getDataEntry(toolName, entryId) {
+        const response = await fetch(`/api/data/${toolName}/${entryId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch data entry: ${response.statusText}`);
+        }
+        return await response.json();
+    }
+
+    /**
      * Load a specific data entry
      */
     async loadDataEntry(entryId) {

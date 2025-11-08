@@ -157,7 +157,8 @@ class DocumentQuerySuggestionEngine {
             replaceStart: expressionStart,
             replaceEnd: expressionEnd,
             beforeExpression: queryInput.substring(0, expressionStart),
-            afterExpression: queryInput.substring(expressionEnd)
+            afterExpression: queryInput.substring(expressionEnd),
+            toolName: this.options.toolName // Pass toolName for data history suggestions
         };
     }
 

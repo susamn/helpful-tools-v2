@@ -686,6 +686,36 @@
         .dqs-type-function .dqs-suggestion-text { color: #6600cc; }
         .dqs-type-filter .dqs-suggestion-text { color: #cc0066; }
 
+        /* Data history suggestions - light green */
+        .dqs-type-data_history {
+            background: #e8f5e9 !important;
+            border-left: 3px solid #4caf50;
+        }
+
+        .dqs-type-data_history .dqs-suggestion-text {
+            color: #2e7d32;
+            font-weight: 700;
+        }
+
+        .dqs-type-data_history .dqs-suggestion-description {
+            color: #558b2f;
+            font-size: 10px;
+        }
+
+        .dqs-type-data_history:hover {
+            background: #c8e6c9 !important;
+        }
+
+        .dqs-type-data_history.selected {
+            background: #4caf50 !important;
+            border-left-color: #2e7d32;
+        }
+
+        .dqs-type-data_history.selected .dqs-suggestion-text,
+        .dqs-type-data_history.selected .dqs-suggestion-description {
+            color: white;
+        }
+
         /* Function Suggestions Dropdown - Light Blue Theme */
         .func-dropdown {
             background: white;
