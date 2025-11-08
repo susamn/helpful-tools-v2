@@ -763,6 +763,72 @@
             position: relative;
         }
 
+        /* Save tooltip input styling */
+        .save-tooltip {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 4px;
+            background: white;
+            border: 1px solid #a0a0a0;
+            border-radius: 4px;
+            padding: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            z-index: 1000;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+            min-width: 250px;
+        }
+
+        .save-tooltip input {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #c0c0c0;
+            border-radius: 2px;
+            font-size: 11px;
+            outline: none;
+        }
+
+        .save-tooltip input:focus {
+            border-color: #4a90e2;
+        }
+
+        .save-tooltip-btn {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            min-width: 24px;
+        }
+
+        .save-tooltip-btn:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+
+        .save-tooltip-save {
+            background: linear-gradient(to bottom, #4a90e2, #357abd);
+            color: white;
+            border: 1px solid #2968a3;
+        }
+
+        .save-tooltip-save:hover {
+            background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
+        }
+
+        .save-tooltip-cancel {
+            background: linear-gradient(to bottom, #f44336, #d32f2f);
+            color: white;
+            border: 1px solid #b71c1c;
+        }
+
+        .save-tooltip-cancel:hover {
+            background: linear-gradient(to bottom, #e53935, #c62828);
+        }
+
     </style>
 </head>
 <body>
@@ -818,7 +884,7 @@
             <div class="hist-popup" id="historyPopup">
                 <div class="hist-tabs">
                     <button class="hist-tab active" data-tab="history">History</button>
-                    <button class="hist-tab" data-tab="copy">Copy</button>
+                    <button class="hist-tab" data-tab="data">Data</button>
                 </div>
                 <div class="hist-content" id="historyContent">
                     <div class="hist-tab-content active" id="historyTab">
@@ -826,8 +892,10 @@
                             <div class="hist-item">No history available</div>
                         </div>
                     </div>
-                    <div class="hist-tab-content" id="copyTab" style="display: none;">
-                        <div class="hist-item">Copy features coming soon</div>
+                    <div class="hist-tab-content" id="dataTab" style="display: none;">
+                        <div id="dataList">
+                            <div class="hist-item">No saved data available</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -873,6 +941,14 @@ skills:
                                 <option value="">Select validator...</option>
                             </select>
                             <button id="validateBtn" disabled>Validate</button>
+                        </div>
+                        <div style="position: relative; display: inline-block;">
+                            <button class="copy-btn" id="saveBtn">💾 Save</button>
+                            <div class="save-tooltip" id="saveTooltip" style="display: none;">
+                                <input type="text" id="saveDescriptionInput" placeholder="Enter description..." maxlength="100">
+                                <button class="save-tooltip-btn save-tooltip-save" id="saveTooltipSave">✓</button>
+                                <button class="save-tooltip-btn save-tooltip-cancel" id="saveTooltipCancel">✕</button>
+                            </div>
                         </div>
                         <button class="copy-btn" id="copyBtn">📋 Copy</button>
                     </div>

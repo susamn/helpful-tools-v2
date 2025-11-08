@@ -36,6 +36,11 @@ class YamlTool {
             minifyBtn: document.getElementById('minifyBtn'),
             stringifyBtn: document.getElementById('stringifyBtn'),
             clearBtn: document.getElementById('clearBtn'),
+            saveBtn: document.getElementById('saveBtn'),
+            saveTooltip: document.getElementById('saveTooltip'),
+            saveDescriptionInput: document.getElementById('saveDescriptionInput'),
+            saveTooltipSave: document.getElementById('saveTooltipSave'),
+            saveTooltipCancel: document.getElementById('saveTooltipCancel'),
             copyBtn: document.getElementById('copyBtn'),
             copyFormattedBtn: document.getElementById('copyFormattedBtn'),
             loadFromSourceBtn: document.getElementById('loadFromSourceBtn'),
@@ -107,6 +112,20 @@ class YamlTool {
         this.elements.minifyBtn.addEventListener('click', () => this.minifyYaml());
         this.elements.stringifyBtn.addEventListener('click', () => this.stringifyYaml());
         this.elements.clearBtn.addEventListener('click', () => this.clearInputs());
+        this.elements.saveBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showSaveTooltip();
+        });
+        this.elements.saveTooltipSave.addEventListener('click', () => this.saveOutput());
+        this.elements.saveTooltipCancel.addEventListener('click', () => this.hideSaveTooltip());
+        this.elements.saveDescriptionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.saveOutput();
+            } else if (e.key === 'Escape') {
+                this.hideSaveTooltip();
+            }
+        });
         this.elements.copyBtn.addEventListener('click', () => this.copyOutput());
         this.elements.copyFormattedBtn.addEventListener('click', () => this.copyFormatted());
 
@@ -140,6 +159,16 @@ class YamlTool {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+
+        // Close save tooltip when clicking outside
+        document.addEventListener('click', (e) => {
+            if (this.elements.saveTooltip &&
+                this.elements.saveTooltip.style.display !== 'none' &&
+                !this.elements.saveTooltip.contains(e.target) &&
+                !this.elements.saveBtn.contains(e.target)) {
+                this.hideSaveTooltip();
+            }
+        });
 
         // Source selector
         this.elements.loadFromSourceBtn.addEventListener('click', () => this.openSourceSelector());
@@ -781,6 +810,59 @@ class YamlTool {
             if (this.historyManager) {
                 await this.historyManager.addHistoryEntry(data, operation);
             }
+        }
+    }
+
+    /**
+     * Show the save tooltip for entering description
+     */
+    showSaveTooltip() {
+        const output = this.elements.yamlOutput.value;
+
+        if (!output) {
+            this.showMessage('No output to save. Please format some YAML first.', 'warning');
+            return;
+        }
+
+        this.elements.saveTooltip.style.display = 'flex';
+        this.elements.saveDescriptionInput.value = '';
+        this.elements.saveDescriptionInput.focus();
+    }
+
+    /**
+     * Hide the save tooltip
+     */
+    hideSaveTooltip() {
+        this.elements.saveTooltip.style.display = 'none';
+        this.elements.saveDescriptionInput.value = '';
+    }
+
+    /**
+     * Save output to data storage with description
+     */
+    async saveOutput() {
+        const output = this.elements.yamlOutput.value;
+        const description = this.elements.saveDescriptionInput.value.trim();
+
+        if (!output) {
+            this.showMessage('No output to save. Please format some YAML first.', 'warning');
+            return;
+        }
+
+        if (!description) {
+            this.showMessage('Description is required to save data', 'warning');
+            this.elements.saveDescriptionInput.focus();
+            return;
+        }
+
+        // Save to data storage using history manager
+        if (this.historyManager) {
+            const success = await this.historyManager.addDataEntry(output, description);
+            if (success) {
+                this.hideSaveTooltip();
+            }
+        } else {
+            this.showMessage('History manager not initialized', 'error');
         }
     }
 
