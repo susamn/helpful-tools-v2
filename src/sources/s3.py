@@ -2,11 +2,9 @@
 AWS S3 data source implementation.
 """
 
-import hashlib
 from datetime import datetime
 from typing import Union, Iterator, List, Dict, Any, Optional
 from urllib.parse import urlparse
-import time
 import configparser
 from pathlib import Path
 
@@ -634,6 +632,7 @@ class S3Source(BaseDataSource):
         """
         # Try to get expiry from session credentials first
         try:
+            import boto3
             session = self._session or boto3.Session()
             credentials = session.get_credentials()
             if credentials and hasattr(credentials, 'token') and credentials.token:
