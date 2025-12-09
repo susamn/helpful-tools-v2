@@ -5,6 +5,8 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: flake8](https://img.shields.io/badge/code%20style-flake8-orange.svg)](https://flake8.pycqa.org/)
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow?style=flat&logo=buy-me-a-coffee)](https://paypal.me/SupratimSamanta)
+
 A comprehensive web-based developer toolkit built with Flask. Simple, fast, and privacy-focused - all tools run locally with no data sent to external servers.
 
 ## Features
@@ -59,6 +61,8 @@ python app.py --host 0.0.0.0     # Bind to all interfaces
 
 ## Configuration
 
+### Tools
+
 Tools can be enabled/disabled via `config/config.json`:
 
 ```json
@@ -77,6 +81,39 @@ Tools can be enabled/disabled via `config/config.json`:
 ```
 
 Set `"enabled": false` to hide a tool from the dashboard and disable its route.
+
+### Source Types
+
+The Sources Manager supports multiple data source types. You can enable/disable source types in `config/config.json`:
+
+```json
+{
+  "source_types": {
+    "http": {
+      "enabled": true,
+      "description": "HTTP/HTTPS URL resources"
+    },
+    "s3": {
+      "enabled": true,
+      "description": "AWS S3 buckets"
+    },
+    "local_file": {
+      "enabled": false,
+      "description": "Local file system"
+    },
+    "sftp": {
+      "enabled": false,
+      "description": "SFTP servers"
+    },
+    "samba": {
+      "enabled": false,
+      "description": "Samba/SMB network shares"
+    }
+  }
+}
+```
+
+Only enabled source types will appear in the Sources Manager dropdown.
 
 ## Project Structure
 
@@ -102,6 +139,7 @@ helpful-tools-v2/
 |----------|--------|-------------|
 | `/` | GET | Dashboard |
 | `/api/tools` | GET | List enabled tools |
+| `/api/source-types` | GET | List enabled source types |
 | `/api/convert` | POST | Format conversion |
 | `/api/text-diff/compare` | POST | Text comparison |
 | `/api/history/<tool>` | GET/POST | Tool history |
