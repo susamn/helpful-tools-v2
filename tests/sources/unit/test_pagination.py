@@ -7,6 +7,7 @@ import sys
 import os
 import tempfile
 import shutil
+import uuid
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 from pathlib import Path
@@ -224,9 +225,9 @@ class TestLocalFileSourcePagination:
         # Create test files and directories
         self.create_test_structure()
 
-        # Create source instance
+        # Create source instance with unique ID to avoid cache collisions
         config = SourceConfig(
-            source_id='test-local',
+            source_id=f'test-local-pagination-{uuid.uuid4().hex[:8]}',
             name='Test Local',
             source_type='local_file',
             static_config={},

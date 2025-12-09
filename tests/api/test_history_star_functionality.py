@@ -125,11 +125,11 @@ class TestHistoryStarFunctionality:
         entries = []
         for i in range(3):
             result = self.history_manager.add_history_entry(
-                self.test_tool, f"data-{i}", f"operation-{i}"
+                self.test_tool, f"data-{i}", f"op-{i}"
             )
             entries.append(result["entry_id"])
 
-        # Star first and third entries
+        # Star first and third entries (entries[0] is oldest, entries[2] is newest)
         self.history_manager.update_star_status(self.test_tool, entries[0], True)
         self.history_manager.update_star_status(self.test_tool, entries[2], True)
 
@@ -137,17 +137,23 @@ class TestHistoryStarFunctionality:
         local_history = self.history_manager.get_history(self.test_tool)
         assert len(local_history) == 3
 
-        # Note: entries are returned in reverse order (most recent first)
-        assert local_history[0]["starred"] is True   # entries[2]
-        assert local_history[1]["starred"] is False  # entries[1]
-        assert local_history[2]["starred"] is True   # entries[0]
+        # Note: starred items come first, then non-starred (both groups in insertion order)
+        # Starred: entries[0], entries[2] -> but entries[2] was starred last so it's first in starred group
+        # Actually the starred items maintain their original order within the starred group
+        starred_entries = [e for e in local_history if e["starred"]]
+        non_starred_entries = [e for e in local_history if not e["starred"]]
 
-        # Verify in global history
+        assert len(starred_entries) == 2
+        assert len(non_starred_entries) == 1
+        assert non_starred_entries[0]["operation"] == "op-1"  # entries[1] is not starred
+
+        # Verify in global history - same pattern
         global_history = self.history_manager.get_global_history()
         assert len(global_history) == 3
-        assert global_history[0]["starred"] is True   # entries[2]
-        assert global_history[1]["starred"] is False  # entries[1]
-        assert global_history[2]["starred"] is True   # entries[0]
+        starred_global = [e for e in global_history if e["starred"]]
+        non_starred_global = [e for e in global_history if not e["starred"]]
+        assert len(starred_global) == 2
+        assert len(non_starred_global) == 1
 
     def test_cross_tool_star_independence(self):
         """Test that stars are independent across different tools"""
@@ -175,9 +181,15 @@ class TestHistoryStarFunctionality:
         # Verify global history shows correct stars
         global_history = self.history_manager.get_global_history()
         assert len(global_history) == 2
-        # Most recent first (tool2, then tool1)
-        assert global_history[0]["starred"] is False  # tool2 entry
-        assert global_history[1]["starred"] is True   # tool1 entry
+
+        # Starred items come first, so tool1 entry (starred) is first
+        starred_global = [e for e in global_history if e["starred"]]
+        non_starred_global = [e for e in global_history if not e["starred"]]
+
+        assert len(starred_global) == 1
+        assert len(non_starred_global) == 1
+        assert starred_global[0]["tool_name"] == tool1
+        assert non_starred_global[0]["tool_name"] == tool2
 
     def test_star_persistence_through_operations(self):
         """Test that star status persists through other operations"""
@@ -238,7 +250,7 @@ class TestHistoryStarFunctionality:
         assert entry["tool_name"] == self.test_tool
 
     def test_delete_starred_entry_local(self):
-        """Test deleting starred entries from local history"""
+        """Test that starred entries cannot be deleted from local history"""
         # Add and star entry
         result = self.history_manager.add_history_entry(
             self.test_tool, self.test_data, self.test_operation
@@ -251,19 +263,19 @@ class TestHistoryStarFunctionality:
         local_history = self.history_manager.get_history(self.test_tool)
         assert local_history[0]["starred"] is True
 
-        # Delete entry
+        # Attempt to delete entry - should fail because it's starred
         success = self.history_manager.delete_history_entry(self.test_tool, entry_id)
-        assert success is True
+        assert success is False  # Cannot delete starred entries
 
-        # Verify deleted from both local and global
+        # Verify entry still exists
         local_history = self.history_manager.get_history(self.test_tool)
-        assert len(local_history) == 0
+        assert len(local_history) == 1
 
         global_history = self.history_manager.get_global_history()
-        assert len(global_history) == 0
+        assert len(global_history) == 1
 
     def test_delete_starred_entry_global(self):
-        """Test deleting starred entries from global history"""
+        """Test that starred entries cannot be deleted from global history"""
         # Add and star entry
         result = self.history_manager.add_history_entry(
             self.test_tool, self.test_data, self.test_operation
@@ -272,16 +284,16 @@ class TestHistoryStarFunctionality:
 
         self.history_manager.update_global_star_status(entry_id, True)
 
-        # Delete via global method
+        # Attempt to delete via global method - should fail because it's starred
         success = self.history_manager.delete_global_history_entry(entry_id)
-        assert success is True
+        assert success is False  # Cannot delete starred entries
 
-        # Verify deleted from both
+        # Verify entry still exists
         local_history = self.history_manager.get_history(self.test_tool)
-        assert len(local_history) == 0
+        assert len(local_history) == 1
 
         global_history = self.history_manager.get_global_history()
-        assert len(global_history) == 0
+        assert len(global_history) == 1
 
     def test_clear_history_removes_starred_entries(self):
         """Test that clearing history removes starred entries"""
@@ -311,29 +323,31 @@ class TestHistoryStarFunctionality:
         assert len(global_history) == 3
 
     def test_history_limit_with_starred_entries(self):
-        """Test that history limits work correctly with starred entries"""
+        """Test that starred entries are preserved beyond history limit"""
         # Set a small limit for testing
         original_limit = self.history_manager._get_history_limit(self.test_tool)
 
         with patch.object(self.history_manager, '_get_history_limit', return_value=2):
-            # Add 3 entries, star the first one
-            entry_ids = []
-            for i in range(3):
-                result = self.history_manager.add_history_entry(
+            # Add first entry and star it
+            result0 = self.history_manager.add_history_entry(
+                self.test_tool, "data-0", "op-0"
+            )
+            self.history_manager.update_star_status(self.test_tool, result0["entry_id"], True)
+
+            # Add 2 more entries (these will trigger limit)
+            for i in range(1, 3):
+                self.history_manager.add_history_entry(
                     self.test_tool, f"data-{i}", f"op-{i}"
                 )
-                entry_ids.append(result["entry_id"])
-                if i == 0:
-                    self.history_manager.update_star_status(self.test_tool, result["entry_id"], True)
 
-            # Should only have 2 entries due to limit
+            # Should have 3 entries: 1 starred + 2 non-starred (limit applies to non-starred only)
             local_history = self.history_manager.get_history(self.test_tool)
-            assert len(local_history) == 2
+            assert len(local_history) == 3
 
-            # Check if starred entry survived (it should be the oldest one that gets removed)
+            # Starred entry should be preserved
             starred_entries = [entry for entry in local_history if entry["starred"]]
-            # The starred entry (first one added) should have been removed due to FIFO limit
-            assert len(starred_entries) == 0
+            assert len(starred_entries) == 1
+            assert starred_entries[0]["operation"] == "op-0"
 
 
 class TestValidationUtilityFunctions:

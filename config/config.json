@@ -1,7 +1,29 @@
 {
+  "source_types": {
+    "http": {
+      "enabled": true,
+      "description": "HTTP/HTTPS URL resources"
+    },
+    "s3": {
+      "enabled": true,
+      "description": "AWS S3 buckets"
+    },
+    "local_file": {
+      "enabled": true,
+      "description": "Local file system"
+    },
+    "sftp": {
+      "enabled": false,
+      "description": "SFTP servers"
+    },
+    "samba": {
+      "enabled": false,
+      "description": "Samba/SMB network shares"
+    }
+  },
   "tools": {
     "scratchpad": {
-      "enabled": true,
+      "enabled": false,
       "description": "Simple note-taking tool"
     },
     "json-tool": {

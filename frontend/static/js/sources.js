@@ -10,12 +10,52 @@ class SourcesManager {
         this.sources = [];
         this.currentEditingId = null;
         this.countdownTimer = null;
-        
+        this.enabledSourceTypes = [];
+
         this.initElements();
         this.attachEvents();
         this.applyFontSize();
-        this.loadSources();
+        this.loadSourceTypes().then(() => {
+            this.loadSources();
+        });
         this.startCountdownTimer();
+    }
+
+    async loadSourceTypes() {
+        // Source type icons and display names
+        const sourceTypeConfig = {
+            'local_file': { icon: '📁', label: 'Local File' },
+            's3': { icon: '☁️', label: 'Amazon S3' },
+            'sftp': { icon: '🔐', label: 'SFTP' },
+            'samba': { icon: '🌐', label: 'Samba/SMB' },
+            'http': { icon: '🌍', label: 'HTTP URL' }
+        };
+
+        try {
+            const response = await fetch('/api/source-types');
+            const result = await response.json();
+            this.enabledSourceTypes = result.enabled || [];
+
+            // Populate the dropdown
+            const select = this.els.sourceType;
+            select.innerHTML = '<option value="">Select source type...</option>';
+
+            for (const type of this.enabledSourceTypes) {
+                const config = sourceTypeConfig[type] || { icon: '📄', label: type };
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = `${config.icon} ${config.label}`;
+                select.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Failed to load source types:', error);
+            // Fallback to default types
+            this.enabledSourceTypes = ['http', 's3'];
+            const select = this.els.sourceType;
+            select.innerHTML = '<option value="">Select source type...</option>';
+            select.innerHTML += '<option value="http">🌍 HTTP URL</option>';
+            select.innerHTML += '<option value="s3">☁️ Amazon S3</option>';
+        }
     }
 
     initElements() {

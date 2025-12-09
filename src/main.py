@@ -61,6 +61,30 @@ def get_enabled_tools(tools_list):
     """Filter tools list to only include enabled tools."""
     return [tool for tool in tools_list if is_tool_enabled(tool.get('id', ''))]
 
+# Load source types configuration
+def load_source_types_config():
+    """Load source types configuration from config/config.json"""
+    config_file = app_root / "config" / "config.json"
+    if config_file.exists():
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get('source_types', {})
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+SOURCE_TYPES_CONFIG = load_source_types_config()
+
+def is_source_type_enabled(source_type):
+    """Check if a source type is enabled in config. Defaults to True if not specified."""
+    type_conf = SOURCE_TYPES_CONFIG.get(source_type, {})
+    return type_conf.get('enabled', True)
+
+def get_enabled_source_types():
+    """Get list of enabled source types."""
+    return [st for st, conf in SOURCE_TYPES_CONFIG.items() if conf.get('enabled', True)]
+
 # Helper function to convert legacy source data to new SourceConfig format
 def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
     """Convert legacy source data format to new SourceConfig format."""
@@ -474,6 +498,18 @@ def dashboard():
 @app.route('/api/tools')
 def api_tools():
     return jsonify({'tools': get_enabled_tools(TOOLS)})
+
+@app.route('/api/source-types')
+def api_source_types():
+    """Return enabled source types and their configuration."""
+    enabled_types = []
+    for source_type, config in SOURCE_TYPES_CONFIG.items():
+        if config.get('enabled', True):
+            enabled_types.append({
+                'type': source_type,
+                'description': config.get('description', '')
+            })
+    return jsonify({'source_types': enabled_types, 'enabled': get_enabled_source_types()})
 
 # History API Routes
 @app.route('/api/history/<tool_name>', methods=['POST'])
