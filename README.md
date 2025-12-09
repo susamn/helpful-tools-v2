@@ -1,5 +1,10 @@
 # Helpful Tools v2
 
+[![CI](https://github.com/susamn/helpful-tools-v2/actions/workflows/ci.yml/badge.svg)](https://github.com/susamn/helpful-tools-v2/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: flake8](https://img.shields.io/badge/code%20style-flake8-orange.svg)](https://flake8.pycqa.org/)
+
 A comprehensive web-based developer toolkit built with Flask. Simple, fast, and privacy-focused - all tools run locally with no data sent to external servers.
 
 ## Features
