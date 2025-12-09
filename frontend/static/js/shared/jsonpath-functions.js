@@ -148,6 +148,53 @@ function functionLast(data) {
     return data;
 }
 
+/**
+ * limit(n) - Limit array to first n elements
+ * @param {Array} data - The data to limit
+ * @param {number} n - Number of elements to keep
+ */
+function functionLimit(data, n = 10) {
+    if (!Array.isArray(data)) return data;
+    const limit = parseInt(n);
+    if (isNaN(limit) || limit <= 0) return data;
+    return data.slice(0, limit);
+}
+
+/**
+ * select(...keys) - Select specific fields from objects
+ * @param {Array} data - The data to select from
+ * @param {...string} keys - Keys to select
+ */
+function functionSelect(data, ...keys) {
+    if (!Array.isArray(data)) {
+        // Single object
+        if (typeof data === 'object' && data !== null) {
+            const result = {};
+            keys.forEach(key => {
+                if (key in data) {
+                    result[key] = data[key];
+                }
+            });
+            return result;
+        }
+        return data;
+    }
+
+    // Array of objects
+    return data.map(item => {
+        if (typeof item === 'object' && item !== null) {
+            const result = {};
+            keys.forEach(key => {
+                if (key in item) {
+                    result[key] = item[key];
+                }
+            });
+            return result;
+        }
+        return item;
+    });
+}
+
 // Export for both CommonJS (worker) and ES modules (browser)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -160,6 +207,8 @@ if (typeof module !== 'undefined' && module.exports) {
         functionSort,
         functionReverse,
         functionFirst,
-        functionLast
+        functionLast,
+        functionLimit,
+        functionSelect
     };
 }

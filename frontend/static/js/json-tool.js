@@ -1180,6 +1180,10 @@ class JsonTool {
                 return functionFirst(data);  // Shared function
             case 'last':
                 return functionLast(data);  // Shared function
+            case 'limit':
+                return functionLimit(data, params[0]);  // Shared function
+            case 'select':
+                return functionSelect(data, ...params);  // Shared function
             case 'filter':
                 return this.functionFilter(data, params[0]);  // Main thread only (uses this)
             case 'compare':
@@ -1190,7 +1194,7 @@ class JsonTool {
     }
 
     /**
-     * Note: Simple functions (list, uniq, count, flatten, keys, values, sort, reverse, first, last)
+     * Note: Simple functions (list, uniq, count, flatten, keys, values, sort, reverse, first, last, limit, select)
      * are now loaded from shared/jsonpath-functions.js and called directly (no duplication)
      */
 

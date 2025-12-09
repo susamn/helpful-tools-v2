@@ -37,6 +37,30 @@ os.makedirs(app_root / "frontend" / "static" / "js", exist_ok=True)
 os.makedirs(app_root / "logs", exist_ok=True)
 os.makedirs(app_root / "frontend" / "tools", exist_ok=True)
 
+# Load tool configuration from config.json
+def load_tool_config():
+    """Load tool configuration from config/config.json"""
+    config_file = app_root / "config" / "config.json"
+    if config_file.exists():
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                return config.get('tools', {})
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+TOOL_CONFIG = load_tool_config()
+
+def is_tool_enabled(tool_id):
+    """Check if a tool is enabled in config. Defaults to True if not specified."""
+    tool_conf = TOOL_CONFIG.get(tool_id, {})
+    return tool_conf.get('enabled', True)
+
+def get_enabled_tools(tools_list):
+    """Filter tools list to only include enabled tools."""
+    return [tool for tool in tools_list if is_tool_enabled(tool.get('id', ''))]
+
 # Helper function to convert legacy source data to new SourceConfig format
 def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
     """Convert legacy source data format to new SourceConfig format."""
@@ -103,6 +127,7 @@ def convert_to_source_config(source_data: Dict[str, Any]) -> SourceConfig:
 # Store for tools configuration
 TOOLS = [
     {
+        "id": "scratchpad",
         "name": "Scratchpad",
         "description": "Simple note-taking tool for viewing and storing data with history tracking",
         "path": "/tools/scratchpad",
@@ -111,6 +136,7 @@ TOOLS = [
         "icon": "📝"
     },
     {
+        "id": "json-tool",
         "name": "JSON Tool",
         "description": "Format, validate, and minify JSON data with history tracking",
         "path": "/tools/json-tool",
@@ -119,6 +145,7 @@ TOOLS = [
         "icon": "📄"
     },
     {
+        "id": "yaml-tool",
         "name": "YAML Tool",
         "description": "Format, validate, and minify YAML data with syntax highlighting",
         "path": "/tools/yaml-tool",
@@ -127,6 +154,7 @@ TOOLS = [
         "icon": "📋"
     },
     {
+        "id": "json-yaml-xml-converter",
         "name": "JSON-YAML-XML Converter",
         "description": "Bidirectional conversion between JSON, YAML, and XML formats with syntax highlighting",
         "path": "/tools/json-yaml-xml-converter",
@@ -135,6 +163,7 @@ TOOLS = [
         "icon": "🔄"
     },
     {
+        "id": "text-diff",
         "name": "Text Diff Tool",
         "description": "Compare two text files side-by-side with inline highlighting of differences",
         "path": "/tools/text-diff",
@@ -143,6 +172,7 @@ TOOLS = [
         "icon": "⚖️"
     },
     {
+        "id": "regex-tester",
         "name": "Regex Tester",
         "description": "Interactive regex testing tool with live highlighting, group visualization, and match details",
         "path": "/tools/regex-tester",
@@ -151,6 +181,7 @@ TOOLS = [
         "icon": "🔍"
     },
     {
+        "id": "cron-parser",
         "name": "Cron Parser",
         "description": "Parse and analyze cron expressions with human-readable descriptions and next execution times",
         "path": "/tools/cron-parser",
@@ -159,6 +190,7 @@ TOOLS = [
         "icon": "⏰"
     },
     {
+        "id": "scientific-calculator",
         "name": "Scientific Calculator",
         "description": "Advanced calculator with scientific functions and interactive graph plotter for mathematical expressions",
         "path": "/tools/scientific-calculator",
@@ -167,6 +199,7 @@ TOOLS = [
         "icon": "🧮"
     },
     {
+        "id": "jwt-decoder",
         "name": "JWT Decoder",
         "description": "Decode and analyze JWT (JSON Web Tokens) with syntax highlighting, validation, and timestamp formatting",
         "path": "/tools/jwt-decoder",
@@ -175,6 +208,7 @@ TOOLS = [
         "icon": "🔑"
     },
     {
+        "id": "sources",
         "name": "Sources Manager",
         "description": "Manage data sources from various locations: local files, S3, SFTP, Samba, HTTP URLs with secure credential management",
         "path": "/tools/sources",
@@ -183,6 +217,7 @@ TOOLS = [
         "icon": "🗄️"
     },
     {
+        "id": "aws-sf-viewer",
         "name": "AWS Step Functions Viewer",
         "description": "Visualize AWS Step Functions state machines with interactive graph rendering, state details, and multiple layout options",
         "path": "/tools/aws-sf-viewer",
@@ -434,11 +469,11 @@ DASHBOARD_TEMPLATE = '''
 
 @app.route('/')
 def dashboard():
-    return render_template_string(DASHBOARD_TEMPLATE, tools=TOOLS)
+    return render_template_string(DASHBOARD_TEMPLATE, tools=get_enabled_tools(TOOLS))
 
 @app.route('/api/tools')
 def api_tools():
-    return jsonify({'tools': TOOLS})
+    return jsonify({'tools': get_enabled_tools(TOOLS)})
 
 # History API Routes
 @app.route('/api/history/<tool_name>', methods=['POST'])
@@ -1102,12 +1137,16 @@ def api_detect_format():
 # Tool Routes
 @app.route('/tools/<tool_name>')
 def serve_tool(tool_name):
+    # Check if tool is enabled in config
+    if not is_tool_enabled(tool_name):
+        abort(404)
+
     # Get the directory where main.py is located
     app_dir = Path(__file__).parent.parent
     tool_file = app_dir / "frontend" / "tools" / f"{tool_name}.html"
     if not tool_file.exists():
         abort(404)
-    
+
     with open(tool_file, 'r', encoding='utf-8') as f:
         return f.read()
 

@@ -101,6 +101,11 @@ class JSONPathEvaluator extends QueryEvaluator {
                 return await this.getDataHistorySuggestions(document, partialQuery, context);
             }
 
+            // Key suggestions for select() function parameters
+            if (partialQuery.includes('select(')) {
+                return this.getSelectKeySuggestions(document, partialQuery, context);
+            }
+
             // Pipe function suggestions (after |)
             if (partialQuery.includes('|') && this.options.enableFunctions) {
                 return this.getPipeFunctionSuggestions(document, partialQuery, context);
@@ -553,6 +558,111 @@ class JSONPathEvaluator extends QueryEvaluator {
     }
 
     /**
+     * Get key suggestions for select() function parameters
+     */
+    getSelectKeySuggestions(document, partialQuery, context) {
+        const suggestions = [];
+
+        try {
+            // Find where select( starts
+            const selectIndex = partialQuery.indexOf('select(');
+            if (selectIndex === -1) return suggestions;
+
+            // Get everything before select(
+            const beforeSelect = partialQuery.substring(0, selectIndex).trim();
+
+            // Evaluate the query before select() to get the data
+            let currentData = document;
+
+            // If there's a query before select(), evaluate it
+            if (beforeSelect && beforeSelect !== '$' && beforeSelect !== '') {
+                // Remove trailing pipe if present
+                const queryPath = beforeSelect.replace(/\|$/, '').trim();
+
+                try {
+                    // Try to evaluate the path
+                    const evalResult = this.evaluateJsonPath(currentData, queryPath);
+                    if (evalResult && evalResult.length > 0) {
+                        currentData = evalResult[0];
+                    }
+                } catch (error) {
+                    console.log('Could not evaluate path before select():', error);
+                    // Continue with original document
+                }
+            }
+
+            // Get keys from the current data
+            const keys = new Set();
+
+            if (Array.isArray(currentData)) {
+                // Get keys from first few objects in array
+                const sample = currentData.slice(0, 10);
+                sample.forEach(item => {
+                    if (typeof item === 'object' && item !== null) {
+                        Object.keys(item).forEach(key => keys.add(key));
+                    }
+                });
+            } else if (typeof currentData === 'object' && currentData !== null) {
+                // Get keys from single object
+                Object.keys(currentData).forEach(key => keys.add(key));
+            }
+
+            // Extract what's already in select( to filter suggestions
+            const selectContent = partialQuery.substring(selectIndex + 7); // after "select("
+            const lastCommaIndex = selectContent.lastIndexOf(',');
+            const partialKey = lastCommaIndex >= 0
+                ? selectContent.substring(lastCommaIndex + 1).trim().replace(/["']/g, '')
+                : selectContent.replace(/["']/g, '').trim();
+
+            // Create suggestions for each key
+            const keyArray = Array.from(keys).sort();
+            keyArray.forEach(key => {
+                // Filter based on partial input
+                if (!partialKey || key.toLowerCase().includes(partialKey.toLowerCase())) {
+                    const insertText = this.buildSelectInsertText(partialQuery, key, selectIndex);
+
+                    suggestions.push({
+                        text: key,
+                        displayText: `"${key}"`,
+                        type: 'select_key',
+                        description: `Select field: ${key}`,
+                        insertText: insertText
+                    });
+                }
+            });
+
+            return suggestions;
+        } catch (error) {
+            console.error('Error getting select key suggestions:', error);
+            return suggestions;
+        }
+    }
+
+    /**
+     * Build insert text for select() key suggestion
+     */
+    buildSelectInsertText(partialQuery, key, selectIndex) {
+        const beforeSelect = partialQuery.substring(0, selectIndex + 7); // includes "select("
+        const afterSelect = partialQuery.substring(selectIndex + 7);
+
+        // Check if there are already keys in select()
+        if (afterSelect.trim() && !afterSelect.trim().startsWith(')')) {
+            // There's already content, add comma before new key
+            const lastCommaIndex = afterSelect.lastIndexOf(',');
+            if (lastCommaIndex >= 0) {
+                // Replace text after last comma
+                return `${beforeSelect}${afterSelect.substring(0, lastCommaIndex + 1)} "${key}"`;
+            } else {
+                // No comma yet, add one
+                return `${beforeSelect}"${key}"`;
+            }
+        } else {
+            // First key in select()
+            return `${beforeSelect}"${key}"`;
+        }
+    }
+
+    /**
      * Parse JSONPath query structure
      */
     parseQuery(query) {
@@ -671,6 +781,7 @@ class JSONPathEvaluator extends QueryEvaluator {
             { name: 'list', description: 'Convert to array (useful for JSONL)' },
             { name: 'filter', description: 'Filter array elements by expression', hasParam: true },
             { name: 'compare', description: 'Compare with saved data from history', hasParam: true },
+            { name: 'select', description: 'Select specific fields from objects', hasParam: true },
             { name: 'uniq', description: 'Get unique values', hasParam: false },
             { name: 'count', description: 'Count elements' },
             { name: 'flatten', description: 'Flatten nested arrays' },
@@ -679,7 +790,8 @@ class JSONPathEvaluator extends QueryEvaluator {
             { name: 'sort', description: 'Sort array' },
             { name: 'reverse', description: 'Reverse array' },
             { name: 'first', description: 'Get first element' },
-            { name: 'last', description: 'Get last element' }
+            { name: 'last', description: 'Get last element' },
+            { name: 'limit', description: 'Limit to first N elements', hasParam: true }
         ];
 
         // If there's text after the pipe, filter functions that match

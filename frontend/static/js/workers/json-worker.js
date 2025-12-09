@@ -322,6 +322,10 @@ function applyFunction(func, data) {
             return functionFirst(data);
         case 'last':
             return functionLast(data);
+        case 'limit':
+            return functionLimit(data, params[0]);
+        case 'select':
+            return functionSelect(data, ...params);
         case 'filter':
             return functionFilter(data, params[0]);
         default:

@@ -1,4 +1,50 @@
 {
+  "tools": {
+    "scratchpad": {
+      "enabled": true,
+      "description": "Simple note-taking tool"
+    },
+    "json-tool": {
+      "enabled": true,
+      "description": "JSON formatter and validator"
+    },
+    "yaml-tool": {
+      "enabled": true,
+      "description": "YAML formatter and validator"
+    },
+    "json-yaml-xml-converter": {
+      "enabled": true,
+      "description": "Format converter between JSON, YAML, and XML"
+    },
+    "text-diff": {
+      "enabled": true,
+      "description": "Text comparison tool"
+    },
+    "regex-tester": {
+      "enabled": true,
+      "description": "Regular expression tester"
+    },
+    "cron-parser": {
+      "enabled": true,
+      "description": "Cron expression parser"
+    },
+    "scientific-calculator": {
+      "enabled": true,
+      "description": "Scientific calculator with graphing"
+    },
+    "jwt-decoder": {
+      "enabled": true,
+      "description": "JWT token decoder"
+    },
+    "sources": {
+      "enabled": true,
+      "description": "Data sources manager"
+    },
+    "aws-sf-viewer": {
+      "enabled": false,
+      "description": "AWS Step Functions state machine viewer"
+    }
+  },
   "history_limits": {
     "json-tool": 50,
     "yaml-tool": 50,
