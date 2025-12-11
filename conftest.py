@@ -9,6 +9,11 @@ import warnings
 import json
 import tempfile
 import shutil
+import socket
+import subprocess
+import time
+import signal
+import sys
 from pathlib import Path
 
 
@@ -62,11 +67,78 @@ def is_server_running():
         return pid_file.exists()
 
 
+def find_free_port(start_port=32000):
+    """Find a free port starting from start_port."""
+    port = start_port
+    while port < 65535:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind(('127.0.0.1', port))
+                return port
+            except OSError:
+                port += 1
+    raise RuntimeError("No free ports found")
+
+
+def start_test_server(port):
+    """Start the test server on the specified port."""
+    project_root = Path(__file__).parent.absolute()
+    cmd = [sys.executable, str(project_root / "app.py"), "--port", str(port)]
+    
+    # Start server as a subprocess
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        cwd=str(project_root)
+    )
+    
+    # Wait for server to start
+    start_time = time.time()
+    while time.time() - start_time < 10:  # 10 second timeout
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                if sock.connect_ex(('127.0.0.1', port)) == 0:
+                    return process
+        except Exception:
+            pass
+        time.sleep(0.1)
+        
+    # If we get here, server failed to start
+    process.terminate()
+    raise RuntimeError(f"Failed to start test server on port {port}")
+
+
 def pytest_configure(config):
     """Configure pytest with server information."""
-    port = get_server_port()
-    server_running = is_server_running()
     config_dir = get_config_directory()
+    
+    # Check if server is already running
+    if is_server_running():
+        port = get_server_port()
+        server_running = True
+        config.server_process = None
+        print(f"\n🔧 Test Configuration: Using existing server on port {port}")
+    else:
+        # Start a new server for testing
+        try:
+            port = find_free_port()
+            print(f"\n🚀 Starting test server on port {port}...")
+            config.server_process = start_test_server(port)
+            server_running = True
+            
+            # Ensure config dir exists
+            config_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Write port to file so other tools (like Jest) can find it
+            port_file = config_dir / ".port"
+            port_file.write_text(str(port))
+            
+        except Exception as e:
+            print(f"⚠️  Failed to auto-start server: {e}")
+            port = 8000
+            server_running = False
+            config.server_process = None
 
     # Store in pytest config for access by tests
     config.port = port
@@ -77,11 +149,6 @@ def pytest_configure(config):
     os.environ['HELPFUL_TOOLS_PORT'] = str(port)
     os.environ['HELPFUL_TOOLS_BASE_URL'] = f'http://127.0.0.1:{port}'
     os.environ['HELPFUL_TOOLS_CONFIG_DIR'] = str(config_dir)
-
-    print(f"\n🔧 Test Configuration:")
-    print(f"   Config Directory: {config_dir}")
-    print(f"   Server Port: {port}")
-    print(f"   Server Running: {'✅ Yes' if server_running else '❌ No'}")
 
     if not server_running:
         print(f"   ⚠️  WARNING: Server is not running!")
@@ -96,16 +163,30 @@ def pytest_configure(config):
     )
 
 
+def pytest_unconfigure(config):
+    """Clean up after tests."""
+    if hasattr(config, 'server_process') and config.server_process:
+        print("\n🛑 Stopping test server...")
+        config.server_process.terminate()
+        try:
+            config.server_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            config.server_process.kill()
+            
+        # Clean up port file
+        config_dir = get_config_directory()
+        port_file = config_dir / ".port"
+        if port_file.exists():
+            try:
+                port_file.unlink()
+            except OSError:
+                pass
+
+
 def pytest_sessionstart(session):
     """Called after the Session object has been created."""
-    if not session.config.server_running:
-        warnings.warn(
-            "\n"
-            "⚠️  Helpful-Tools-v2 server is not running!\n"
-            "Some integration tests may fail or be skipped.\n"
-            f"Start the server with: ./quick-start.sh start {session.config.port}\n",
-            UserWarning
-        )
+    # We no longer need to warn here as we handle it in configure
+    pass
 
 
 @pytest.fixture(scope="session")
