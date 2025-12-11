@@ -13,7 +13,7 @@ A comprehensive web-based developer toolkit built with Flask. Simple, fast, and 
 
 ## Features
 
-- **11 Developer Tools** - JSON/YAML formatters, converters, diff viewer, regex tester, and more
+- **9 Developer Tools** - JSON/YAML formatters, converters, diff viewer, regex tester, and more
 - **History Tracking** - Save and retrieve tool usage across sessions
 - **Configurable** - Enable/disable tools via configuration
 - **Modern UI** - Clean, responsive interface
