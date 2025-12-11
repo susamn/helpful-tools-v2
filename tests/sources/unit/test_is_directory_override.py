@@ -179,7 +179,7 @@ class TestHttpSourceIsDirectoryOverride:
             source_id='test-123',
             name='Test HTTP Override True',
             source_type='http',
-            static_config={},
+            static_config={'directory_api': {'endpoint': 'http://example.com/api'}},
             path_template='http://example.com/api/data.json',
             dynamic_variables={},
             created_at=datetime.now(),
@@ -377,6 +377,7 @@ class TestFactoryIntegrationWithOverrides:
             {
                 'source_type': 'http',
                 'path_template': 'http://example.com/api/data.json',
+                'static_config': {'directory_api': {'endpoint': 'http://example.com/api'}},
                 'is_directory': True,
                 'expected_class': HttpSource
             },

@@ -35,6 +35,7 @@ class TestHistoryStarAPIEndpoints:
         # Clear any existing history for our test tool
         try:
             requests.delete(f"{BASE_URL}/api/history/{TEST_TOOL}")
+            requests.delete(f"{BASE_URL}/api/global-history")
         except:
             pass
 
@@ -264,9 +265,12 @@ class TestHistoryStarAPIEndpoints:
         entries = history_data["history"]
 
         assert len(entries) == 3
-        # Entries are returned in reverse order (most recent first)
+        # Entries are returned with starred items first, then by recency
+        # entry2 (newest, starred) -> first
+        # entry0 (oldest, starred) -> second
+        # entry1 (middle, unstarred) -> third
         starred_status = [entry["starred"] for entry in entries]
-        assert starred_status == [True, False, True]  # [entry2, entry1, entry0]
+        assert starred_status == [True, True, False]  # [entry2, entry0, entry1]
 
         # Verify in global history
         response = requests.get(f"{BASE_URL}/api/global-history")
@@ -281,7 +285,7 @@ class TestHistoryStarAPIEndpoints:
 
         # Check starred status for our recent entries
         starred_global = [e["starred"] for e in recent_test_entries]
-        assert starred_global == [True, False, True]  # Same pattern
+        assert starred_global == [True, True, False]  # Same pattern
 
     def test_star_synchronization_between_local_and_global(self):
         """Test that starring in local syncs to global and vice versa"""
