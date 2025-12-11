@@ -9,6 +9,8 @@
 
 A comprehensive web-based developer toolkit built with Flask. Simple, fast, and privacy-focused - all tools run locally with no data sent to external servers.
 
+![Dashboard](screenshots/dashboard.png)
+
 ## Features
 
 - **11 Developer Tools** - JSON/YAML formatters, converters, diff viewer, regex tester, and more
@@ -32,6 +34,26 @@ A comprehensive web-based developer toolkit built with Flask. Simple, fast, and 
 | **JWT Decoder** | Decode and analyze JWT tokens | Stable |
 | **Sources Manager** | Manage data sources (local, S3, SFTP, HTTP) | Stable |
 | **AWS Step Functions Viewer** | Visualize state machines | Beta (disabled by default) |
+
+## Screenshots
+
+### Source Manager
+![Source Manager](screenshots/source-manager-tool.png)
+
+### JSON Tool
+![JSON Tool](screenshots/json-tool.png)
+
+### Regex Tester
+![Regex Tester](screenshots/regex-tool.png)
+
+### Text Diff Tool
+![Text Diff Tool](screenshots/text-diff-tool.png)
+
+### Cron Parser
+![Cron Parser](screenshots/cron-tool.png)
+
+### Scientific Calculator
+![Scientific Calculator](screenshots/scientific-calculator.png)
 
 ## Quick Start
 
