@@ -1306,6 +1306,23 @@ class SourceSelector {
                 fetchBtn.textContent = 'Loading...';
             }
 
+            // Handle non-directory sources (single files like HTTP, etc.)
+            if (!source.is_directory) {
+                const response = await fetch(`/api/sources/${source.id}/fetch`);
+                if (response.ok) {
+                    const data = await response.text();
+                    // Trigger fetch callback directly
+                    if (this.options.onFetch) {
+                        this.options.onFetch(data, source);
+                    }
+                    this.hide(); // Close selector
+                    return;
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || `HTTP ${response.status}`);
+                }
+            }
+
             // Use new paginated endpoint for directory sources
             const response = await fetch(`/api/sources/${source.id}/browse-paginated?page=1&limit=50&sort_by=name&sort_order=asc`);
 

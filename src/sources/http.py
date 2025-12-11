@@ -676,6 +676,10 @@ class HttpSource(BaseDataSource):
         # Could be configured via static_config
         return self.config.static_config.get('writable', False)
     
+    def is_directory(self) -> bool:
+        """HTTP sources are files unless configured as directory API."""
+        return bool(self.config.static_config.get('directory_api'))
+
     def is_listable(self) -> bool:
         """HTTP sources have limited listing support."""
         return False

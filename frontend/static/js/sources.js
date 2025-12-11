@@ -780,7 +780,6 @@ class SourcesManager {
             
             case 'http':
                 return `
-                    ${directoryConfig}
                     <div class="config-separator"></div>
                     <h4>HTTP Configuration</h4>
                     <div class="form-group">

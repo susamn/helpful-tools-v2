@@ -1357,6 +1357,15 @@ def get_sources():
         for source in sources.values():
             source_with_expiry = source.copy()
             source_with_expiry['expiry'] = get_source_expiry_info(source)
+            
+            # Update is_directory based on actual source logic to fix legacy config
+            try:
+                conf = convert_to_source_config(source)
+                inst = SourceFactory.create_source(conf)
+                source_with_expiry['is_directory'] = inst.is_directory()
+            except Exception:
+                pass
+                
             sources_with_expiry.append(source_with_expiry)
         
         return jsonify({'success': True, 'sources': sources_with_expiry})
