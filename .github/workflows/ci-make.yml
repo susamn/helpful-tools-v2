@@ -1,0 +1,36 @@
+name: CI with Make
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Dependencies
+      run: make install
+
+    - name: Run Code Quality Checks
+      run: make lint
+
+    - name: Run Backend Tests
+      run: make test-backend
+
+    - name: Run Frontend Tests
+      run: make test-frontend
