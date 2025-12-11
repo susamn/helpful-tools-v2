@@ -59,7 +59,7 @@ A comprehensive web-based developer toolkit built with Flask. Simple, fast, and 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/helpful-tools-v2.git
+git clone https://github.com/susamn/helpful-tools-v2.git
 cd helpful-tools-v2
 
 # Run the quick-start script (creates venv, installs deps, starts server)
@@ -210,11 +210,11 @@ python -m pytest tests/ --cov=src --cov-report=html
 
 ### Adding New Tools
 
-1. Create HTML template in `frontend/tools/your-tool.html`
+1. Create HTML template in `frontend/tools/*-tool.html`
 2. Add CSS/JS assets in `frontend/static/`
 3. Add tool entry in `src/main.py` TOOLS list with unique `id`
 4. Add configuration in `config/config.json`
-5. Add tests in `tests/your-tool/`
+5. Add tests in `tests/*-tool/`
 
 ## Requirements
 
