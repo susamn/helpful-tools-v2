@@ -34,7 +34,7 @@ class TextDiffFrontendTest(unittest.TestCase):
             # Fallback to Firefox if Chrome not available
             cls.driver = webdriver.Firefox()
         
-        cls.base_url = "http://localhost:8000"  # Adjust port as needed
+        cls.base_url = os.environ.get('HELPFUL_TOOLS_BASE_URL', "http://localhost:8000")
         cls.wait = WebDriverWait(cls.driver, 10)
     
     @classmethod
