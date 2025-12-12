@@ -27,6 +27,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from src.main import app
 
+BASE_URL = os.environ.get('HELPFUL_TOOLS_BASE_URL', "http://localhost:8000")
 
 class TestJWTDecoderIntegration:
     """Test JWT decoder integration with the main application"""
@@ -99,7 +100,7 @@ class TestJWTDecoderHistory:
     def test_global_history_integration(self, client):
         """Test global history integration"""
         # Add entry to local history first
-        jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkphaW4gRG9lIn0.XbPfbIHMI6arZ3Y922BhjWgQzWXcXNrz0ogtVhfEd2o"
+        jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.XbPfbIHMI6arZ3Y922BhjWgQzWXcXNrz0ogtVhfEd2o"
         history_data = {
             'data': {
                 'token': jwt_token,
@@ -219,7 +220,7 @@ class TestJWTDecoderUI:
     
     def test_page_loads_correctly(self, driver):
         """Test that the JWT decoder page loads with all elements"""
-        driver.get("http://127.0.0.1:8000/tools/jwt-decoder")
+        driver.get(f"{BASE_URL}/tools/jwt-decoder")
         
         # Check page title
         assert "JWT Decoder" in driver.title
@@ -253,7 +254,7 @@ class TestJWTDecoderUI:
     
     def test_sample_jwt_loading(self, driver):
         """Test loading sample JWT"""
-        driver.get("http://127.0.0.1:8000/tools/jwt-decoder")
+        driver.get(f"{BASE_URL}/tools/jwt-decoder")
         
         # Click load sample button
         sample_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Load Sample')]")
@@ -280,7 +281,7 @@ class TestJWTDecoderUI:
     
     def test_clear_functionality(self, driver):
         """Test clear all functionality"""
-        driver.get("http://127.0.0.1:8000/tools/jwt-decoder")
+        driver.get(f"{BASE_URL}/tools/jwt-decoder")
         
         # First load sample
         sample_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Load Sample')]")
@@ -306,7 +307,7 @@ class TestJWTDecoderUI:
     
     def test_invalid_jwt_handling(self, driver):
         """Test handling of invalid JWT tokens"""
-        driver.get("http://127.0.0.1:8000/tools/jwt-decoder")
+        driver.get(f"{BASE_URL}/tools/jwt-decoder")
         
         # Enter invalid JWT
         jwt_input = driver.find_element(By.ID, "jwtInput")
@@ -322,7 +323,7 @@ class TestJWTDecoderUI:
     
     def test_history_popup_functionality(self, driver):
         """Test history popup opens and closes correctly"""
-        driver.get("http://127.0.0.1:8000/tools/jwt-decoder")
+        driver.get(f"{BASE_URL}/tools/jwt-decoder")
         
         # Wait for the page to be fully loaded and JavaScript initialized
         WebDriverWait(driver, 10).until(
@@ -400,7 +401,7 @@ class TestJWTDecoderIntegrationEnd2End:
     
     def test_full_workflow(self, driver):
         """Test complete JWT decoder workflow"""
-        driver.get("http://127.0.0.1:8000/tools/jwt-decoder")
+        driver.get(f"{BASE_URL}/tools/jwt-decoder")
         
         # Load sample JWT
         sample_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Load Sample')]")

@@ -6,20 +6,23 @@ Minimal test suite for Scientific Calculator - Basic smoke tests only
 import pytest
 import requests
 import json
+import os
+
+BASE_URL = os.environ.get('HELPFUL_TOOLS_BASE_URL', "http://localhost:8000")
 
 class TestScientificCalculatorIntegration:
     """Test API integration and route accessibility"""
     
     def test_scientific_calculator_route_exists(self):
         """Test that scientific calculator route is accessible"""
-        response = requests.get("http://127.0.0.1:8000/tools/scientific-calculator")
+        response = requests.get(f"{BASE_URL}/tools/scientific-calculator")
         assert response.status_code == 200
         assert "Scientific Calculator" in response.text
         assert "mathjs" in response.text  # Check math.js is included
     
     def test_main_dashboard_includes_calculator(self):
         """Test that calculator appears in main dashboard"""
-        response = requests.get("http://127.0.0.1:8000/")
+        response = requests.get(f"{BASE_URL}/")
         assert response.status_code == 200
         assert "Scientific Calculator" in response.text
         assert "/tools/scientific-calculator" in response.text
@@ -35,7 +38,7 @@ class TestScientificCalculatorHistory:
             "operation": "plot"
         }
         
-        response = requests.post("http://127.0.0.1:8000/api/history/scientific-calculator", json=test_data)
+        response = requests.post(f"{BASE_URL}/api/history/scientific-calculator", json=test_data)
         assert response.status_code == 200
         
         result = response.json()
@@ -43,7 +46,7 @@ class TestScientificCalculatorHistory:
         assert "entry_id" in result
         
         # Test retrieving history
-        response = requests.get("http://127.0.0.1:8000/api/history/scientific-calculator?limit=5")
+        response = requests.get(f"{BASE_URL}/api/history/scientific-calculator?limit=5")
         assert response.status_code == 200
         
         data = response.json()

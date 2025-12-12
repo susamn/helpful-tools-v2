@@ -6,6 +6,7 @@ Minimal test suite for Regex Tester Tool - Integration testing only
 import pytest
 import requests
 import json
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -13,12 +14,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 import time
 
+BASE_URL = os.environ.get('HELPFUL_TOOLS_BASE_URL', "http://localhost:8000")
+
 class TestRegexTesterIntegration:
     """Integration tests for the regex tester tool route accessibility"""
     
     def test_regex_tester_route_exists(self):
         """Test that the regex tester route is accessible"""
-        response = requests.get("http://127.0.0.1:8000/tools/regex-tester")
+        response = requests.get(f"{BASE_URL}/tools/regex-tester")
         assert response.status_code == 200
         assert "Regex Tester" in response.text
         assert "Enter your regular expression" in response.text
@@ -39,7 +42,7 @@ class TestRegexTesterUI:
     
     def test_page_loads_with_elements(self, driver):
         """Test that page loads with basic elements"""
-        driver.get("http://127.0.0.1:8000/tools/regex-tester")
+        driver.get(f"{BASE_URL}/tools/regex-tester")
         wait = WebDriverWait(driver, 10)
         
         # Check basic elements exist
@@ -50,7 +53,7 @@ class TestRegexTesterUI:
     
     def test_basic_regex_functionality(self, driver):
         """Test basic regex matching works in UI"""
-        driver.get("http://127.0.0.1:8000/tools/regex-tester")
+        driver.get(f"{BASE_URL}/tools/regex-tester")
         wait = WebDriverWait(driver, 10)
         
         # Enter simple email regex
@@ -111,7 +114,7 @@ class TestHistoryIntegration:
 
     def test_history_button_functionality(self, driver):
         """Test that history button shows popup"""
-        driver.get("http://127.0.0.1:8000/tools/regex-tester")
+        driver.get(f"{BASE_URL}/tools/regex-tester")
         wait = WebDriverWait(driver, 10)
         
         # Wait for page to load
@@ -142,14 +145,14 @@ class TestHistoryIntegration:
             "operation": "test"
         }
         
-        response = requests.post("http://127.0.0.1:8000/api/history/regex-tester", json=test_data)
+        response = requests.post(f"{BASE_URL}/api/history/regex-tester", json=test_data)
         assert response.status_code == 200
         
         result = response.json()
         assert result["success"] is True
         
         # Test retrieving history
-        response = requests.get("http://127.0.0.1:8000/api/history/regex-tester?limit=5")
+        response = requests.get(f"{BASE_URL}/api/history/regex-tester?limit=5")
         assert response.status_code == 200
         
         data = response.json()

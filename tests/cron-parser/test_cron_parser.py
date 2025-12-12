@@ -6,6 +6,7 @@ Minimal test suite for Cron Parser - UI workflow testing only
 import pytest
 import requests
 import json
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -13,12 +14,14 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 import time
 
+BASE_URL = os.environ.get('HELPFUL_TOOLS_BASE_URL', "http://localhost:8000")
+
 class TestCronParserIntegration:
     """Test basic integration and route availability"""
     
     def test_cron_parser_route_exists(self):
         """Test that the cron parser route is accessible"""
-        response = requests.get("http://127.0.0.1:8000/tools/cron-parser")
+        response = requests.get(f"{BASE_URL}/tools/cron-parser")
         assert response.status_code == 200
         assert "Cron Parser" in response.text
         assert "cron-input" in response.text
@@ -40,7 +43,7 @@ class TestCronParserUI:
     
     def test_page_loads_correctly(self, driver):
         """Test that the cron parser page loads with all elements"""
-        driver.get("http://127.0.0.1:8000/tools/cron-parser")
+        driver.get(f"{BASE_URL}/tools/cron-parser")
         wait = WebDriverWait(driver, 10)
         
         # Check main elements are present
@@ -52,7 +55,7 @@ class TestCronParserUI:
     
     def test_basic_cron_input_parsing(self, driver):
         """Test basic cron expression input and parsing"""
-        driver.get("http://127.0.0.1:8000/tools/cron-parser")
+        driver.get(f"{BASE_URL}/tools/cron-parser")
         wait = WebDriverWait(driver, 10)
         
         # Find input and enter a basic cron expression
@@ -84,13 +87,13 @@ class TestCronHistoryIntegration:
             "operation": "parse"
         }
         
-        response = requests.post("http://127.0.0.1:8000/api/history/cron-parser", json=test_data)
+        response = requests.post(f"{BASE_URL}/api/history/cron-parser", json=test_data)
         assert response.status_code == 200
         result = response.json()
         assert result["success"] is True
         
         # Test retrieving history
-        response = requests.get("http://127.0.0.1:8000/api/history/cron-parser?limit=5")
+        response = requests.get(f"{BASE_URL}/api/history/cron-parser?limit=5")
         assert response.status_code == 200
         history = response.json()
         assert "history" in history

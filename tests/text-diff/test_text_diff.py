@@ -844,6 +844,9 @@ class TestDiffAPIIntegration(unittest.TestCase):
     def test_text_diff_api_endpoint(self):
         """Test that the /api/text-diff/compare endpoint works"""
         import requests
+        import os
+        
+        base_url = os.environ.get('HELPFUL_TOOLS_BASE_URL', "http://localhost:8000")
         
         try:
             payload = {
@@ -851,7 +854,7 @@ class TestDiffAPIIntegration(unittest.TestCase):
                 'text2': 'Modified text\nWith multiple lines\nAnd extra content'
             }
             
-            response = requests.post('http://127.0.0.1:8000/api/text-diff/compare', json=payload)
+            response = requests.post(f'{base_url}/api/text-diff/compare', json=payload)
             
             if response.status_code == 200:
                 data = response.json()
