@@ -34,7 +34,7 @@ def write_port_file(port):
     port_file = config_dir / ".port"
     with open(port_file, 'w') as f:
         f.write(str(port))
-    print(f"📝 Port {port} written to {port_file}")
+    print(f"Port {port} written to {port_file}")
 
 def cleanup_port_file():
     """Remove the .port file on shutdown."""
@@ -42,7 +42,7 @@ def cleanup_port_file():
     port_file = config_dir / ".port"
     if port_file.exists():
         port_file.unlink()
-        print("🗑️  Port file cleaned up")
+        print("Port file cleaned up")
 
 if __name__ == '__main__':
     # Parse command line arguments
@@ -60,10 +60,10 @@ if __name__ == '__main__':
     write_port_file(args.port)
 
     try:
-        print(f"🚀 Starting Helpful Tools v2 on http://{args.host}:{args.port}")
+        print(f"Starting Helpful Tools v2 on http://{args.host}:{args.port}")
         # Run the Flask application
         app.run(host=args.host, port=args.port, debug=True)
     except KeyboardInterrupt:
-        print("\n⏹️  Server stopped by user")
+        print("\nServer stopped by user")
     finally:
         cleanup_port_file()
