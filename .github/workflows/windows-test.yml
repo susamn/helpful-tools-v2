@@ -1,0 +1,155 @@
+name: Windows PowerShell Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.ps1'
+      - 'app.py'
+      - 'requirements.txt'
+      - '.github/workflows/windows-test.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.ps1'
+      - 'app.py'
+      - 'requirements.txt'
+      - '.github/workflows/windows-test.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  powershell-tests:
+    name: PowerShell Quick-Start Tests
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.11', '3.12']
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Display Python version
+      run: python --version
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Verify PowerShell version
+      shell: powershell
+      run: |
+        Write-Host "PowerShell Version:" -ForegroundColor Cyan
+        $PSVersionTable.PSVersion
+
+    - name: Run PowerShell Quick-Start Tests
+      shell: powershell
+      run: |
+        Write-Host "========================================" -ForegroundColor Magenta
+        Write-Host "Running PowerShell Quick-Start Tests" -ForegroundColor Magenta
+        Write-Host "Python Version: ${{ matrix.python-version }}" -ForegroundColor Magenta
+        Write-Host "========================================" -ForegroundColor Magenta
+
+        # Run the test script
+        .\tests\scripts\test-quick-start.ps1 -TestPort 8001
+
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "Tests failed with exit code: $LASTEXITCODE" -ForegroundColor Red
+          exit $LASTEXITCODE
+        }
+      env:
+        PYTHONPATH: ${{ github.workspace }}\src;${{ github.workspace }}
+
+    - name: Display logs on failure
+      if: failure()
+      shell: powershell
+      run: |
+        $logFile = Join-Path $env:USERPROFILE ".config\helpful-tools\helpful-tools-v2.log"
+        if (Test-Path $logFile) {
+          Write-Host "========================================" -ForegroundColor Yellow
+          Write-Host "Application Logs" -ForegroundColor Yellow
+          Write-Host "========================================" -ForegroundColor Yellow
+          Get-Content $logFile -Tail 50
+        } else {
+          Write-Host "No log file found at: $logFile" -ForegroundColor Yellow
+        }
+
+    - name: Upload test logs and artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-logs-python-${{ matrix.python-version }}
+        path: |
+          ${{ env.USERPROFILE }}\.config\helpful-tools\*.log
+          ${{ env.USERPROFILE }}\.config\helpful-tools\*.pid
+          ${{ env.USERPROFILE }}\.config\helpful-tools\.port
+        if-no-files-found: ignore
+        retention-days: 7
+
+  bash-script-test:
+    name: Test Bash Script on Windows (WSL/Git Bash)
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Test quick-start.sh with Git Bash
+      shell: bash
+      run: |
+        echo "Testing quick-start.sh help command..."
+        chmod +x quick-start.sh
+        ./quick-start.sh help || echo "Note: Full bash script may not work on Windows without WSL"
+
+  summary:
+    name: Test Summary
+    runs-on: windows-latest
+    needs: [powershell-tests, bash-script-test]
+    if: always()
+
+    steps:
+    - name: Check test results
+      shell: powershell
+      run: |
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host "Windows Test Summary" -ForegroundColor Cyan
+        Write-Host "========================================" -ForegroundColor Cyan
+
+        $psResult = "${{ needs.powershell-tests.result }}"
+        $bashResult = "${{ needs.bash-script-test.result }}"
+
+        Write-Host "PowerShell Tests: $psResult" -ForegroundColor $(if ($psResult -eq 'success') { 'Green' } else { 'Red' })
+        Write-Host "Bash Script Test: $bashResult" -ForegroundColor $(if ($bashResult -eq 'success') { 'Green' } else { 'Yellow' })
+
+        if ($psResult -ne 'success') {
+          Write-Host "`nPowerShell tests failed!" -ForegroundColor Red
+          exit 1
+        }
+
+        Write-Host "`nAll critical tests passed!" -ForegroundColor Green
