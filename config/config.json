@@ -63,7 +63,7 @@
       "description": "Data sources manager"
     },
     "aws-sf-viewer": {
-      "enabled": false,
+      "enabled": true,
       "description": "AWS Step Functions state machine viewer"
     }
   },

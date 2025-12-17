@@ -718,7 +718,7 @@ class SourcesManager {
                     </div>
                     <div class="form-group">
                         <label for="s3Region">Region (optional)</label>
-                        <input type="text" id="s3Region" name="region" placeholder="us-east-1">
+                        <input type="text" id="s3Region" name="region" placeholder="us-east-1" value="us-east-1">
                     </div>
                 `;
             
