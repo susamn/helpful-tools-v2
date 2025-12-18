@@ -138,15 +138,12 @@ export class StateMachineRenderer {
                     'border-color': '#512DA8'
                 }
             },
-            // Parallel branch
+            // Branch states (states within parallel branches)
             {
-                selector: 'node[type="ParallelBranch"]',
+                selector: 'node[isBranchState]',
                 style: {
-                    'background-color': '#E1BEE7',
-                    'text-outline-color': '#E1BEE7',
-                    'color': '#333',
-                    'border-color': '#9C27B0',
-                    'shape': 'roundrectangle'
+                    'border-width': 2,
+                    'border-style': 'dashed'
                 }
             },
             // Edge styles
@@ -244,6 +241,9 @@ export class StateMachineRenderer {
                     type: node.type,
                     isStart: node.isStart,
                     isEnd: node.isEnd,
+                    isBranchState: node.isBranchState,
+                    branchIndex: node.branchIndex,
+                    parentParallel: node.parentParallel,
                     stateData: node.data
                 }
             });
@@ -261,7 +261,9 @@ export class StateMachineRenderer {
                     isChoice: edge.isChoice,
                     isDefault: edge.isDefault,
                     isError: edge.isError,
-                    isBranch: edge.isBranch
+                    isBranch: edge.isBranch,
+                    isBranchEnd: edge.isBranchEnd,
+                    conditionData: edge.conditionData
                 }
             });
         });

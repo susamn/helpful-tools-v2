@@ -122,8 +122,8 @@ export class StateMachineParser {
 
         // Create edges for transitions
         for (const [stateName, state] of Object.entries(this.stateMachine.States)) {
-            // Standard Next transition
-            if (state.Next) {
+            // Standard Next transition (skip for Parallel states - handled separately)
+            if (state.Next && state.Type !== 'Parallel') {
                 edges.push({
                     id: `${stateName}->${state.Next}`,
                     source: stateName,
@@ -141,7 +141,8 @@ export class StateMachineParser {
                             source: stateName,
                             target: choice.Next,
                             label: this.getChoiceLabel(choice),
-                            isChoice: true
+                            isChoice: true,
+                            conditionData: choice // Store full condition for tooltip
                         });
                     }
                 });
@@ -158,33 +159,107 @@ export class StateMachineParser {
                 }
             }
 
-            // Parallel state branches
+            // Parallel state branches - expand fully into the graph
             if (state.Type === 'Parallel' && state.Branches) {
-                state.Branches.forEach((branch, index) => {
-                    if (branch.StartAt) {
-                        // Create a virtual node for the branch
-                        const branchId = `${stateName}-branch-${index}`;
-                        nodes.push({
-                            id: branchId,
-                            label: `Branch ${index + 1}`,
-                            type: 'ParallelBranch',
-                            isStart: false,
-                            isEnd: false,
-                            data: branch
-                        });
+                state.Branches.forEach((branch, branchIndex) => {
+                    if (branch.StartAt && branch.States) {
+                        // Add all states from the branch directly to the main graph
+                        const branchPrefix = `${stateName}:B${branchIndex + 1}`;
 
-                        edges.push({
-                            id: `${stateName}->${branchId}`,
-                            source: stateName,
-                            target: branchId,
-                            label: `Branch ${index + 1}`,
-                            isBranch: true
-                        });
+                        for (const [branchStateName, branchState] of Object.entries(branch.States)) {
+                            const nodeId = `${branchPrefix}:${branchStateName}`;
+                            const isBranchStart = branchStateName === branch.StartAt;
+                            const isBranchEnd = branchState.End === true || branchState.Type === 'Succeed' || branchState.Type === 'Fail';
 
-                        // Parse branch states
-                        const branchNodes = this.extractBranchNodes(branch, branchId);
-                        nodes.push(...branchNodes.nodes);
-                        edges.push(...branchNodes.edges);
+                            nodes.push({
+                                id: nodeId,
+                                label: `${branchStateName}`,
+                                type: branchState.Type,
+                                isStart: false,
+                                isEnd: false,
+                                isBranchState: true,
+                                branchIndex: branchIndex + 1,
+                                parentParallel: stateName,
+                                data: branchState
+                            });
+
+                            // Edge from parallel state to branch start
+                            if (isBranchStart) {
+                                edges.push({
+                                    id: `${stateName}->${nodeId}`,
+                                    source: stateName,
+                                    target: nodeId,
+                                    label: `B${branchIndex + 1}`,
+                                    isBranch: true
+                                });
+                            }
+
+                            // Internal branch transitions
+                            if (branchState.Next) {
+                                const nextNodeId = `${branchPrefix}:${branchState.Next}`;
+                                edges.push({
+                                    id: `${nodeId}->${nextNodeId}`,
+                                    source: nodeId,
+                                    target: nextNodeId,
+                                    label: ''
+                                });
+                            }
+
+                            // Edge from branch end to parallel's Next state
+                            if (isBranchEnd && state.Next) {
+                                edges.push({
+                                    id: `${nodeId}->${state.Next}`,
+                                    source: nodeId,
+                                    target: state.Next,
+                                    label: '',
+                                    isBranchEnd: true
+                                });
+                            }
+
+                            // Handle Choice states within branches
+                            if (branchState.Type === 'Choice' && branchState.Choices) {
+                                branchState.Choices.forEach((choice, choiceIndex) => {
+                                    if (choice.Next) {
+                                        const choiceTargetId = `${branchPrefix}:${choice.Next}`;
+                                        edges.push({
+                                            id: `${nodeId}->${choiceTargetId}-${choiceIndex}`,
+                                            source: nodeId,
+                                            target: choiceTargetId,
+                                            label: this.getChoiceLabel(choice),
+                                            isChoice: true,
+                                            conditionData: choice
+                                        });
+                                    }
+                                });
+                                if (branchState.Default) {
+                                    const defaultTargetId = `${branchPrefix}:${branchState.Default}`;
+                                    edges.push({
+                                        id: `${nodeId}->${defaultTargetId}-default`,
+                                        source: nodeId,
+                                        target: defaultTargetId,
+                                        label: 'Default',
+                                        isDefault: true
+                                    });
+                                }
+                            }
+
+                            // Handle Catch within branch states
+                            if (branchState.Catch) {
+                                branchState.Catch.forEach((catcher, catchIndex) => {
+                                    if (catcher.Next) {
+                                        const catchTargetId = `${branchPrefix}:${catcher.Next}`;
+                                        edges.push({
+                                            id: `${nodeId}->${catchTargetId}-catch-${catchIndex}`,
+                                            source: nodeId,
+                                            target: catchTargetId,
+                                            label: `Catch: ${catcher.ErrorEquals.join(', ')}`,
+                                            isError: true,
+                                            conditionData: catcher
+                                        });
+                                    }
+                                });
+                            }
+                        }
                     }
                 });
             }
@@ -198,7 +273,8 @@ export class StateMachineParser {
                             source: stateName,
                             target: catcher.Next,
                             label: `Catch: ${catcher.ErrorEquals.join(', ')}`,
-                            isError: true
+                            isError: true,
+                            conditionData: catcher
                         });
                     }
                 });
@@ -215,43 +291,6 @@ export class StateMachineParser {
                 startAt: startState
             }
         };
-    }
-
-    /**
-     * Extract nodes from parallel branch
-     */
-    extractBranchNodes(branch, parentId) {
-        const nodes = [];
-        const edges = [];
-
-        if (!branch.States) {
-            return { nodes, edges };
-        }
-
-        for (const [stateName, state] of Object.entries(branch.States)) {
-            const nodeId = `${parentId}-${stateName}`;
-            nodes.push({
-                id: nodeId,
-                label: stateName,
-                type: state.Type,
-                isStart: stateName === branch.StartAt,
-                isEnd: state.End === true,
-                data: state,
-                parentBranch: parentId
-            });
-
-            if (state.Next) {
-                const nextId = `${parentId}-${state.Next}`;
-                edges.push({
-                    id: `${nodeId}->${nextId}`,
-                    source: nodeId,
-                    target: nextId,
-                    label: ''
-                });
-            }
-        }
-
-        return { nodes, edges };
     }
 
     /**

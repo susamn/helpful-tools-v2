@@ -159,11 +159,27 @@
         }
         .json-panel {
             width: 30%;
+            min-width: 200px;
             background: white;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             border-right: 1px solid #c0c0c0;
+            position: relative;
+        }
+        .resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 6px;
+            height: 100%;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 10;
+        }
+        .resize-handle:hover,
+        .resize-handle.active {
+            background: linear-gradient(to right, transparent, rgba(74, 144, 226, 0.3));
         }
         .json-content {
             flex: 1;
@@ -226,13 +242,13 @@
             background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
         }
         .graph-container {
-            width: 50%;
+            flex: 1;
+            min-width: 300px;
             position: relative;
             background: #ffffff;
             border-right: 1px solid #c0c0c0;
             display: flex;
             flex-direction: column;
-            min-width: 0;
         }
         #cy {
             width: 100%;
@@ -312,10 +328,20 @@
         }
         .info-panel {
             width: 20%;
+            min-width: 200px;
             background: white;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
+        }
+        .info-panel .resize-handle {
+            left: 0;
+            right: auto;
+        }
+        .info-panel .resize-handle:hover,
+        .info-panel .resize-handle.active {
+            background: linear-gradient(to left, transparent, rgba(74, 144, 226, 0.3));
         }
         .panel-header {
             background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
@@ -372,13 +398,74 @@
         .state-details pre {
             background: #f5f5f5;
             border: 1px solid #e0e0e0;
-            padding: 8px;
+            padding: 6px;
             border-radius: 2px;
             overflow-x: auto;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 10px;
+            font-size: 9px;
+            font-weight: 600;
             margin-top: 6px;
-            line-height: 1.3;
+            line-height: 1.25;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        /* Edge condition tooltip */
+        .edge-tooltip {
+            position: absolute;
+            background: #fff;
+            border: 1px solid #c0c0c0;
+            border-radius: 4px;
+            padding: 8px 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-width: 350px;
+            font-size: 11px;
+            pointer-events: auto;
+        }
+        .edge-tooltip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .edge-tooltip-title {
+            font-weight: 600;
+            color: #333;
+        }
+        .edge-tooltip-close {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            line-height: 1;
+        }
+        .edge-tooltip-close:hover {
+            color: #333;
+        }
+        .edge-tooltip pre {
+            background: #f8f8f8;
+            border: 1px solid #e0e0e0;
+            padding: 6px;
+            border-radius: 2px;
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .edge-tooltip-transition {
+            margin-top: 6px;
+            color: #666;
+            font-size: 10px;
+        }
+        .edge-tooltip-transition strong {
+            color: #4a90e2;
         }
         .legend-section {
             background: linear-gradient(to bottom, #f8f8f8, #f0f0f0);
@@ -513,7 +600,7 @@
     </div>
 
     <div class="main-container">
-        <div class="json-panel">
+        <div class="json-panel" id="json-panel">
             <div class="panel-header">
                 <span>JSON Definition</span>
                 <div class="header-controls">
@@ -526,6 +613,7 @@
             <div class="json-content">
                 <textarea class="json-textarea" id="json-textarea" placeholder="Paste or type your AWS Step Functions state machine JSON here..."></textarea>
             </div>
+            <div class="resize-handle" id="json-panel-resize"></div>
         </div>
 
         <div class="graph-container">
@@ -539,6 +627,7 @@
             <div id="cy"></div>
             <div id="loading" class="loading hidden">Loading...</div>
             <div id="error-message" class="error-message hidden"></div>
+            <div id="edge-tooltip" class="edge-tooltip" style="display: none;"></div>
 
             <div class="legend-section">
                 <div class="legend-title">Legend</div>
@@ -571,7 +660,8 @@
             </div>
         </div>
 
-        <div class="info-panel">
+        <div class="info-panel" id="info-panel">
+            <div class="resize-handle" id="info-panel-resize"></div>
             <div class="panel-header">State Information</div>
             <div class="panel-content">
                 <div id="state-details" class="state-details">
@@ -650,11 +740,18 @@
                     walkStartBtn: document.getElementById('walk-start-btn'),
                     walkNextBtn: document.getElementById('walk-next-btn'),
                     walkStopBtn: document.getElementById('walk-stop-btn'),
-                    walkInstruction: document.getElementById('walk-instruction')
+                    walkInstruction: document.getElementById('walk-instruction'),
+                    jsonPanel: document.getElementById('json-panel'),
+                    infoPanel: document.getElementById('info-panel'),
+                    jsonPanelResize: document.getElementById('json-panel-resize'),
+                    infoPanelResize: document.getElementById('info-panel-resize'),
+                    edgeTooltip: document.getElementById('edge-tooltip'),
+                    mainContainer: document.querySelector('.main-container')
                 };
 
                 this.cy = this.renderer.initialize();
                 this.addWalkStyles();
+                this.initPanelResizing();
             }
 
             addWalkStyles() {
@@ -698,6 +795,44 @@
                     .update();
             }
 
+            initPanelResizing() {
+                const setupResize = (handle, panel, direction) => {
+                    let isResizing = false;
+                    let startX, startWidth;
+
+                    handle.addEventListener('mousedown', (e) => {
+                        isResizing = true;
+                        startX = e.clientX;
+                        startWidth = panel.offsetWidth;
+                        handle.classList.add('active');
+                        document.body.style.cursor = 'ew-resize';
+                        document.body.style.userSelect = 'none';
+                        e.preventDefault();
+                    });
+
+                    document.addEventListener('mousemove', (e) => {
+                        if (!isResizing) return;
+                        const diff = direction === 'right' ? e.clientX - startX : startX - e.clientX;
+                        const newWidth = Math.max(200, Math.min(startWidth + diff, window.innerWidth * 0.5));
+                        panel.style.width = newWidth + 'px';
+                        // Trigger cytoscape resize
+                        if (this.cy) this.cy.resize();
+                    });
+
+                    document.addEventListener('mouseup', () => {
+                        if (isResizing) {
+                            isResizing = false;
+                            handle.classList.remove('active');
+                            document.body.style.cursor = '';
+                            document.body.style.userSelect = '';
+                        }
+                    });
+                };
+
+                setupResize(this.elements.jsonPanelResize, this.elements.jsonPanel, 'right');
+                setupResize(this.elements.infoPanelResize, this.elements.infoPanel, 'left');
+            }
+
             attachEventListeners() {
                 // File upload
                 this.elements.uploadFileBtn.addEventListener('click', () => this.elements.fileInput.click());
@@ -729,6 +864,15 @@
                 this.cy.on('tap', (evt) => {
                     if (evt.target === this.cy) {
                         this.clearStateDetails();
+                        this.hideEdgeTooltip();
+                    }
+                });
+
+                // Close edge tooltip when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!this.elements.edgeTooltip.contains(e.target) &&
+                        !e.target.closest('#cy')) {
+                        this.hideEdgeTooltip();
                     }
                 });
             }
@@ -1103,10 +1247,17 @@
             }
 
             handleEdgeClick(evt) {
+                const clickedEdge = evt.target;
+                const edgeData = clickedEdge.data();
+
+                // Show condition tooltip for choice/condition edges
+                if (edgeData.conditionData || edgeData.isChoice || edgeData.isDefault || edgeData.isError) {
+                    this.showEdgeTooltip(evt, edgeData);
+                }
+
+                // Walk mode handling
                 if (!this.walkMode.active) return;
                 if (this.walkMode.availableEdges.length === 0) return;
-
-                const clickedEdge = evt.target;
 
                 // Check if this edge is in available edges
                 const isAvailable = this.walkMode.availableEdges.some(e => e.id() === clickedEdge.id());
@@ -1128,6 +1279,67 @@
 
                 const targetLabel = clickedEdge.target().data('label');
                 this.showInstruction(`<strong>Path selected</strong> → ${targetLabel}<br>Click "Next" to proceed`);
+            }
+
+            showEdgeTooltip(evt, edgeData) {
+                const tooltip = this.elements.edgeTooltip;
+                const renderedPosition = evt.renderedPosition;
+                const container = document.querySelector('.graph-container');
+                const containerRect = container.getBoundingClientRect();
+
+                let title = 'Transition';
+                let conditionHtml = '';
+
+                if (edgeData.isDefault) {
+                    title = 'Default Path';
+                    conditionHtml = '<p>This path is taken when no other conditions match.</p>';
+                } else if (edgeData.isError) {
+                    title = 'Error Handler';
+                    if (edgeData.conditionData) {
+                        conditionHtml = `<pre>${JSON.stringify(edgeData.conditionData, null, 2)}</pre>`;
+                    } else {
+                        conditionHtml = `<p>Catches errors: ${edgeData.label.replace('Catch: ', '')}</p>`;
+                    }
+                } else if (edgeData.conditionData) {
+                    title = 'Condition';
+                    conditionHtml = `<pre>${JSON.stringify(edgeData.conditionData, null, 2)}</pre>`;
+                } else if (edgeData.isChoice) {
+                    title = 'Choice Condition';
+                    conditionHtml = `<p>${edgeData.label || 'Condition'}</p>`;
+                }
+
+                tooltip.innerHTML = `
+                    <div class="edge-tooltip-header">
+                        <span class="edge-tooltip-title">${title}</span>
+                        <button class="edge-tooltip-close" onclick="this.closest('.edge-tooltip').style.display='none'">×</button>
+                    </div>
+                    ${conditionHtml}
+                    <div class="edge-tooltip-transition">
+                        <strong>${edgeData.source}</strong> → <strong>${edgeData.target}</strong>
+                    </div>
+                `;
+
+                // Position tooltip near the click
+                let left = renderedPosition.x + 10;
+                let top = renderedPosition.y + 10;
+
+                // Ensure tooltip stays within container
+                tooltip.style.display = 'block';
+                const tooltipRect = tooltip.getBoundingClientRect();
+
+                if (left + tooltipRect.width > containerRect.width - 20) {
+                    left = renderedPosition.x - tooltipRect.width - 10;
+                }
+                if (top + tooltipRect.height > containerRect.height - 20) {
+                    top = renderedPosition.y - tooltipRect.height - 10;
+                }
+
+                tooltip.style.left = Math.max(10, left) + 'px';
+                tooltip.style.top = Math.max(10, top) + 'px';
+            }
+
+            hideEdgeTooltip() {
+                this.elements.edgeTooltip.style.display = 'none';
             }
 
             stopWalk() {
