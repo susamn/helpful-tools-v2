@@ -4,14 +4,14 @@
  */
 
 // Dynamic import handling for both browser and Node.js
-let StateMachineParser, StateMachineRenderer;
+let NodeParser, NodeRenderer;
 
 if (typeof module !== 'undefined' && module.exports) {
     // Node.js/Jest environment
     const parserModule = require('./parser.js');
     const rendererModule = require('./renderer.js');
-    StateMachineParser = parserModule.StateMachineParser;
-    StateMachineRenderer = rendererModule.StateMachineRenderer;
+    NodeParser = parserModule.StateMachineParser;
+    NodeRenderer = rendererModule.StateMachineRenderer;
 }
 
 class AwsSfViewerApp {
@@ -19,10 +19,10 @@ class AwsSfViewerApp {
         // In browser, use global classes; in Node.js, use required modules
         const ParserClass = (typeof window !== 'undefined' && window.StateMachineParser)
             ? window.StateMachineParser
-            : StateMachineParser;
+            : NodeParser;
         const RendererClass = (typeof window !== 'undefined' && window.StateMachineRenderer)
             ? window.StateMachineRenderer
-            : StateMachineRenderer;
+            : NodeRenderer;
 
         this.parser = new ParserClass();
         this.renderer = new RendererClass('cy');

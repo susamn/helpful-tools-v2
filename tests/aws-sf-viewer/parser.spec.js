@@ -217,6 +217,58 @@ const fixtures = {
       SucceedState: { Type: "Succeed" },
       FailState: { Type: "Fail", Error: "Failed", Cause: "Test failure" }
     }
+  },
+
+  extendedChoiceState: {
+    StartAt: "CheckConditions",
+    States: {
+      CheckConditions: {
+        Type: "Choice",
+        Choices: [
+          {
+            Variable: "$.isActive",
+            BooleanEquals: true,
+            Next: "Active"
+          },
+          {
+            Variable: "$.count",
+            NumericLessThan: 10,
+            Next: "LowCount"
+          },
+          {
+            And: [
+              { Variable: "$.a", BooleanEquals: true },
+              { Variable: "$.b", BooleanEquals: false }
+            ],
+            Next: "ComplexAnd"
+          },
+          {
+            Or: [
+              { Variable: "$.x", NumericEquals: 0 },
+              { Variable: "$.y", NumericEquals: 0 }
+            ],
+            Next: "ComplexOr"
+          },
+          {
+            Not: { Variable: "$.flag", BooleanEquals: true },
+            Next: "ComplexNot"
+          },
+          {
+            Variable: "$.unknown",
+            TimestampEquals: "2023-01-01T00:00:00Z", // Unhandled type in label generation
+            Next: "Unknown"
+          }
+        ],
+        Default: "DefaultPath"
+      },
+      Active: { Type: "Succeed" },
+      LowCount: { Type: "Succeed" },
+      ComplexAnd: { Type: "Succeed" },
+      ComplexOr: { Type: "Succeed" },
+      ComplexNot: { Type: "Succeed" },
+      Unknown: { Type: "Succeed" },
+      DefaultPath: { Type: "Succeed" }
+    }
   }
 };
 
@@ -519,6 +571,30 @@ describe('AWS Step Functions Parser', () => {
         expect(edge.conditionData.Variable).toBeDefined();
         expect(edge.conditionData.Next).toBeDefined();
       });
+    });
+
+    test('should generate labels for extended choice operators', () => {
+      const result = parser.parse(fixtures.extendedChoiceState);
+      const edges = result.edges.filter(e => e.source === 'CheckConditions' && e.isChoice);
+
+      const boolEdge = edges.find(e => e.target === 'Active');
+      expect(boolEdge.label).toContain('$.isActive');
+      expect(boolEdge.label).toContain('true');
+
+      const lessEdge = edges.find(e => e.target === 'LowCount');
+      expect(lessEdge.label).toContain('$.count < 10');
+
+      const andEdge = edges.find(e => e.target === 'ComplexAnd');
+      expect(andEdge.label).toBe('AND condition');
+
+      const orEdge = edges.find(e => e.target === 'ComplexOr');
+      expect(orEdge.label).toBe('OR condition');
+
+      const notEdge = edges.find(e => e.target === 'ComplexNot');
+      expect(notEdge.label).toBe('NOT condition');
+
+      const unknownEdge = edges.find(e => e.target === 'Unknown');
+      expect(unknownEdge.label).toBe('Condition');
     });
   });
 
