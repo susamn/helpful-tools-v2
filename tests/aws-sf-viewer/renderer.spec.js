@@ -316,7 +316,7 @@ describe('AWS Step Functions Renderer', () => {
       renderer.applyLayout('dagre');
 
       expect(mockCy.layout).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'dagre' })
+        expect.objectContaining({ name: 'dagre', animate: false })
       );
     });
 

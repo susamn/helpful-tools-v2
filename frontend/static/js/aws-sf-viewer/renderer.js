@@ -18,6 +18,15 @@ class StateMachineRenderer {
             throw new Error(`Container with id "${this.containerId}" not found`);
         }
 
+        if (typeof cytoscape === 'undefined') {
+            throw new Error('Cytoscape.js is not loaded');
+        }
+
+        // Ensure container is an HTMLElement
+        if (!(container instanceof HTMLElement)) {
+            throw new Error(`Element with id "${this.containerId}" is not a valid HTMLElement`);
+        }
+
         this.cy = cytoscape({
             container: container,
             style: this.getStyles(),
@@ -49,6 +58,8 @@ class StateMachineRenderer {
                     'font-weight': 'bold',
                     'width': 'label',
                     'height': 'label',
+                    'min-width': '60px',
+                    'min-height': '30px',
                     'padding': '10px',
                     'shape': 'roundrectangle',
                     'border-width': 2,
@@ -294,8 +305,7 @@ class StateMachineRenderer {
 
         const layoutOptions = {
             name: layoutName,
-            animate: true,
-            animationDuration: 500,
+            animate: false,
             fit: true,
             padding: 50
         };
