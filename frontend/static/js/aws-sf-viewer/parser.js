@@ -3,7 +3,7 @@
  * Parses Amazon States Language (ASL) JSON format
  */
 
-export class StateMachineParser {
+class StateMachineParser {
     constructor() {
         this.stateMachine = null;
         this.errors = [];
@@ -108,178 +108,16 @@ export class StateMachineParser {
         const edges = [];
         const startState = this.stateMachine.StartAt;
 
-        // Create nodes for each state
-        for (const [stateName, state] of Object.entries(this.stateMachine.States)) {
-            nodes.push({
-                id: stateName,
-                label: stateName,
-                type: state.Type,
-                isStart: stateName === startState,
-                isEnd: state.End === true || state.Type === 'Succeed' || state.Type === 'Fail',
-                data: state
-            });
-        }
-
-        // Create edges for transitions
-        for (const [stateName, state] of Object.entries(this.stateMachine.States)) {
-            // Standard Next transition (skip for Parallel states - handled separately)
-            if (state.Next && state.Type !== 'Parallel') {
-                edges.push({
-                    id: `${stateName}->${state.Next}`,
-                    source: stateName,
-                    target: state.Next,
-                    label: ''
-                });
-            }
-
-            // Choice state transitions
-            if (state.Type === 'Choice' && state.Choices) {
-                state.Choices.forEach((choice, index) => {
-                    if (choice.Next) {
-                        edges.push({
-                            id: `${stateName}->${choice.Next}-${index}`,
-                            source: stateName,
-                            target: choice.Next,
-                            label: this.getChoiceLabel(choice),
-                            isChoice: true,
-                            conditionData: choice // Store full condition for tooltip
-                        });
-                    }
-                });
-
-                // Default transition
-                if (state.Default) {
-                    edges.push({
-                        id: `${stateName}->${state.Default}-default`,
-                        source: stateName,
-                        target: state.Default,
-                        label: 'Default',
-                        isDefault: true
-                    });
-                }
-            }
-
-            // Parallel state branches - expand fully into the graph
-            if (state.Type === 'Parallel' && state.Branches) {
-                state.Branches.forEach((branch, branchIndex) => {
-                    if (branch.StartAt && branch.States) {
-                        // Add all states from the branch directly to the main graph
-                        const branchPrefix = `${stateName}:B${branchIndex + 1}`;
-
-                        for (const [branchStateName, branchState] of Object.entries(branch.States)) {
-                            const nodeId = `${branchPrefix}:${branchStateName}`;
-                            const isBranchStart = branchStateName === branch.StartAt;
-                            const isBranchEnd = branchState.End === true || branchState.Type === 'Succeed' || branchState.Type === 'Fail';
-
-                            nodes.push({
-                                id: nodeId,
-                                label: `${branchStateName}`,
-                                type: branchState.Type,
-                                isStart: false,
-                                isEnd: false,
-                                isBranchState: true,
-                                branchIndex: branchIndex + 1,
-                                parentParallel: stateName,
-                                data: branchState
-                            });
-
-                            // Edge from parallel state to branch start
-                            if (isBranchStart) {
-                                edges.push({
-                                    id: `${stateName}->${nodeId}`,
-                                    source: stateName,
-                                    target: nodeId,
-                                    label: `B${branchIndex + 1}`,
-                                    isBranch: true
-                                });
-                            }
-
-                            // Internal branch transitions
-                            if (branchState.Next) {
-                                const nextNodeId = `${branchPrefix}:${branchState.Next}`;
-                                edges.push({
-                                    id: `${nodeId}->${nextNodeId}`,
-                                    source: nodeId,
-                                    target: nextNodeId,
-                                    label: ''
-                                });
-                            }
-
-                            // Edge from branch end to parallel's Next state
-                            if (isBranchEnd && state.Next) {
-                                edges.push({
-                                    id: `${nodeId}->${state.Next}`,
-                                    source: nodeId,
-                                    target: state.Next,
-                                    label: '',
-                                    isBranchEnd: true
-                                });
-                            }
-
-                            // Handle Choice states within branches
-                            if (branchState.Type === 'Choice' && branchState.Choices) {
-                                branchState.Choices.forEach((choice, choiceIndex) => {
-                                    if (choice.Next) {
-                                        const choiceTargetId = `${branchPrefix}:${choice.Next}`;
-                                        edges.push({
-                                            id: `${nodeId}->${choiceTargetId}-${choiceIndex}`,
-                                            source: nodeId,
-                                            target: choiceTargetId,
-                                            label: this.getChoiceLabel(choice),
-                                            isChoice: true,
-                                            conditionData: choice
-                                        });
-                                    }
-                                });
-                                if (branchState.Default) {
-                                    const defaultTargetId = `${branchPrefix}:${branchState.Default}`;
-                                    edges.push({
-                                        id: `${nodeId}->${defaultTargetId}-default`,
-                                        source: nodeId,
-                                        target: defaultTargetId,
-                                        label: 'Default',
-                                        isDefault: true
-                                    });
-                                }
-                            }
-
-                            // Handle Catch within branch states
-                            if (branchState.Catch) {
-                                branchState.Catch.forEach((catcher, catchIndex) => {
-                                    if (catcher.Next) {
-                                        const catchTargetId = `${branchPrefix}:${catcher.Next}`;
-                                        edges.push({
-                                            id: `${nodeId}->${catchTargetId}-catch-${catchIndex}`,
-                                            source: nodeId,
-                                            target: catchTargetId,
-                                            label: `Catch: ${catcher.ErrorEquals.join(', ')}`,
-                                            isError: true,
-                                            conditionData: catcher
-                                        });
-                                    }
-                                });
-                            }
-                        }
-                    }
-                });
-            }
-
-            // Error handling
-            if (state.Catch) {
-                state.Catch.forEach((catcher, index) => {
-                    if (catcher.Next) {
-                        edges.push({
-                            id: `${stateName}->${catcher.Next}-catch-${index}`,
-                            source: stateName,
-                            target: catcher.Next,
-                            label: `Catch: ${catcher.ErrorEquals.join(', ')}`,
-                            isError: true,
-                            conditionData: catcher
-                        });
-                    }
-                });
-            }
-        }
+        // Process top-level states
+        this.processStates(
+            this.stateMachine.States,
+            startState,
+            '', // no prefix for top-level
+            null, // no parent parallel
+            null, // no next state override
+            nodes,
+            edges
+        );
 
         return {
             nodes,
@@ -291,6 +129,194 @@ export class StateMachineParser {
                 startAt: startState
             }
         };
+    }
+
+    /**
+     * Recursively process states and their nested structures
+     * @param {object} states - States object to process
+     * @param {string} startAt - The start state name
+     * @param {string} prefix - Prefix for node IDs (for nested states)
+     * @param {string} parentNodeId - Parent node ID (for connecting from parent)
+     * @param {string} exitTargetId - Target node ID when branch ends
+     * @param {array} nodes - Nodes array to populate
+     * @param {array} edges - Edges array to populate
+     * @param {object} options - Additional options (branchIndex, isIterator, etc.)
+     */
+    processStates(states, startAt, prefix, parentNodeId, exitTargetId, nodes, edges, options = {}) {
+        const { branchIndex, isIterator, branchLabel } = options;
+
+        for (const [stateName, state] of Object.entries(states)) {
+            const nodeId = prefix ? `${prefix}:${stateName}` : stateName;
+            const isStart = stateName === startAt;
+            const isEnd = state.End === true || state.Type === 'Succeed' || state.Type === 'Fail';
+
+            // Create node
+            nodes.push({
+                id: nodeId,
+                label: stateName,
+                type: state.Type,
+                isStart: isStart && !prefix, // Only mark as start if top-level
+                isEnd: isEnd && !prefix, // Only mark as end if top-level
+                isBranchState: !!prefix,
+                branchIndex: branchIndex,
+                isIteratorState: isIterator,
+                data: state
+            });
+
+            // Edge from parent (parallel/map) to branch start
+            if (isStart && parentNodeId) {
+                edges.push({
+                    id: `${parentNodeId}->${nodeId}`,
+                    source: parentNodeId,
+                    target: nodeId,
+                    label: branchLabel || '',
+                    isBranch: true
+                });
+            }
+
+            // Handle different state types
+            if (state.Type === 'Parallel' && state.Branches) {
+                // Process parallel branches recursively
+                this.processParallelState(state, nodeId, prefix, nodes, edges);
+            } else if (state.Type === 'Map' && state.Iterator) {
+                // Process Map iterator
+                this.processMapState(state, nodeId, prefix, nodes, edges);
+            } else if (state.Type === 'Choice') {
+                // Choice state transitions
+                this.processChoiceState(state, stateName, nodeId, prefix, nodes, edges);
+            } else {
+                // Standard Next transition
+                if (state.Next) {
+                    const nextNodeId = prefix ? `${prefix}:${state.Next}` : state.Next;
+                    edges.push({
+                        id: `${nodeId}->${nextNodeId}`,
+                        source: nodeId,
+                        target: nextNodeId,
+                        label: ''
+                    });
+                }
+            }
+
+            // Edge from branch end to exit target
+            if (isEnd && exitTargetId) {
+                edges.push({
+                    id: `${nodeId}->${exitTargetId}`,
+                    source: nodeId,
+                    target: exitTargetId,
+                    label: '',
+                    isBranchEnd: true
+                });
+            }
+
+            // Error handling (Catch)
+            if (state.Catch) {
+                state.Catch.forEach((catcher, catchIndex) => {
+                    if (catcher.Next) {
+                        const catchTargetId = prefix ? `${prefix}:${catcher.Next}` : catcher.Next;
+                        edges.push({
+                            id: `${nodeId}->${catchTargetId}-catch-${catchIndex}`,
+                            source: nodeId,
+                            target: catchTargetId,
+                            label: `Catch: ${catcher.ErrorEquals.join(', ')}`,
+                            isError: true,
+                            conditionData: catcher
+                        });
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * Process a Parallel state's branches recursively
+     */
+    processParallelState(state, nodeId, prefix, nodes, edges) {
+        state.Branches.forEach((branch, branchIndex) => {
+            if (branch.StartAt && branch.States) {
+                const branchPrefix = `${nodeId}:B${branchIndex + 1}`;
+                const exitTarget = state.Next ? (prefix ? `${prefix}:${state.Next}` : state.Next) : null;
+
+                this.processStates(
+                    branch.States,
+                    branch.StartAt,
+                    branchPrefix,
+                    nodeId,
+                    exitTarget,
+                    nodes,
+                    edges,
+                    { branchIndex: branchIndex + 1, branchLabel: `B${branchIndex + 1}` }
+                );
+            }
+        });
+
+        // Connect parallel state to its Next (if branches don't have End states)
+        // This is handled by individual branch ends above
+    }
+
+    /**
+     * Process a Map state's iterator recursively
+     */
+    processMapState(state, nodeId, prefix, nodes, edges) {
+        const iterator = state.Iterator;
+        if (iterator.StartAt && iterator.States) {
+            const iteratorPrefix = `${nodeId}:Iterator`;
+            const exitTarget = state.Next ? (prefix ? `${prefix}:${state.Next}` : state.Next) : null;
+
+            this.processStates(
+                iterator.States,
+                iterator.StartAt,
+                iteratorPrefix,
+                nodeId,
+                exitTarget,
+                nodes,
+                edges,
+                { isIterator: true, branchLabel: 'Iterator' }
+            );
+        }
+
+        // Standard Next transition for Map state
+        if (state.Next) {
+            const nextNodeId = prefix ? `${prefix}:${state.Next}` : state.Next;
+            edges.push({
+                id: `${nodeId}->${nextNodeId}-map`,
+                source: nodeId,
+                target: nextNodeId,
+                label: ''
+            });
+        }
+    }
+
+    /**
+     * Process a Choice state's transitions
+     */
+    processChoiceState(state, stateName, nodeId, prefix, nodes, edges) {
+        if (state.Choices) {
+            state.Choices.forEach((choice, index) => {
+                if (choice.Next) {
+                    const choiceTargetId = prefix ? `${prefix}:${choice.Next}` : choice.Next;
+                    edges.push({
+                        id: `${nodeId}->${choiceTargetId}-${index}`,
+                        source: nodeId,
+                        target: choiceTargetId,
+                        label: this.getChoiceLabel(choice),
+                        isChoice: true,
+                        conditionData: choice
+                    });
+                }
+            });
+        }
+
+        // Default transition
+        if (state.Default) {
+            const defaultTargetId = prefix ? `${prefix}:${state.Default}` : state.Default;
+            edges.push({
+                id: `${nodeId}->${defaultTargetId}-default`,
+                source: nodeId,
+                target: defaultTargetId,
+                label: 'Default',
+                isDefault: true
+            });
+        }
     }
 
     /**
@@ -324,4 +350,14 @@ export class StateMachineParser {
     getErrors() {
         return this.errors;
     }
+}
+
+// Export for Node.js (CommonJS)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { StateMachineParser };
+}
+
+// Export for browser (global)
+if (typeof window !== 'undefined') {
+    window.StateMachineParser = StateMachineParser;
 }

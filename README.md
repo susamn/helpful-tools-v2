@@ -13,7 +13,7 @@ A comprehensive web-based developer toolkit built with Flask. Simple, fast, and 
 
 ## Features
 
-- **9 Developer Tools** - JSON/YAML formatters, converters, diff viewer, regex tester, and more
+- **11 Developer Tools** - JSON/YAML formatters, converters, diff viewer, regex tester, aws-sf-viewer and more
 - **History Tracking** - Save and retrieve tool usage across sessions
 - **Configurable** - Enable/disable tools via configuration
 - **Modern UI** - Clean, responsive interface
@@ -21,19 +21,19 @@ A comprehensive web-based developer toolkit built with Flask. Simple, fast, and 
 
 ## Available Tools
 
-| Tool | Description | Status |
-|------|-------------|--------|
-| **Scratchpad** | Simple note-taking tool with history tracking | Stable |
-| **JSON Tool** | Format, validate, and minify JSON data | Stable |
-| **YAML Tool** | Format, validate, and work with YAML data | Stable |
-| **JSON-YAML-XML Converter** | Bidirectional format conversion | Stable |
-| **Text Diff Tool** | Compare text side-by-side with highlighting | Stable |
-| **Regex Tester** | Interactive regex testing with live highlighting | Stable |
-| **Cron Parser** | Parse cron expressions with human-readable output | Stable |
-| **Scientific Calculator** | Advanced calculator with graphing support | Stable |
-| **JWT Decoder** | Decode and analyze JWT tokens | Stable |
-| **Sources Manager** | Manage data sources (local, S3, SFTP, HTTP) | Stable |
-| **AWS Step Functions Viewer** | Visualize state machines | Beta (disabled by default) |
+| Tool | Description | Status          |
+|------|-------------|-----------------|
+| **Scratchpad** | Simple note-taking tool with history tracking | Disabled (Beta) |
+| **JSON Tool** | Format, validate, and minify JSON data | Stable          |
+| **YAML Tool** | Format, validate, and work with YAML data | Stable          |
+| **JSON-YAML-XML Converter** | Bidirectional format conversion | Stable          |
+| **Text Diff Tool** | Compare text side-by-side with highlighting | Stable          |
+| **Regex Tester** | Interactive regex testing with live highlighting | Stable          |
+| **Cron Parser** | Parse cron expressions with human-readable output | Stable          |
+| **Scientific Calculator** | Advanced calculator with graphing support | Stable          |
+| **JWT Decoder** | Decode and analyze JWT tokens | Stable          |
+| **Sources Manager** | Manage data sources (local, S3, SFTP, HTTP) | Stable          |
+| **AWS Step Functions Viewer** | Visualize state machines | Beta            |
 
 ## Screenshots
 
@@ -54,6 +54,9 @@ A comprehensive web-based developer toolkit built with Flask. Simple, fast, and 
 
 ### Scientific Calculator
 ![Scientific Calculator](screenshots/scientific-calculator.png)
+
+### AWS SF Viewer (Beta)
+![AWS SF Viewer](screenshots/aws-sf-viewer.png)
 
 ## Quick Start
 

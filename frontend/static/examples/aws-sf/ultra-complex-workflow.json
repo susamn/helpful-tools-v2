@@ -1,0 +1,288 @@
+{
+  "Comment": "Ultra-complex orchestration with nested parallelism, map, saga, and callbacks",
+  "StartAt": "ValidateRequest",
+  "States": {
+
+    "ValidateRequest": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123:function:validate",
+      "TimeoutSeconds": 10,
+      "Retry": [{
+        "ErrorEquals": ["States.ALL"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2
+      }],
+      "Catch": [{
+        "ErrorEquals": ["States.ALL"],
+        "Next": "FailWorkflow"
+      }],
+      "Next": "PreflightChecks"
+    },
+
+    "PreflightChecks": {
+      "Type": "Parallel",
+      "Next": "MainProcessing",
+      "Branches": [
+
+        {
+          "StartAt": "CheckQuota",
+          "States": {
+            "CheckQuota": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123:function:check-quota",
+              "End": true
+            }
+          }
+        },
+
+        {
+          "StartAt": "CheckDependencies",
+          "States": {
+            "CheckDependencies": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123:function:check-deps",
+              "End": true
+            }
+          }
+        },
+
+        {
+          "StartAt": "CheckFeatureFlags",
+          "States": {
+            "CheckFeatureFlags": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123:function:feature-flags",
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+
+    "MainProcessing": {
+      "Type": "Parallel",
+      "Next": "EvaluateGlobalRisk",
+      "Branches": [
+
+        {
+          "StartAt": "IngestPipeline",
+          "States": {
+            "IngestPipeline": {
+              "Type": "Parallel",
+              "Next": "PersistRawData",
+              "Branches": [
+
+                {
+                  "StartAt": "PullFromS3",
+                  "States": {
+                    "PullFromS3": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:lambda:us-east-1:123:function:pull-s3",
+                      "End": true
+                    }
+                  }
+                },
+
+                {
+                  "StartAt": "PullFromAPI",
+                  "States": {
+                    "PullFromAPI": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:lambda:us-east-1:123:function:pull-api",
+                      "Retry": [{
+                        "ErrorEquals": ["States.Timeout"],
+                        "IntervalSeconds": 5,
+                        "MaxAttempts": 3
+                      }],
+                      "End": true
+                    }
+                  }
+                }
+
+              ]
+            },
+
+            "PersistRawData": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123:function:persist-raw",
+              "End": true
+            }
+          }
+        },
+
+        {
+          "StartAt": "RiskAssessment",
+          "States": {
+            "RiskAssessment": {
+              "Type": "Parallel",
+              "Next": "ComputeRiskScore",
+              "Branches": [
+
+                {
+                  "StartAt": "FraudScan",
+                  "States": {
+                    "FraudScan": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:lambda:us-east-1:123:function:fraud-scan",
+                      "End": true
+                    }
+                  }
+                },
+
+                {
+                  "StartAt": "ComplianceScan",
+                  "States": {
+                    "ComplianceScan": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:lambda:us-east-1:123:function:compliance",
+                      "End": true
+                    }
+                  }
+                },
+
+                {
+                  "StartAt": "AnomalyDetection",
+                  "States": {
+                    "AnomalyDetection": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:lambda:us-east-1:123:function:anomaly",
+                      "End": true
+                    }
+                  }
+                }
+
+              ]
+            },
+
+            "ComputeRiskScore": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123:function:risk-score",
+              "End": true
+            }
+          }
+        },
+
+        {
+          "StartAt": "MetadataPipeline",
+          "States": {
+            "MetadataPipeline": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:123:function:metadata",
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+
+    "EvaluateGlobalRisk": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.risk.score",
+          "NumericGreaterThan": 80,
+          "Next": "ManualApproval"
+        }
+      ],
+      "Default": "ProcessItems"
+    },
+
+    "ProcessItems": {
+      "Type": "Map",
+      "ItemsPath": "$.items",
+      "MaxConcurrency": 10,
+      "Iterator": {
+        "StartAt": "ItemRouting",
+        "States": {
+
+          "ItemRouting": {
+            "Type": "Choice",
+            "Choices": [
+              {
+                "Variable": "$.type",
+                "StringEquals": "FAST",
+                "Next": "FastItemFlow"
+              }
+            ],
+            "Default": "SlowItemFlow"
+          },
+
+          "FastItemFlow": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:us-east-1:123:function:fast-item",
+            "End": true
+          },
+
+          "SlowItemFlow": {
+            "Type": "Parallel",
+            "Next": "FinalizeItem",
+            "Branches": [
+
+              {
+                "StartAt": "TransformItem",
+                "States": {
+                  "TransformItem": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:lambda:us-east-1:123:function:transform",
+                    "End": true
+                  }
+                }
+              },
+
+              {
+                "StartAt": "EnrichItem",
+                "States": {
+                  "EnrichItem": {
+                    "Type": "Task",
+                    "Resource": "arn:aws:lambda:us-east-1:123:function:enrich",
+                    "End": true
+                  }
+                }
+              }
+
+            ]
+          },
+
+          "FinalizeItem": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:us-east-1:123:function:finalize-item",
+            "End": true
+          }
+        }
+      },
+      "Next": "FinalizeWorkflow"
+    },
+
+    "ManualApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish.waitForTaskToken",
+      "TimeoutSeconds": 86400,
+      "HeartbeatSeconds": 3600,
+      "Parameters": {
+        "Message": {
+          "TaskToken.$": "$.Task.Token",
+          "Input.$": "$"
+        },
+        "TopicArn": "arn:aws:sns:us-east-1:123:manual-approval"
+      },
+      "Next": "ProcessItems"
+    },
+
+    "FinalizeWorkflow": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:123:function:finalize",
+      "Next": "SucceedWorkflow"
+    },
+
+    "SucceedWorkflow": {
+      "Type": "Succeed"
+    },
+
+    "FailWorkflow": {
+      "Type": "Fail",
+      "Error": "WorkflowFailed",
+      "Cause": "Unhandled failure"
+    }
+  }
+}
