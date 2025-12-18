@@ -2,7 +2,7 @@
  * State Machine Renderer using Cytoscape.js
  */
 
-export class StateMachineRenderer {
+class StateMachineRenderer {
     constructor(containerId) {
         this.containerId = containerId;
         this.cy = null;
@@ -146,6 +146,14 @@ export class StateMachineRenderer {
                     'border-style': 'dashed'
                 }
             },
+            // Iterator states (states within Map iterators)
+            {
+                selector: 'node[isIteratorState]',
+                style: {
+                    'border-width': 2,
+                    'border-style': 'dotted'
+                }
+            },
             // Edge styles
             {
                 selector: 'edge',
@@ -244,6 +252,7 @@ export class StateMachineRenderer {
                     isBranchState: node.isBranchState,
                     branchIndex: node.branchIndex,
                     parentParallel: node.parentParallel,
+                    isIteratorState: node.isIteratorState,
                     stateData: node.data
                 }
             });
@@ -380,4 +389,14 @@ export class StateMachineRenderer {
             this.cy = null;
         }
     }
+}
+
+// Export for Node.js (CommonJS)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { StateMachineRenderer };
+}
+
+// Export for browser (global)
+if (typeof window !== 'undefined') {
+    window.StateMachineRenderer = StateMachineRenderer;
 }
