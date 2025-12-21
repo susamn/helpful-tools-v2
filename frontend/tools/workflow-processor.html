@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workflow Processor - Helpful Tools v2</title>
+    <link rel="stylesheet" href="/static/css/common-enhancements.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            color: #333;
+            font-size: 13px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+            border-bottom: 1px solid #c0c0c0;
+            padding: 8px 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            height: 40px;
+        }
+        .header h1 {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+        }
+        .header a {
+            background: linear-gradient(to bottom, #f8f8f8, #e0e0e0);
+            border: 1px solid #a0a0a0;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 2px;
+            color: #333;
+            text-decoration: none;
+        }
+        .header a:hover {
+            background: linear-gradient(to bottom, #ffffff, #e8e8e8);
+        }
+        .main-container {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .left-pane {
+            width: 300px;
+            background: #f5f5f5;
+            border-right: 1px solid #c0c0c0;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        .right-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            min-width: 0;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+            color: #555;
+        }
+        .source-selection {
+            background: white;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .selected-file-info {
+            margin-top: 5px;
+            font-size: 11px;
+            color: #666;
+            word-break: break-all;
+        }
+        .workflow-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .workflow-step {
+            background: white;
+            border: 1px solid #ddd;
+            border-left: 4px solid #ddd; /* Default status color */
+            border-radius: 4px;
+            padding: 10px;
+            position: relative;
+            transition: border-left-color 0.3s;
+        }
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .step-number {
+            font-weight: bold;
+            color: #555;
+        }
+        .remove-step {
+            color: #dc3545;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+        }
+        .step-controls select, .step-controls input {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 5px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .add-step-btn {
+            width: 100%;
+            padding: 8px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .add-step-btn:hover {
+            background: #218838;
+        }
+        .run-btn {
+            width: 100%;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .run-btn:hover {
+            background: #0069d9;
+        }
+        .run-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .output-header {
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #c0c0c0;
+            font-weight: bold;
+            color: #555;
+        }
+        #outputArea {
+            flex: 1;
+            width: 100%;
+            border: none;
+            padding: 10px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            resize: none;
+            outline: none;
+        }
+        .load-more-container {
+            padding: 10px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+            background: #f9f9f9;
+        }
+        .load-more-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .load-more-btn:hover {
+            background: #0069d9;
+        }
+        .param-field {
+            margin-top: 5px;
+        }
+        .step-status {
+            font-size: 10px;
+            margin-top: 4px;
+            font-style: italic;
+            display: none;
+        }
+        
+        /* Autocomplete Styles (Simplified) */
+        .autocomplete-dropdown {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        .autocomplete-item {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .autocomplete-item:hover, .autocomplete-item.selected {
+            background: #f0f8ff;
+            color: #007bff;
+        }
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚙️ Workflow Processor</h1>
+        <a href="/">← Back to Tools</a>
+    </div>
+
+    <div class="main-container">
+        <div class="left-pane">
+            <div class="section-title">1. Input Source</div>
+            <div class="source-selection">
+                <button id="selectSourceBtn" style="width: 100%; padding: 5px;">Select File</button>
+                <div id="selectedFileInfo" class="selected-file-info">No file selected</div>
+                <div style="margin-top: 10px; display: flex; align-items: center;">
+                    <input type="checkbox" id="paginationCheckbox" checked style="margin-right: 5px;">
+                    <label for="paginationCheckbox" style="font-size: 12px; color: #555;">Enable Pagination for Large Results</label>
+                </div>
+            </div>
+
+            <div class="section-title">2. Build Workflow</div>
+            
+            <!-- Default Process Step -->
+            <div id="initialProcessStep" class="workflow-step" style="margin-bottom: 10px;">
+                <div class="step-header">
+                    <span class="step-number" style="color: #007bff;">Initial Load</span>
+                </div>
+                <div class="step-controls">
+                    <div style="padding: 6px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 3px; color: #666; font-size: 12px;">
+                        ⬇️ Download & Read File
+                    </div>
+                </div>
+                <div class="step-status" id="initialStatus"></div>
+            </div>
+
+            <div id="workflowList" class="workflow-list">
+                <!-- Steps will be added here -->
+            </div>
+            <button id="addStepBtn" class="add-step-btn">+ Add Step</button>
+
+            <div class="section-title">3. Execute</div>
+            <button id="runBtn" class="run-btn" disabled>Run Workflow</button>
+        </div>
+
+        <div class="right-pane">
+            <div class="output-header">Output</div>
+            <textarea id="outputArea" readonly placeholder="Output will appear here..."></textarea>
+            <div class="load-more-container" id="loadMoreContainer" style="display: none;">
+                <button class="load-more-btn" id="loadMoreBtn">Load More...</button>
+                <span id="loadMoreStatus" style="font-size: 11px; color: #666; margin-left: 10px;"></span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/source-selector.js"></script>
+    <script src="/static/js/source-selector-loader.js"></script>
+    <script src="/static/js/workflow-processor.js"></script>
+</body>
+</html>

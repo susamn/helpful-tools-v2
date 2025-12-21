@@ -26,3 +26,5 @@ colorama==0.4.6
 # Validation dependencies (optional)
 jsonschema==4.17.3
 xmlschema==2.5.1
+
+jsonpath-ng

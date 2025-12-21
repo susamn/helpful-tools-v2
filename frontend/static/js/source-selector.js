@@ -243,6 +243,7 @@ class SourceSelector {
             onEdit: null, // Callback when source is edited: (source) => {}
             showEditButton: true,
             showFetchButton: true,
+            fetchOnSelect: true,
             allowMultiSelect: false,
             ...options
         };
@@ -1202,6 +1203,25 @@ class SourceSelector {
             
             // Mark current item as selected
             element.classList.add('selected');
+
+            // Handle fetchOnSelect: false - skip download
+            if (!this.options.fetchOnSelect) {
+                // Hide the modal
+                this.hide();
+
+                // Create modified source object with file path
+                const fileSource = {
+                    ...source,
+                    selectedFile: filePath,
+                    pathDisplay: `${source.name}/${filePath}`
+                };
+
+                // Trigger fetch callback with null data (indicating no content fetched)
+                if (this.options.onFetch) {
+                    this.options.onFetch(null, fileSource);
+                }
+                return;
+            }
 
             // Show loading indicator
             this.showFileLoading(filePath, source.name);
