@@ -176,9 +176,7 @@ class WorkflowProcessor {
             { value: 'csv_to_yaml', label: 'CSV to YAML' },
             { value: 'csv_to_xml', label: 'CSV to XML' },
             { value: 'json_to_xml', label: 'JSON to XML' },
-            { value: 'json_to_yaml', label: 'JSON to YAML' },
-            { value: 'json_to_toml', label: 'JSON to TOML' },
-            { value: 'toml_to_json', label: 'TOML to JSON' }
+            { value: 'json_to_yaml', label: 'JSON to YAML' }
         ];
 
         this.init();

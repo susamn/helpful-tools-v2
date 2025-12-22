@@ -13,20 +13,6 @@ from utils.encryption import encrypt_data, decrypt_data
 from sources import SourceFactory
 from utils import source_helpers
 
-try:
-    import tomllib
-except ImportError:
-    # Fallback for older Python versions
-    try:
-        import tomli as tomllib
-    except ImportError:
-        tomllib = None
-
-try:
-    import tomli_w
-except ImportError:
-    tomli_w = None
-
 workflow_bp = Blueprint('workflow', __name__)
 
 CONFIG_DIR = Path.home() / ".config" / "helpful-tools"
@@ -243,18 +229,6 @@ def process_workflow_logic(content, workflow, run_id=None):
                 
             elif operator == 'json_to_yaml':
                 current_data = converter.json_to_yaml(current_data)
-                
-            elif operator == 'json_to_toml':
-                if not tomli_w:
-                    return {'error': 'tomli-w library not installed', 'step_index': i}
-                obj = json.loads(current_data)
-                current_data = tomli_w.dumps(obj)
-                
-            elif operator == 'toml_to_json':
-                if not tomllib:
-                    return {'error': 'tomllib (or tomli) library not installed', 'step_index': i}
-                obj = tomllib.loads(current_data)
-                current_data = json.dumps(obj, indent=2)
                 
             elif operator == 'jsonpath':
                 # Basic JSONPath implementation if jsonpath-ng is missing

@@ -15,7 +15,6 @@ from main import app
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-#from src.main import generate_diff, generate_character_diff_html, app
 
 class TestDiffGenerationFunctions(unittest.TestCase):
     """Test suite for diff generation logic"""
