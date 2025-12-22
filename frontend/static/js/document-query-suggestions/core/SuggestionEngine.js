@@ -33,8 +33,7 @@ class DocumentQuerySuggestionEngine {
             'json': () => new JSONDocumentParser(),
             'yaml': () => new YAMLDocumentParser(),
             'yml': () => new YAMLDocumentParser(),
-            'xml': () => new XMLDocumentParser(),
-            'toml': () => new TOMLDocumentParser()
+            'xml': () => new XMLDocumentParser()
         };
 
         const parserFactory = parsers[documentType];

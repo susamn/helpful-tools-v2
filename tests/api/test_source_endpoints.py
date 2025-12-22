@@ -100,7 +100,7 @@ class TestSourceAPIEndpoints:
 class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
     """Test /api/sources/<id>/fetch endpoint."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_fetch_file_source(self, mock_get_sources):
         """Test fetching from a file source."""
         mock_get_sources.return_value = self.mock_sources
@@ -112,7 +112,7 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         assert b"Test file content" in response.data
         assert b"Second line" in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_fetch_directory_source(self, mock_get_sources):
         """Test fetching from a directory source."""
         mock_get_sources.return_value = self.mock_sources
@@ -151,7 +151,7 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         assert subfile_item is not None
         assert subfile_item['is_directory'] is False
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_fetch_nonexistent_source(self, mock_get_sources):
         """Test fetching from a non-existent source."""
         mock_get_sources.return_value = self.mock_sources
@@ -164,7 +164,7 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert 'error' in data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     @patch('sources.s3.S3Source._get_s3_client')
     def test_fetch_s3_file_source(self, mock_get_client, mock_get_sources):
         """Test fetching from S3 file source."""
@@ -202,7 +202,7 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         assert 'text/plain' in response.content_type
         assert b"S3 file content" in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     @patch('sources.s3.S3Source._get_s3_client')
     def test_fetch_s3_directory_source(self, mock_get_client, mock_get_sources):
         """Test fetching from S3 directory source."""
@@ -273,7 +273,7 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
         assert file_item is not None
         assert file_item['name'] == 'file1.txt'
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_fetch_source_not_found(self, mock_get_sources):
         """Test fetching from unknown source ID."""
         mock_get_sources.return_value = self.mock_sources
@@ -289,7 +289,7 @@ class TestFetchSourceEndpoint(TestSourceAPIEndpoints):
 class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
     """Test /api/sources/<id>/browse endpoint."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_browse_directory_source(self, mock_get_sources):
         """Test browsing a directory source."""
         mock_get_sources.return_value = self.mock_sources
@@ -322,7 +322,7 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
         assert subdir_item is not None
         assert subdir_item['has_children'] is True
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_browse_file_source_error(self, mock_get_sources):
         """Test browsing a file source (should fail)."""
         mock_get_sources.return_value = self.mock_sources
@@ -334,7 +334,7 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert 'not a directory' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_browse_with_path_parameter(self, mock_get_sources):
         """Test browsing with path parameter."""
         mock_get_sources.return_value = self.mock_sources
@@ -351,7 +351,7 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
         subfile_item = next((item for item in tree if item['name'] == 'subfile.txt'), None)
         assert subfile_item is not None
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     @patch('sources.s3.S3Source._get_s3_client')
     def test_browse_s3_directory_source(self, mock_get_client, mock_get_sources):
         """Test browsing S3 directory source."""
@@ -422,7 +422,7 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
         assert file_item['name'] == 'file1.txt'
         assert file_item['size'] == 1024
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_browse_non_local_file_source(self, mock_get_sources):
         """Test browsing non-local file source type."""
         sources = {
@@ -448,7 +448,7 @@ class TestBrowseSourceEndpoint(TestSourceAPIEndpoints):
 class TestFileSourceEndpoint(TestSourceAPIEndpoints):
     """Test /api/sources/<id>/file endpoint."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_get_file_from_directory_source(self, mock_get_sources):
         """Test getting specific file from directory source."""
         mock_get_sources.return_value = self.mock_sources
@@ -460,7 +460,7 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
         assert b"Test file content" in response.data
         assert b"Second line" in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_get_file_from_subdirectory(self, mock_get_sources):
         """Test getting file from subdirectory."""
         mock_get_sources.return_value = self.mock_sources
@@ -471,7 +471,7 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
         assert 'text/plain' in response.content_type
         assert b"Subfile content" in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_get_file_missing_path_parameter(self, mock_get_sources):
         """Test getting file without path parameter."""
         mock_get_sources.return_value = self.mock_sources
@@ -483,7 +483,7 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert 'File path parameter required' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_get_nonexistent_file(self, mock_get_sources):
         """Test getting non-existent file."""
         mock_get_sources.return_value = self.mock_sources
@@ -495,7 +495,7 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert 'File not found' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_get_directory_as_file(self, mock_get_sources):
         """Test trying to get directory as file."""
         mock_get_sources.return_value = self.mock_sources
@@ -507,7 +507,7 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert 'Path is a directory, not a file' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_path_traversal_security(self, mock_get_sources):
         """Test path traversal security."""
         mock_get_sources.return_value = self.mock_sources
@@ -520,7 +520,7 @@ class TestFileSourceEndpoint(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert 'Access denied' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_get_file_from_non_local_source(self, mock_get_sources):
         """Test getting file from non-local source type."""
         sources = {
@@ -678,7 +678,7 @@ class TestDirectoryTreeFunction(TestSourceAPIEndpoints):
 class TestErrorHandling(TestSourceAPIEndpoints):
     """Test error handling in API endpoints."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_missing_source_id(self, mock_get_sources):
         """Test handling of missing source ID."""
         mock_get_sources.return_value = {}
@@ -690,8 +690,8 @@ class TestErrorHandling(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert data['error'] == 'Source not found'
     
-    @patch('main.get_stored_sources')
-    @patch('main.convert_to_source_config')
+    @patch('utils.source_helpers.get_stored_sources')
+    @patch('utils.source_helpers.convert_to_source_config')
     def test_source_creation_error(self, mock_convert, mock_get_sources):
         """Test handling of source creation errors."""
         mock_get_sources.return_value = self.mock_sources
@@ -704,7 +704,7 @@ class TestErrorHandling(TestSourceAPIEndpoints):
         assert data['success'] is False
         assert 'Source creation failed' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_permission_error_handling(self, mock_get_sources):
         """Test handling of permission errors."""
         # Create a source pointing to a restricted path

@@ -49,7 +49,7 @@ class TestPaginationEndpoints:
             os.makedirs(dir_path)
 
         # Mock source storage
-        with patch('main.get_stored_sources') as mock_get_sources:
+        with patch('utils.source_helpers.get_stored_sources') as mock_get_sources:
             mock_sources = {
                 'test-local-123': {
                     'source_id': 'test-local-123',
@@ -190,7 +190,7 @@ class TestPaginationEndpoints:
 
     def test_browse_paginated_source_error(self, client):
         """Test pagination endpoint when source has errors."""
-        with patch('main.get_stored_sources') as mock_get_sources:
+        with patch('utils.source_helpers.get_stored_sources') as mock_get_sources:
             mock_sources = {
                 'error-source': {
                     'source_id': 'error-source',
@@ -303,7 +303,7 @@ class TestPaginationEndpoints:
         mock_paginator.paginate.return_value = [mock_page]
 
         # Mock source storage
-        with patch('main.get_stored_sources') as mock_get_sources:
+        with patch('utils.source_helpers.get_stored_sources') as mock_get_sources:
             mock_sources = {
                 'test-s3': {
                     'source_id': 'test-s3',
@@ -347,7 +347,7 @@ class TestPaginationEndpointEdgeCases:
     def test_empty_directory_pagination(self, client):
         """Test pagination with empty directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch('main.get_stored_sources') as mock_get_sources:
+            with patch('utils.source_helpers.get_stored_sources') as mock_get_sources:
                 mock_sources = {
                     'empty-source': {
                         'source_id': 'empty-source',
@@ -376,7 +376,7 @@ class TestPaginationEndpointEdgeCases:
                 with open(os.path.join(temp_dir, f'file{i}.txt'), 'w') as f:
                     f.write('content')
 
-            with patch('main.get_stored_sources') as mock_get_sources:
+            with patch('utils.source_helpers.get_stored_sources') as mock_get_sources:
                 mock_sources = {
                     'small-source': {
                         'source_id': 'small-source',

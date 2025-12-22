@@ -8,11 +8,13 @@ import sys
 import os
 import json
 
+from src.blueprints.text_diff import generate_diff, generate_character_diff_html
+from main import app
+
 # Add project root to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from src.main import generate_diff, generate_character_diff_html, app
 
 class TestDiffGenerationFunctions(unittest.TestCase):
     """Test suite for diff generation logic"""

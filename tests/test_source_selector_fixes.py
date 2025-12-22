@@ -20,7 +20,8 @@ from unittest.mock import patch, MagicMock
 import sys
 sys.path.insert(0, '/home/susamn/dotfiles/workspace/tools/helpful-tools-v2/src')
 
-from main import app, check_source_connection, convert_to_source_config
+from main import app
+from utils.source_helpers import check_source_connection, convert_to_source_config
 
 
 class TestSourceSelectorFixes:
