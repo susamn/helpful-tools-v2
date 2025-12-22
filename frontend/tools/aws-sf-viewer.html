@@ -159,11 +159,27 @@
         }
         .json-panel {
             width: 30%;
+            min-width: 200px;
             background: white;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             border-right: 1px solid #c0c0c0;
+            position: relative;
+        }
+        .resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 6px;
+            height: 100%;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 10;
+        }
+        .resize-handle:hover,
+        .resize-handle.active {
+            background: linear-gradient(to right, transparent, rgba(74, 144, 226, 0.3));
         }
         .json-content {
             flex: 1;
@@ -226,13 +242,13 @@
             background: linear-gradient(to bottom, #5ba0f2, #4a90e2);
         }
         .graph-container {
-            width: 50%;
+            flex: 1;
+            min-width: 300px;
             position: relative;
             background: #ffffff;
             border-right: 1px solid #c0c0c0;
             display: flex;
             flex-direction: column;
-            min-width: 0;
         }
         #cy {
             width: 100%;
@@ -312,10 +328,20 @@
         }
         .info-panel {
             width: 20%;
+            min-width: 200px;
             background: white;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
+        }
+        .info-panel .resize-handle {
+            left: 0;
+            right: auto;
+        }
+        .info-panel .resize-handle:hover,
+        .info-panel .resize-handle.active {
+            background: linear-gradient(to left, transparent, rgba(74, 144, 226, 0.3));
         }
         .panel-header {
             background: linear-gradient(to bottom, #f0f0f0, #e0e0e0);
@@ -372,13 +398,74 @@
         .state-details pre {
             background: #f5f5f5;
             border: 1px solid #e0e0e0;
-            padding: 8px;
+            padding: 6px;
             border-radius: 2px;
             overflow-x: auto;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 10px;
+            font-size: 9px;
+            font-weight: 600;
             margin-top: 6px;
-            line-height: 1.3;
+            line-height: 1.25;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        /* Edge condition tooltip */
+        .edge-tooltip {
+            position: absolute;
+            background: #fff;
+            border: 1px solid #c0c0c0;
+            border-radius: 4px;
+            padding: 8px 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-width: 350px;
+            font-size: 11px;
+            pointer-events: auto;
+        }
+        .edge-tooltip-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .edge-tooltip-title {
+            font-weight: 600;
+            color: #333;
+        }
+        .edge-tooltip-close {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            line-height: 1;
+        }
+        .edge-tooltip-close:hover {
+            color: #333;
+        }
+        .edge-tooltip pre {
+            background: #f8f8f8;
+            border: 1px solid #e0e0e0;
+            padding: 6px;
+            border-radius: 2px;
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .edge-tooltip-transition {
+            margin-top: 6px;
+            color: #666;
+            font-size: 10px;
+        }
+        .edge-tooltip-transition strong {
+            color: #4a90e2;
         }
         .legend-section {
             background: linear-gradient(to bottom, #f8f8f8, #f0f0f0);
@@ -489,6 +576,7 @@
                 <option value="/static/examples/aws-sf/parallel-states.json">Parallel States</option>
                 <option value="/static/examples/aws-sf/choice-state.json">Choice State</option>
                 <option value="/static/examples/aws-sf/error-handling.json">Error Handling</option>
+                <option value="/static/examples/aws-sf/ultra-complex-workflow.json">Ultra Complex (Nested Parallel + Map)</option>
             </select>
         </div>
 
@@ -513,7 +601,7 @@
     </div>
 
     <div class="main-container">
-        <div class="json-panel">
+        <div class="json-panel" id="json-panel">
             <div class="panel-header">
                 <span>JSON Definition</span>
                 <div class="header-controls">
@@ -526,6 +614,7 @@
             <div class="json-content">
                 <textarea class="json-textarea" id="json-textarea" placeholder="Paste or type your AWS Step Functions state machine JSON here..."></textarea>
             </div>
+            <div class="resize-handle" id="json-panel-resize"></div>
         </div>
 
         <div class="graph-container">
@@ -539,6 +628,7 @@
             <div id="cy"></div>
             <div id="loading" class="loading hidden">Loading...</div>
             <div id="error-message" class="error-message hidden"></div>
+            <div id="edge-tooltip" class="edge-tooltip" style="display: none;"></div>
 
             <div class="legend-section">
                 <div class="legend-title">Legend</div>
@@ -571,7 +661,8 @@
             </div>
         </div>
 
-        <div class="info-panel">
+        <div class="info-panel" id="info-panel">
+            <div class="resize-handle" id="info-panel-resize"></div>
             <div class="panel-header">State Information</div>
             <div class="panel-content">
                 <div id="state-details" class="state-details">
@@ -597,637 +688,12 @@
     </div>
 
     <script src="/static/js/common-functions.js"></script>
-    <script type="module">
-        import { StateMachineParser } from '/static/js/aws-sf-viewer/parser.js';
-        import { StateMachineRenderer } from '/static/js/aws-sf-viewer/renderer.js';
-
-        class AwsSfViewerApp {
-            constructor() {
-                this.parser = new StateMachineParser();
-                this.renderer = new StateMachineRenderer('cy');
-                this.currentGraph = null;
-                this.cy = null;
-                this.fontSize = 12;
-
-                // Walk mode state
-                this.walkMode = {
-                    active: false,
-                    currentNode: null,
-                    visitedNodes: [],
-                    visitedEdges: [],
-                    selectedEdge: null,
-                    availableEdges: []
-                };
-
-                this.initializeUI();
-                this.attachEventListeners();
-            }
-
-            initializeUI() {
-                this.elements = {
-                    fileInput: document.getElementById('file-input'),
-                    uploadFileBtn: document.getElementById('upload-file-btn'),
-                    fileName: document.getElementById('file-name'),
-                    exampleSelect: document.getElementById('example-select'),
-                    layoutSelect: document.getElementById('layout-select'),
-                    zoomInBtn: document.getElementById('zoom-in-btn'),
-                    zoomOutBtn: document.getElementById('zoom-out-btn'),
-                    fitBtn: document.getElementById('fit-btn'),
-                    exportBtn: document.getElementById('export-btn'),
-                    loading: document.getElementById('loading'),
-                    errorMessage: document.getElementById('error-message'),
-                    stateDetails: document.getElementById('state-details'),
-                    statusText: document.getElementById('statusText'),
-                    stateCount: document.getElementById('stateCount'),
-                    transitionCount: document.getElementById('transitionCount'),
-                    fontIncreaseBtn: document.getElementById('fontIncreaseBtn'),
-                    fontDecreaseBtn: document.getElementById('fontDecreaseBtn'),
-                    jsonTextarea: document.getElementById('json-textarea'),
-                    jsonError: document.getElementById('json-error'),
-                    applyJsonBtn: document.getElementById('apply-json-btn'),
-                    formatJsonBtn: document.getElementById('format-json-btn'),
-                    clearJsonBtn: document.getElementById('clear-json-btn'),
-                    walkStartBtn: document.getElementById('walk-start-btn'),
-                    walkNextBtn: document.getElementById('walk-next-btn'),
-                    walkStopBtn: document.getElementById('walk-stop-btn'),
-                    walkInstruction: document.getElementById('walk-instruction')
-                };
-
-                this.cy = this.renderer.initialize();
-                this.addWalkStyles();
-            }
-
-            addWalkStyles() {
-                // Add custom styles for walk mode
-                this.cy.style()
-                    .selector('.current-node')
-                    .style({
-                        'border-width': '4px',
-                        'border-color': '#FF9800',
-                        'border-style': 'solid',
-                        'background-color': '#FFF3E0',
-                        'z-index': 999
-                    })
-                    .selector('.visited-node')
-                    .style({
-                        'opacity': 0.6,
-                        'border-width': '2px',
-                        'border-color': '#9E9E9E'
-                    })
-                    .selector('.walked-edge')
-                    .style({
-                        'line-color': '#9E9E9E',
-                        'target-arrow-color': '#9E9E9E',
-                        'opacity': 0.5,
-                        'width': 2
-                    })
-                    .selector('.available-edge')
-                    .style({
-                        'line-color': '#4CAF50',
-                        'target-arrow-color': '#4CAF50',
-                        'width': 4,
-                        'z-index': 100
-                    })
-                    .selector('.selected-edge')
-                    .style({
-                        'line-color': '#FF9800',
-                        'target-arrow-color': '#FF9800',
-                        'width': 5,
-                        'z-index': 101
-                    })
-                    .update();
-            }
-
-            attachEventListeners() {
-                // File upload
-                this.elements.uploadFileBtn.addEventListener('click', () => this.elements.fileInput.click());
-                this.elements.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-
-                this.elements.exampleSelect.addEventListener('change', (e) => this.loadExample(e.target.value));
-                this.elements.layoutSelect.addEventListener('change', (e) => this.renderer.applyLayout(e.target.value));
-                this.elements.zoomInBtn.addEventListener('click', () => this.renderer.zoomIn());
-                this.elements.zoomOutBtn.addEventListener('click', () => this.renderer.zoomOut());
-                this.elements.fitBtn.addEventListener('click', () => this.renderer.fit());
-                this.elements.exportBtn.addEventListener('click', () => this.exportGraph());
-
-                // Font controls
-                this.elements.fontIncreaseBtn.addEventListener('click', () => this.changeFontSize(1));
-                this.elements.fontDecreaseBtn.addEventListener('click', () => this.changeFontSize(-1));
-
-                // JSON editor controls
-                this.elements.applyJsonBtn.addEventListener('click', () => this.applyJson());
-                this.elements.formatJsonBtn.addEventListener('click', () => this.formatJson());
-                this.elements.clearJsonBtn.addEventListener('click', () => this.clearJson());
-
-                // Walk controls
-                this.elements.walkStartBtn.addEventListener('click', () => this.startWalk());
-                this.elements.walkNextBtn.addEventListener('click', () => this.walkNext());
-                this.elements.walkStopBtn.addEventListener('click', () => this.stopWalk());
-
-                this.cy.on('tap', 'node', (evt) => this.handleNodeClick(evt));
-                this.cy.on('tap', 'edge', (evt) => this.handleEdgeClick(evt));
-                this.cy.on('tap', (evt) => {
-                    if (evt.target === this.cy) {
-                        this.clearStateDetails();
-                    }
-                });
-            }
-
-            changeFontSize(delta) {
-                this.fontSize = Math.max(8, Math.min(20, this.fontSize + delta));
-                document.getElementById('state-details').style.fontSize = this.fontSize + 'px';
-            }
-
-            async handleFileUpload(event) {
-                const file = event.target.files[0];
-                if (!file) return;
-
-                this.elements.fileName.textContent = file.name;
-                this.elements.exampleSelect.value = ''; // Reset example dropdown
-                this.showLoading(true);
-                this.hideError();
-
-                try {
-                    const text = await file.text();
-                    const json = JSON.parse(text);
-                    this.currentJson = json;
-                    this.displayJson(json);
-                    this.renderStateMachine(json);
-                    this.elements.statusText.textContent = `Loaded: ${file.name}`;
-                } catch (error) {
-                    this.showJsonError(`Invalid JSON file: ${error.message}`);
-                    this.showError(`Failed to load file: ${error.message}`);
-                    this.elements.statusText.textContent = 'Error loading file';
-                } finally {
-                    this.showLoading(false);
-                }
-            }
-
-            async loadExample(path) {
-                if (!path) return;
-
-                this.elements.fileInput.value = ''; // Reset file input
-                this.showLoading(true);
-                this.hideError();
-
-                try {
-                    const response = await fetch(path);
-                    if (!response.ok) {
-                        throw new Error(`Failed to load example: ${response.statusText}`);
-                    }
-                    const json = await response.json();
-                    this.currentJson = json;
-                    this.displayJson(json);
-                    this.renderStateMachine(json);
-                    this.elements.fileName.textContent = path.split('/').pop();
-                    this.elements.statusText.textContent = `Loaded example: ${path.split('/').pop()}`;
-                } catch (error) {
-                    this.showJsonError(`Failed to load example: ${error.message}`);
-                    this.showError(`Failed to load example: ${error.message}`);
-                    this.elements.statusText.textContent = 'Error loading example';
-                } finally {
-                    this.showLoading(false);
-                }
-            }
-
-            displayJson(json) {
-                const formatted = JSON.stringify(json, null, 2);
-                this.elements.jsonTextarea.value = formatted;
-                this.hideJsonError();
-            }
-
-            applyJson() {
-                const jsonText = this.elements.jsonTextarea.value.trim();
-
-                if (!jsonText) {
-                    this.showJsonError('Please enter JSON data');
-                    return;
-                }
-
-                try {
-                    const json = JSON.parse(jsonText);
-                    this.currentJson = json;
-                    this.hideJsonError();
-                    this.renderStateMachine(json);
-                    this.elements.statusText.textContent = 'JSON applied successfully';
-                    this.elements.fileName.textContent = 'Manual JSON';
-                } catch (error) {
-                    this.showJsonError(`Invalid JSON: ${error.message}`);
-                    this.elements.statusText.textContent = 'Invalid JSON';
-                }
-            }
-
-            formatJson() {
-                const jsonText = this.elements.jsonTextarea.value.trim();
-
-                if (!jsonText) {
-                    this.showJsonError('No JSON to format');
-                    return;
-                }
-
-                try {
-                    const json = JSON.parse(jsonText);
-                    const formatted = JSON.stringify(json, null, 2);
-                    this.elements.jsonTextarea.value = formatted;
-                    this.hideJsonError();
-                    this.elements.statusText.textContent = 'JSON formatted';
-                } catch (error) {
-                    this.showJsonError(`Cannot format invalid JSON: ${error.message}`);
-                }
-            }
-
-            clearJson() {
-                this.elements.jsonTextarea.value = '';
-                this.hideJsonError();
-                this.cy.elements().remove();
-                this.clearStateDetails();
-                this.elements.stateCount.textContent = '0';
-                this.elements.transitionCount.textContent = '0';
-                this.elements.statusText.textContent = 'JSON cleared';
-                this.elements.fileName.textContent = 'No file selected';
-            }
-
-            showJsonError(message) {
-                this.elements.jsonError.textContent = message;
-                this.elements.jsonError.classList.add('show');
-            }
-
-            hideJsonError() {
-                this.elements.jsonError.classList.remove('show');
-            }
-
-            renderStateMachine(json) {
-                try {
-                    const graph = this.parser.parse(json);
-                    this.currentGraph = graph;
-                    this.renderer.render(graph);
-                    this.clearStateDetails();
-                    this.hideError();
-                    this.hideJsonError();
-
-                    // Update status
-                    this.elements.stateCount.textContent = graph.nodes.length;
-                    this.elements.transitionCount.textContent = graph.edges.length;
-                    this.elements.statusText.textContent = 'State machine loaded successfully';
-                } catch (error) {
-                    this.showJsonError(`Parse Error: ${error.message}`);
-                    this.showError(error.message);
-                    this.elements.statusText.textContent = 'Error parsing state machine';
-                    throw error;
-                }
-            }
-
-            handleNodeClick(evt) {
-                const node = evt.target;
-                const data = node.data();
-                this.displayStateDetails(data);
-            }
-
-            displayStateDetails(data) {
-                const stateData = data.stateData;
-
-                let html = `
-                    <div class="state-info">
-                        <h4>${data.label}</h4>
-                        <div class="property">
-                            <span class="property-label">Type:</span>
-                            <span class="property-value">${data.type}</span>
-                        </div>
-                        ${data.isStart ? '<div class="property"><span class="property-label">Role:</span><span class="property-value">Start State</span></div>' : ''}
-                        ${data.isEnd ? '<div class="property"><span class="property-label">Role:</span><span class="property-value">End State</span></div>' : ''}
-                `;
-
-                if (stateData) {
-                    if (stateData.Resource) {
-                        html += `<div class="property"><span class="property-label">Resource:</span><span class="property-value">${stateData.Resource}</span></div>`;
-                    }
-                    if (stateData.Next) {
-                        html += `<div class="property"><span class="property-label">Next:</span><span class="property-value">${stateData.Next}</span></div>`;
-                    }
-                    if (stateData.Comment) {
-                        html += `<div class="property"><span class="property-label">Comment:</span><span class="property-value">${stateData.Comment}</span></div>`;
-                    }
-                    if (stateData.TimeoutSeconds) {
-                        html += `<div class="property"><span class="property-label">Timeout:</span><span class="property-value">${stateData.TimeoutSeconds}s</span></div>`;
-                    }
-                    if (stateData.Seconds) {
-                        html += `<div class="property"><span class="property-label">Wait Time:</span><span class="property-value">${stateData.Seconds}s</span></div>`;
-                    }
-                    if (stateData.Error) {
-                        html += `<div class="property"><span class="property-label">Error:</span><span class="property-value">${stateData.Error}</span></div>`;
-                    }
-                    if (stateData.Cause) {
-                        html += `<div class="property"><span class="property-label">Cause:</span><span class="property-value">${stateData.Cause}</span></div>`;
-                    }
-                    if (stateData.Retry && stateData.Retry.length > 0) {
-                        html += `<h4>Retry Configuration</h4><div class="property"><span class="property-label">Attempts:</span><span class="property-value">${stateData.Retry[0].MaxAttempts || 'N/A'}</span></div>`;
-                    }
-                    if (stateData.Catch && stateData.Catch.length > 0) {
-                        html += `<h4>Error Handlers</h4>`;
-                        stateData.Catch.forEach((catcher, idx) => {
-                            html += `<div class="property"><span class="property-label">Catch ${idx + 1}:</span><span class="property-value">${catcher.ErrorEquals.join(', ')} → ${catcher.Next}</span></div>`;
-                        });
-                    }
-                    html += `<h4>Full State Definition</h4><pre>${JSON.stringify(stateData, null, 2)}</pre>`;
-                }
-
-                html += '</div>';
-                this.elements.stateDetails.innerHTML = html;
-            }
-
-            clearStateDetails() {
-                this.elements.stateDetails.innerHTML = '<p class="placeholder">Click on a state to view details</p>';
-            }
-
-            exportGraph() {
-                try {
-                    const blob = this.renderer.exportAsPNG();
-                    if (blob) {
-                        const url = URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.download = 'state-machine.png';
-                        link.href = url;
-                        link.click();
-                        URL.revokeObjectURL(url);
-                        this.elements.statusText.textContent = 'Exported as PNG';
-                    }
-                } catch (error) {
-                    this.showError(`Failed to export: ${error.message}`);
-                    this.elements.statusText.textContent = 'Export failed';
-                }
-            }
-
-            showLoading(show) {
-                if (show) {
-                    this.elements.loading.classList.remove('hidden');
-                } else {
-                    this.elements.loading.classList.add('hidden');
-                }
-            }
-
-            showError(message) {
-                this.elements.errorMessage.textContent = message;
-                this.elements.errorMessage.classList.remove('hidden');
-                setTimeout(() => this.hideError(), 5000);
-            }
-
-            hideError() {
-                this.elements.errorMessage.classList.add('hidden');
-            }
-
-            // ===== WALK MODE FUNCTIONS =====
-
-            startWalk() {
-                if (!this.currentGraph || !this.currentGraph.nodes || this.currentGraph.nodes.length === 0) {
-                    this.showError('Please load a state machine first');
-                    return;
-                }
-
-                // Reset walk state
-                this.walkMode = {
-                    active: true,
-                    currentNode: null,
-                    visitedNodes: [],
-                    visitedEdges: [],
-                    selectedEdge: null,
-                    availableEdges: []
-                };
-
-                // Find start node
-                const startNode = this.cy.nodes().filter(node => node.data('isStart'));
-                if (startNode.length === 0) {
-                    this.showError('No start state found');
-                    return;
-                }
-
-                // Reset all styles
-                this.resetWalkStyles();
-
-                // Set current node
-                this.walkMode.currentNode = startNode[0];
-                this.walkMode.visitedNodes.push(startNode[0].id());
-
-                // Update UI
-                this.elements.walkStartBtn.style.display = 'none';
-                this.elements.walkNextBtn.style.display = 'inline-block';
-                this.elements.walkStopBtn.style.display = 'inline-block';
-
-                // Highlight and zoom to start node
-                this.highlightCurrentNode();
-                this.cy.animate({
-                    center: { eles: startNode[0] },
-                    zoom: 1.5
-                }, {
-                    duration: 500
-                });
-
-                // Show state details
-                this.displayStateDetails(startNode[0].data());
-
-                // Show instruction
-                this.showInstruction(`Starting at: <strong>${startNode[0].data('label')}</strong><br>Click "Next" to proceed`);
-                this.elements.statusText.textContent = 'Walk mode: Started';
-            }
-
-            walkNext() {
-                if (!this.walkMode.currentNode) return;
-
-                const currentNodeId = this.walkMode.currentNode.id();
-
-                // Get outgoing edges
-                const outgoingEdges = this.cy.edges().filter(edge => edge.source().id() === currentNodeId);
-
-                if (outgoingEdges.length === 0) {
-                    // Reached end state
-                    this.showInstruction(`<strong>End state reached!</strong><br>No more transitions`);
-                    this.elements.walkNextBtn.disabled = true;
-                    this.elements.statusText.textContent = 'Walk mode: End reached';
-                    return;
-                }
-
-                if (outgoingEdges.length === 1) {
-                    // Single path - move directly
-                    this.moveToNextNode(outgoingEdges[0]);
-                } else {
-                    // Multiple paths - let user select
-                    if (this.walkMode.selectedEdge) {
-                        // User has selected an edge
-                        this.moveToNextNode(this.walkMode.selectedEdge);
-                        this.walkMode.selectedEdge = null;
-                        this.walkMode.availableEdges = [];
-                    } else {
-                        // Show available edges for selection
-                        this.walkMode.availableEdges = outgoingEdges;
-                        this.highlightAvailableEdges();
-                        this.showInstruction(`<strong>Multiple paths available!</strong><br>Click on an edge to select your path`);
-                        this.elements.walkNextBtn.disabled = true;
-                        this.elements.statusText.textContent = 'Walk mode: Select a path';
-                    }
-                }
-            }
-
-            moveToNextNode(edge) {
-                const nextNode = edge.target();
-
-                // Mark edge as visited
-                this.walkMode.visitedEdges.push(edge.id());
-                edge.addClass('walked-edge');
-
-                // Move to next node
-                this.walkMode.currentNode = nextNode;
-                this.walkMode.visitedNodes.push(nextNode.id());
-
-                // Update visuals
-                this.highlightCurrentNode();
-                this.cy.animate({
-                    center: { eles: nextNode },
-                    zoom: 1.5
-                }, {
-                    duration: 500
-                });
-
-                // Show state details
-                this.displayStateDetails(nextNode.data());
-
-                // Update instruction
-                const isEndState = nextNode.data('isEnd');
-                if (isEndState) {
-                    this.showInstruction(`<strong>${nextNode.data('label')}</strong><br>End state reached!`);
-                    this.elements.walkNextBtn.disabled = true;
-                } else {
-                    this.showInstruction(`Now at: <strong>${nextNode.data('label')}</strong><br>Click "Next" to continue`);
-                    this.elements.walkNextBtn.disabled = false;
-                }
-
-                this.elements.statusText.textContent = `Walk mode: At ${nextNode.data('label')}`;
-            }
-
-            handleEdgeClick(evt) {
-                if (!this.walkMode.active) return;
-                if (this.walkMode.availableEdges.length === 0) return;
-
-                const clickedEdge = evt.target;
-
-                // Check if this edge is in available edges
-                const isAvailable = this.walkMode.availableEdges.some(e => e.id() === clickedEdge.id());
-                if (!isAvailable) return;
-
-                // Select this edge
-                this.walkMode.selectedEdge = clickedEdge;
-
-                // Update visuals
-                this.walkMode.availableEdges.forEach(edge => {
-                    edge.removeClass('available-edge');
-                    if (edge.id() === clickedEdge.id()) {
-                        edge.addClass('selected-edge');
-                    }
-                });
-
-                // Enable Next button
-                this.elements.walkNextBtn.disabled = false;
-
-                const targetLabel = clickedEdge.target().data('label');
-                this.showInstruction(`<strong>Path selected</strong> → ${targetLabel}<br>Click "Next" to proceed`);
-            }
-
-            stopWalk() {
-                // Reset walk state
-                this.walkMode.active = false;
-                this.walkMode.currentNode = null;
-                this.walkMode.visitedNodes = [];
-                this.walkMode.visitedEdges = [];
-                this.walkMode.selectedEdge = null;
-                this.walkMode.availableEdges = [];
-
-                // Reset styles
-                this.resetWalkStyles();
-
-                // Update UI
-                this.elements.walkStartBtn.style.display = 'inline-block';
-                this.elements.walkNextBtn.style.display = 'none';
-                this.elements.walkStopBtn.style.display = 'none';
-                this.elements.walkNextBtn.disabled = false;
-                this.hideInstruction();
-
-                // Fit graph
-                this.renderer.fit();
-
-                this.elements.statusText.textContent = 'Walk mode stopped';
-            }
-
-            highlightCurrentNode() {
-                // Remove previous highlights
-                this.cy.nodes().removeClass('current-node visited-node');
-
-                // Mark visited nodes
-                this.walkMode.visitedNodes.forEach(nodeId => {
-                    const node = this.cy.getElementById(nodeId);
-                    if (node.id() !== this.walkMode.currentNode.id()) {
-                        node.addClass('visited-node');
-                    }
-                });
-
-                // Highlight current node
-                if (this.walkMode.currentNode) {
-                    this.walkMode.currentNode.addClass('current-node');
-                }
-            }
-
-            highlightAvailableEdges() {
-                // Remove previous edge highlights
-                this.cy.edges().removeClass('available-edge selected-edge');
-
-                // Highlight available edges with pulsing effect
-                this.walkMode.availableEdges.forEach(edge => {
-                    edge.addClass('available-edge');
-                });
-            }
-
-            resetWalkStyles() {
-                this.cy.nodes().removeClass('current-node visited-node');
-                this.cy.edges().removeClass('walked-edge available-edge selected-edge');
-            }
-
-            showInstruction(html) {
-                this.elements.walkInstruction.innerHTML = html;
-                this.elements.walkInstruction.classList.add('show');
-            }
-
-            hideInstruction() {
-                this.elements.walkInstruction.classList.remove('show');
-            }
-        }
-
-        // Wait for all libraries to load before initializing
-        let initAttempts = 0;
-        function initializeApp() {
-            initAttempts++;
-
-            if (typeof cytoscape === 'undefined' || typeof dagre === 'undefined') {
-                if (initAttempts < 50) {
-                    console.log('Waiting for libraries to load... attempt', initAttempts);
-                    setTimeout(initializeApp, 100);
-                } else {
-                    console.error('Failed to load required libraries after 5 seconds');
-                    document.getElementById('error-message').textContent = 'Failed to load visualization libraries. Please refresh the page.';
-                    document.getElementById('error-message').classList.remove('hidden');
-                }
-                return;
-            }
-
-            console.log('Cytoscape and dagre loaded successfully');
-            console.log('Dagre version:', dagre.version);
-            console.log('Cytoscape version:', cytoscape.version);
-
-            window.awsSfViewerApp = new AwsSfViewerApp();
-        }
-
-        // Use window.onload to ensure all scripts are loaded
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeApp);
-        } else {
-            initializeApp();
-        }
+    <script src="/static/js/aws-sf-viewer/parser.js"></script>
+    <script src="/static/js/aws-sf-viewer/renderer.js"></script>
+    <script src="/static/js/aws-sf-viewer/app.js"></script>
+    <script>
+        // Initialize the app
+        initializeApp();
     </script>
 </body>
 </html>

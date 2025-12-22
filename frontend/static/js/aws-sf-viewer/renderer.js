@@ -2,7 +2,7 @@
  * State Machine Renderer using Cytoscape.js
  */
 
-export class StateMachineRenderer {
+class StateMachineRenderer {
     constructor(containerId) {
         this.containerId = containerId;
         this.cy = null;
@@ -16,6 +16,15 @@ export class StateMachineRenderer {
         const container = document.getElementById(this.containerId);
         if (!container) {
             throw new Error(`Container with id "${this.containerId}" not found`);
+        }
+
+        if (typeof cytoscape === 'undefined') {
+            throw new Error('Cytoscape.js is not loaded');
+        }
+
+        // Ensure container is an HTMLElement
+        if (!(container instanceof HTMLElement)) {
+            throw new Error(`Element with id "${this.containerId}" is not a valid HTMLElement`);
         }
 
         this.cy = cytoscape({
@@ -49,6 +58,8 @@ export class StateMachineRenderer {
                     'font-weight': 'bold',
                     'width': 'label',
                     'height': 'label',
+                    'min-width': '60px',
+                    'min-height': '30px',
                     'padding': '10px',
                     'shape': 'roundrectangle',
                     'border-width': 2,
@@ -138,15 +149,20 @@ export class StateMachineRenderer {
                     'border-color': '#512DA8'
                 }
             },
-            // Parallel branch
+            // Branch states (states within parallel branches)
             {
-                selector: 'node[type="ParallelBranch"]',
+                selector: 'node[isBranchState]',
                 style: {
-                    'background-color': '#E1BEE7',
-                    'text-outline-color': '#E1BEE7',
-                    'color': '#333',
-                    'border-color': '#9C27B0',
-                    'shape': 'roundrectangle'
+                    'border-width': 2,
+                    'border-style': 'dashed'
+                }
+            },
+            // Iterator states (states within Map iterators)
+            {
+                selector: 'node[isIteratorState]',
+                style: {
+                    'border-width': 2,
+                    'border-style': 'dotted'
                 }
             },
             // Edge styles
@@ -244,6 +260,10 @@ export class StateMachineRenderer {
                     type: node.type,
                     isStart: node.isStart,
                     isEnd: node.isEnd,
+                    isBranchState: node.isBranchState,
+                    branchIndex: node.branchIndex,
+                    parentParallel: node.parentParallel,
+                    isIteratorState: node.isIteratorState,
                     stateData: node.data
                 }
             });
@@ -261,7 +281,9 @@ export class StateMachineRenderer {
                     isChoice: edge.isChoice,
                     isDefault: edge.isDefault,
                     isError: edge.isError,
-                    isBranch: edge.isBranch
+                    isBranch: edge.isBranch,
+                    isBranchEnd: edge.isBranchEnd,
+                    conditionData: edge.conditionData
                 }
             });
         });
@@ -283,8 +305,7 @@ export class StateMachineRenderer {
 
         const layoutOptions = {
             name: layoutName,
-            animate: true,
-            animationDuration: 500,
+            animate: false,
             fit: true,
             padding: 50
         };
@@ -378,4 +399,14 @@ export class StateMachineRenderer {
             this.cy = null;
         }
     }
+}
+
+// Export for Node.js (CommonJS)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { StateMachineRenderer };
+}
+
+// Export for browser (global)
+if (typeof window !== 'undefined') {
+    window.StateMachineRenderer = StateMachineRenderer;
 }

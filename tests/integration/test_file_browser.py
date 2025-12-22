@@ -142,7 +142,7 @@ class TestFileBrowserIntegration:
 class TestDirectoryDetectionWorkflow(TestFileBrowserIntegration):
     """Test complete directory detection workflow."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_fetch_detects_directory_automatically(self, mock_get_sources):
         """Test that fetch endpoint automatically detects directories."""
         mock_get_sources.return_value = self.mock_sources
@@ -168,7 +168,7 @@ class TestDirectoryDetectionWorkflow(TestFileBrowserIntegration):
         assert 'data' in file_names
         assert 'empty' in file_names
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_fetch_detects_file_automatically(self, mock_get_sources):
         """Test that fetch endpoint automatically detects files."""
         mock_get_sources.return_value = self.mock_sources
@@ -180,7 +180,7 @@ class TestDirectoryDetectionWorkflow(TestFileBrowserIntegration):
         assert 'text/plain' in response.content_type
         assert b'This is a readme file' in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_dynamic_variables_with_directory(self, mock_get_sources):
         """Test directory detection with dynamic variables."""
         mock_get_sources.return_value = self.mock_sources
@@ -208,7 +208,7 @@ class TestDirectoryDetectionWorkflow(TestFileBrowserIntegration):
 class TestDirectoryTreeStructure(TestFileBrowserIntegration):
     """Test directory tree structure and metadata."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_tree_structure_two_levels_deep(self, mock_get_sources):
         """Test tree structure goes exactly 2 levels deep."""
         mock_get_sources.return_value = self.mock_sources
@@ -260,7 +260,7 @@ class TestDirectoryTreeStructure(TestFileBrowserIntegration):
             assert 'has_children' in raw_dir
             assert raw_dir['has_children'] is True
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_file_metadata_in_tree(self, mock_get_sources):
         """Test file metadata is included in tree."""
         mock_get_sources.return_value = self.mock_sources
@@ -286,7 +286,7 @@ class TestDirectoryTreeStructure(TestFileBrowserIntegration):
         assert config['is_directory'] is False
         assert config['size'] > 0
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_directory_metadata_in_tree(self, mock_get_sources):
         """Test directory metadata is included in tree."""
         mock_get_sources.return_value = self.mock_sources
@@ -313,7 +313,7 @@ class TestDirectoryTreeStructure(TestFileBrowserIntegration):
         assert 'has_children' in empty
         assert empty['has_children'] is False
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_hidden_files_included(self, mock_get_sources):
         """Test hidden files are included in tree (new behavior)."""
         # Create hidden files
@@ -338,7 +338,7 @@ class TestDirectoryTreeStructure(TestFileBrowserIntegration):
 class TestFileRetrieval(TestFileBrowserIntegration):
     """Test file retrieval from directory sources."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_retrieve_file_from_root(self, mock_get_sources):
         """Test retrieving file from root directory."""
         mock_get_sources.return_value = self.mock_sources
@@ -349,7 +349,7 @@ class TestFileRetrieval(TestFileBrowserIntegration):
         assert 'text/plain' in response.content_type
         assert b'This is a readme file' in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_retrieve_file_from_subdirectory(self, mock_get_sources):
         """Test retrieving file from subdirectory."""
         mock_get_sources.return_value = self.mock_sources
@@ -359,7 +359,7 @@ class TestFileRetrieval(TestFileBrowserIntegration):
         assert response.status_code == 200
         assert b'Annual report content' in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_retrieve_file_from_deep_subdirectory(self, mock_get_sources):
         """Test retrieving file from deep subdirectory."""
         mock_get_sources.return_value = self.mock_sources
@@ -369,7 +369,7 @@ class TestFileRetrieval(TestFileBrowserIntegration):
         assert response.status_code == 200
         assert b'Raw input data 1' in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_retrieve_csv_file(self, mock_get_sources):
         """Test retrieving CSV file."""
         mock_get_sources.return_value = self.mock_sources
@@ -381,7 +381,7 @@ class TestFileRetrieval(TestFileBrowserIntegration):
         assert b'Alice,100' in response.data
         assert b'Bob,200' in response.data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_retrieve_json_file(self, mock_get_sources):
         """Test retrieving JSON file."""
         mock_get_sources.return_value = self.mock_sources
@@ -393,7 +393,7 @@ class TestFileRetrieval(TestFileBrowserIntegration):
         assert '"setting": "value"' in data
         assert '"number": 42' in data
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_retrieve_markdown_file(self, mock_get_sources):
         """Test retrieving Markdown file."""
         mock_get_sources.return_value = self.mock_sources
@@ -408,7 +408,7 @@ class TestFileRetrieval(TestFileBrowserIntegration):
 class TestErrorScenarios(TestFileBrowserIntegration):
     """Test error scenarios in file browser workflow."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_access_nonexistent_file(self, mock_get_sources):
         """Test accessing non-existent file."""
         mock_get_sources.return_value = self.mock_sources
@@ -420,7 +420,7 @@ class TestErrorScenarios(TestFileBrowserIntegration):
         assert data['success'] is False
         assert 'File not found' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_access_directory_as_file(self, mock_get_sources):
         """Test accessing directory as file."""
         mock_get_sources.return_value = self.mock_sources
@@ -432,7 +432,7 @@ class TestErrorScenarios(TestFileBrowserIntegration):
         assert data['success'] is False
         assert 'Path is a directory, not a file' in data['error']
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_path_traversal_attack(self, mock_get_sources):
         """Test path traversal attack prevention."""
         mock_get_sources.return_value = self.mock_sources
@@ -455,7 +455,7 @@ class TestErrorScenarios(TestFileBrowserIntegration):
             # Could be 'Access denied' or 'File not found'
             assert any(msg in data['error'] for msg in ['Access denied', 'File not found'])
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_browse_nonexistent_directory(self, mock_get_sources):
         """Test browsing non-existent directory."""
         nonexistent_sources = {
@@ -486,7 +486,7 @@ class TestErrorScenarios(TestFileBrowserIntegration):
 class TestPerformance(TestFileBrowserIntegration):
     """Test performance aspects of file browser."""
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_large_directory_handling(self, mock_get_sources):
         """Test handling of directories with many files."""
         # Create directory with many files
@@ -520,7 +520,7 @@ class TestPerformance(TestFileBrowserIntegration):
         expected_files = [f'file_{i:03d}.txt' for i in range(100)]
         assert set(file_names) == set(expected_files)
     
-    @patch('main.get_stored_sources')
+    @patch('utils.source_helpers.get_stored_sources')
     def test_directory_tree_caching_behavior(self, mock_get_sources):
         """Test that directory tree doesn't cache incorrectly using new source system."""
         mock_get_sources.return_value = self.mock_sources

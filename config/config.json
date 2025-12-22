@@ -63,8 +63,12 @@
       "description": "Data sources manager"
     },
     "aws-sf-viewer": {
-      "enabled": false,
+      "enabled": true,
       "description": "AWS Step Functions state machine viewer"
+    },
+    "workflow-processor": {
+      "enabled": false,
+      "description": "Workflow processor for large files"
     }
   },
   "history_limits": {
