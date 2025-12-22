@@ -171,7 +171,14 @@ class WorkflowProcessor {
               ] 
             },
             { value: 'xml_to_json', label: 'XML to JSON' },
-            { value: 'yaml_to_json', label: 'YAML to JSON' }
+            { value: 'yaml_to_json', label: 'YAML to JSON' },
+            { value: 'csv_to_json', label: 'CSV to JSON' },
+            { value: 'csv_to_yaml', label: 'CSV to YAML' },
+            { value: 'csv_to_xml', label: 'CSV to XML' },
+            { value: 'json_to_xml', label: 'JSON to XML' },
+            { value: 'json_to_yaml', label: 'JSON to YAML' },
+            { value: 'json_to_toml', label: 'JSON to TOML' },
+            { value: 'toml_to_json', label: 'TOML to JSON' }
         ];
 
         this.init();
@@ -197,6 +204,11 @@ class WorkflowProcessor {
         document.getElementById('addStepBtn').addEventListener('click', () => this.addStep());
         document.getElementById('runBtn').addEventListener('click', () => this.runWorkflow());
         document.getElementById('loadMoreBtn').addEventListener('click', () => this.loadMore());
+        
+        const clearBtn = document.getElementById('clearWorkflowBtn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clearWorkflow());
+        }
         
         // Delegation for workflow list
         document.getElementById('workflowList').addEventListener('input', (e) => {
@@ -241,11 +253,22 @@ class WorkflowProcessor {
 
     addStep() {
         const stepId = Date.now();
+        const stepIndex = this.workflowSteps.length + 1;
+        
+        // Create connector
+        const connector = document.createElement('div');
+        connector.className = 'step-connector-container';
+        connector.dataset.connectorFor = stepId;
+        connector.innerHTML = `
+            <div class="step-connector-line"></div>
+            <div class="step-node" data-node-index="${stepIndex - 1}">O</div>
+        `;
+        
+        document.getElementById('workflowList').appendChild(connector);
+
         const stepElement = document.createElement('div');
         stepElement.className = 'workflow-step';
         stepElement.dataset.id = stepId;
-        
-        const stepIndex = this.workflowSteps.length + 1;
 
         let optionsHtml = this.operators.map(op => `<option value="${op.value}">${op.label}</option>`).join('');
 
@@ -272,7 +295,11 @@ class WorkflowProcessor {
 
     removeStep(id) {
         const element = document.querySelector(`.workflow-step[data-id="${id}"]`);
+        const connector = document.querySelector(`.step-connector-container[data-connector-for="${id}"]`);
+        
         if (element) element.remove();
+        if (connector) connector.remove();
+        
         this.workflowSteps = this.workflowSteps.filter(s => s.id !== id);
         
         if (this.adapters[id]) {
@@ -280,9 +307,15 @@ class WorkflowProcessor {
             delete this.adapters[id];
         }
         
+        // Renumber steps and nodes
         document.querySelectorAll('#workflowList .workflow-step').forEach((el, index) => {
             el.querySelector('.step-number').textContent = `Step ${index + 1}`;
         });
+        
+        document.querySelectorAll('.step-node').forEach((el, index) => {
+            el.dataset.nodeIndex = index;
+        });
+        
         this.updateRunButton();
     }
 
@@ -363,6 +396,13 @@ class WorkflowProcessor {
             this.setStepStatus(el, 'default', '');
         });
         
+        // Reset nodes
+        document.querySelectorAll('.step-node').forEach(el => {
+            el.classList.remove('has-result', 'clickable', 'active');
+            el.textContent = 'O';
+            el.onclick = null;
+        });
+        
         const filePath = this.selectedSource.selectedFile || this.selectedSource.path;
         const enablePagination = document.getElementById('paginationCheckbox').checked;
         
@@ -385,12 +425,12 @@ class WorkflowProcessor {
             if (response.ok) {
                 outputArea.value = typeof result.result === 'object' ? JSON.stringify(result.result, null, 2) : result.result;
                 this.setStepStatus(initialStep, 'success', 'Completed');
-                // Mark all steps success
+                
                 document.querySelectorAll('.workflow-step[data-id]').forEach(el => {
                     this.setStepStatus(el, 'success', 'Completed');
                 });
                 
-                // Handle pagination
+                // Handle pagination for final result
                 if (result.has_more) {
                     this.currentResultId = result.result_id;
                     this.currentOffset = result.offset;
@@ -399,6 +439,39 @@ class WorkflowProcessor {
                 } else {
                     this.currentResultId = null;
                     this.currentOffset = 0;
+                }
+                
+                // Update intermediate nodes
+                // Node 0: Initial Result
+                const initialNode = document.querySelector('.step-node[data-node-index="0"]');
+                if (initialNode && result.initial_result_id) {
+                    initialNode.classList.add('has-result', 'clickable');
+                    initialNode.textContent = '👁';
+                    initialNode.title = `View result (${result.initial_size} bytes)`;
+                    initialNode.onclick = (e) => {
+                        document.querySelectorAll('.step-node').forEach(el => el.classList.remove('active'));
+                        e.target.classList.add('active');
+                        this.loadStepResult(result.initial_result_id, result.initial_size);
+                    };
+                }
+
+                if (result.step_results) {
+                    result.step_results.forEach(stepResult => {
+                        // Node k corresponds to result of step k-1.
+                        // Step 0 result -> Node 1
+                        const nodeIndex = stepResult.step_index + 1;
+                        const node = document.querySelector(`.step-node[data-node-index="${nodeIndex}"]`);
+                        if (node) {
+                            node.classList.add('has-result', 'clickable');
+                            node.textContent = '👁';
+                            node.title = `View result (${stepResult.size} bytes)`;
+                            node.onclick = (e) => {
+                                document.querySelectorAll('.step-node').forEach(el => el.classList.remove('active'));
+                                e.target.classList.add('active');
+                                this.loadStepResult(stepResult.result_id, stepResult.size);
+                            };
+                        }
+                    });
                 }
                 
             } else {
@@ -422,6 +495,85 @@ class WorkflowProcessor {
         } catch (e) {
             outputArea.value = `Network Error: ${e.message}`;
             this.setStepStatus(initialStep, 'error', 'Network Error');
+        }
+    }
+
+    async loadStepResult(resultId, totalSize) {
+        const outputArea = document.getElementById('outputArea');
+        const loadMoreContainer = document.getElementById('loadMoreContainer');
+        
+        outputArea.value = 'Loading intermediate result...';
+        
+        this.currentResultId = resultId;
+        this.currentOffset = 0; // Start from beginning
+        
+        try {
+            const response = await fetch(`/api/workflow/result/${resultId}?offset=0`);
+            const data = await response.json();
+            
+            if (data.success) {
+                outputArea.value = data.chunk;
+                
+                this.currentOffset = data.offset;
+                
+                if (data.has_more) {
+                    loadMoreContainer.style.display = 'block';
+                    document.getElementById('loadMoreStatus').textContent = `Loaded ${this.currentOffset} bytes of ${totalSize || data.total_size}`;
+                } else {
+                    loadMoreContainer.style.display = 'none';
+                }
+            } else {
+                outputArea.value = 'Failed to load result: ' + data.error;
+            }
+        } catch (e) {
+            outputArea.value = 'Network error: ' + e.message;
+        }
+    }
+
+    async clearWorkflow() {
+        if (!confirm('Are you sure you want to clear the entire workflow and cached data?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/workflow/clear', {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                // Reset Frontend State
+                this.workflowSteps = [];
+                document.getElementById('workflowList').innerHTML = '';
+                
+                this.selectedSource = null;
+                document.getElementById('selectedFileInfo').innerHTML = 'No file selected';
+                
+                document.getElementById('outputArea').value = '';
+                document.getElementById('loadMoreContainer').style.display = 'none';
+                
+                // Reset Initial Step Status
+                const initialStep = document.getElementById('initialProcessStep');
+                this.setStepStatus(initialStep, 'default', '');
+                
+                this.currentResultId = null;
+                this.currentOffset = 0;
+                
+                this.updateRunButton();
+                
+                // Clear any adapters
+                for (const id in this.adapters) {
+                    if (this.adapters[id]) {
+                        this.adapters[id].destroy();
+                    }
+                }
+                this.adapters = {};
+                
+            } else {
+                const error = await response.json();
+                alert(`Failed to clear workflow: ${error.error}`);
+            }
+        } catch (e) {
+            alert(`Network Error: ${e.message}`);
         }
     }
 

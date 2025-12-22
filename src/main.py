@@ -24,6 +24,8 @@ from sources.base import PaginationOptions, PaginatedResult
 from validators import get_validator_types, create_validator, ValidationError
 from validators.manager import ValidatorManager
 
+from utils.encryption import encrypt_data, decrypt_data
+
 # Configure Flask to use the correct static folder with absolute path
 static_dir = Path(__file__).parent.parent / "frontend" / "static"
 app = Flask(__name__, 
@@ -1105,10 +1107,29 @@ def generate_diff(text1: str, text2: str) -> Dict[str, Any]:
 
     return {'lines': result_lines, 'stats': stats}
 
-FILE_CACHE_DIR = Path.home() / ".helpful-tools" / "file_cache"
+import csv
+import io
+try:
+    import tomllib
+except ImportError:
+    # Fallback for older Python versions
+    try:
+        import tomli as tomllib
+    except ImportError:
+        tomllib = None
+
+try:
+    import tomli_w
+except ImportError:
+    tomli_w = None
+
+CONFIG_DIR = Path.home() / ".config" / "helpful-tools"
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+
+FILE_CACHE_DIR = CONFIG_DIR / "file_cache"
 FILE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-WORKFLOW_RESULT_DIR = Path.home() / ".helpful-tools" / "workflow_results"
+WORKFLOW_RESULT_DIR = CONFIG_DIR / "workflow_results"
 WORKFLOW_RESULT_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_cached_file_path(source_id: str, file_path: str) -> Path:
@@ -1119,6 +1140,32 @@ def get_cached_file_path(source_id: str, file_path: str) -> Path:
     return FILE_CACHE_DIR / filename
 
 # Workflow Processor API Routes
+@app.route('/api/workflow/clear', methods=['DELETE'])
+def clear_workflow():
+    """Clear workflow cache (downloaded files) and results"""
+    try:
+        # Clear file cache
+        if FILE_CACHE_DIR.exists():
+            for f in FILE_CACHE_DIR.glob('*'):
+                if f.is_file():
+                    try:
+                        f.unlink()
+                    except Exception as e:
+                        print(f"Failed to delete {f}: {e}")
+        
+        # Clear result cache
+        if WORKFLOW_RESULT_DIR.exists():
+            for f in WORKFLOW_RESULT_DIR.glob('*'):
+                if f.is_file():
+                    try:
+                        f.unlink()
+                    except Exception as e:
+                        print(f"Failed to delete {f}: {e}")
+                        
+        return jsonify({'success': True, 'message': 'Workflow cache cleared'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/workflow/run', methods=['POST'])
 def run_workflow():
     """Run a processing workflow on a file from a source"""
@@ -1144,7 +1191,6 @@ def run_workflow():
         source_data = sources[source_id]
         
         # If file_path is provided, we need to adjust the source config to point to this specific file
-        # This is crucial for directory sources where we want to read a specific child file
         if file_path:
             # Create a copy to avoid modifying the stored source
             import copy
@@ -1154,20 +1200,10 @@ def run_workflow():
             source_type = source_data.get('type')
             config = source_data.get('config', {})
             
-            # For local files, we might need to join the base path with the relative file path
-            # But the source-selector often returns the full path or relative path depending on implementation
-            # Let's assume file_path is the target we want to read
-            
-            # We override the main path config to point to the specific file
-            # This allows us to reuse the read_data() method which typically reads the "main" target
             if source_type == 'local_file':
-                # For local file source, 'path' in config is the target
                 config['path'] = file_path
             elif source_type == 's3':
-                # For S3, if the source was a bucket (directory), we now point to a specific key
-                # We need to handle if file_path is full s3:// url or just key
                 if file_path.startswith('s3://'):
-                     # Extract bucket and key from s3://bucket/key
                      parts = file_path[5:].split('/', 1)
                      if len(parts) == 2:
                          config['bucket'] = parts[0]
@@ -1177,7 +1213,6 @@ def run_workflow():
             
             # Update the config in source_data
             source_data['config'] = config
-            # Also update new-style config if present
             if 'staticConfig' in source_data:
                  if source_type == 'local_file':
                      source_data['pathTemplate'] = file_path
@@ -1194,7 +1229,7 @@ def run_workflow():
         except Exception as e:
              return jsonify({'success': False, 'error': f'Failed to initialize source: {str(e)}'}), 500
 
-        # Read content with caching
+        # Read content with caching (encrypted)
         try:
             cache_path = get_cached_file_path(source_id, file_path or 'main')
             
@@ -1202,39 +1237,60 @@ def run_workflow():
             if cache_path.exists() and (time.time() - cache_path.stat().st_mtime < 3600):
                 # Read from cache
                 try:
-                    # Try reading as text first
-                    with open(cache_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                except UnicodeDecodeError:
-                    # Fallback to binary
                     with open(cache_path, 'rb') as f:
-                        content = f.read()
-            else:
-                # Download from source
-                content = source_instance.read_data()
-                
-                # Save to cache
-                try:
-                    if isinstance(content, str):
-                        with open(cache_path, 'w', encoding='utf-8') as f:
-                            f.write(content)
-                    else:
+                        encrypted_content = f.read()
+                    
+                    decrypted_content = decrypt_data(encrypted_content)
+                    
+                    try:
+                        content = decrypted_content.decode('utf-8')
+                    except UnicodeDecodeError:
+                        content = decrypted_content
+                except Exception as cache_read_err:
+                    print(f"Cache read/decrypt failed, re-fetching: {cache_read_err}")
+                    # Fallback to fetch if cache corrupted/decryption fails
+                    content = source_instance.read_data()
+                    try:
+                        data_to_encrypt = content.encode('utf-8') if isinstance(content, str) else content
+                        encrypted = encrypt_data(data_to_encrypt)
                         with open(cache_path, 'wb') as f:
-                            f.write(content)
+                            f.write(encrypted)
+                    except Exception:
+                        pass
+            else:
+                content = source_instance.read_data()
+                try:
+                    data_to_encrypt = content.encode('utf-8') if isinstance(content, str) else content
+                    encrypted = encrypt_data(data_to_encrypt)
+                    with open(cache_path, 'wb') as f:
+                        f.write(encrypted)
                 except Exception as cache_err:
                     print(f"Warning: Failed to write to cache: {cache_err}")
-                    # Continue without caching if write fails
                     
         except Exception as e:
             return jsonify({'success': False, 'error': f'Failed to read file: {str(e)}'}), 500
             
         # Process workflow
-        process_result = process_workflow_logic(content, workflow)
+        run_id = str(uuid.uuid4())
+        
+        # Save initial content
+        initial_result_id = f"{run_id}_initial"
+        initial_file = WORKFLOW_RESULT_DIR / f"{initial_result_id}.txt"
+        try:
+            mode = 'w' if isinstance(content, str) else 'wb'
+            encoding = 'utf-8' if isinstance(content, str) else None
+            with open(initial_file, mode, encoding=encoding) as f:
+                f.write(content)
+        except Exception as save_err:
+            print(f"Failed to save initial result: {save_err}")
+
+        process_result = process_workflow_logic(content, workflow, run_id=run_id)
         
         if 'error' in process_result:
              return jsonify({'success': False, 'error': process_result['error'], 'step_index': process_result.get('step_index')}), 400
              
         result_content = process_result['result']
+        step_results = process_result.get('step_results', [])
         
         # Handle large results
         # Threshold: 50KB
@@ -1246,10 +1302,18 @@ def run_workflow():
              
         content_len = len(result_content)
         
+        response_data = {
+            'success': True,
+            'result_id': run_id, # Use run_id as the base for the final result too
+            'initial_result_id': initial_result_id,
+            'initial_size': len(content),
+            'step_results': step_results,
+            'has_more': False
+        }
+        
         if enable_pagination and content_len > CHUNK_SIZE:
-            # Save to result cache
-            result_id = str(uuid.uuid4())
-            result_file = WORKFLOW_RESULT_DIR / f"{result_id}.txt"
+            # Save final result to result cache using run_id
+            result_file = WORKFLOW_RESULT_DIR / f"{run_id}.txt"
             
             mode = 'w' if isinstance(result_content, str) else 'wb'
             encoding = 'utf-8' if isinstance(result_content, str) else None
@@ -1260,20 +1324,14 @@ def run_workflow():
             # Return first chunk
             first_chunk = result_content[:CHUNK_SIZE]
             
-            return jsonify({
-                'success': True,
-                'result': first_chunk,
-                'result_id': result_id,
-                'has_more': True,
-                'offset': CHUNK_SIZE,
-                'total_size': content_len
-            })
+            response_data['result'] = first_chunk
+            response_data['has_more'] = True
+            response_data['offset'] = CHUNK_SIZE
+            response_data['total_size'] = content_len
         else:
-            return jsonify({
-                'success': True, 
-                'result': result_content,
-                'has_more': False
-            })
+            response_data['result'] = result_content
+            
+        return jsonify(response_data)
 
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1508,8 +1566,9 @@ def get_jsonpath_suggestions(data, query):
         
     return suggestions
 
-def process_workflow_logic(content, workflow):
+def process_workflow_logic(content, workflow, run_id=None):
     current_data = content
+    step_results = []
     
     # Ensure initial data is string if possible, or handle bytes
     if isinstance(current_data, bytes):
@@ -1573,6 +1632,44 @@ def process_workflow_logic(content, workflow):
                 
             elif operator == 'yaml_to_json':
                 current_data = converter.yaml_to_json(current_data)
+
+            elif operator == 'csv_to_json':
+                f = io.StringIO(current_data)
+                reader = csv.DictReader(f)
+                rows = list(reader)
+                current_data = json.dumps(rows, indent=2)
+                
+            elif operator == 'csv_to_yaml':
+                f = io.StringIO(current_data)
+                reader = csv.DictReader(f)
+                rows = list(reader)
+                # Need to use yaml from converter, but main.py doesn't import yaml directly usually
+                # converter.json_to_yaml takes string.
+                current_data = converter.json_to_yaml(json.dumps(rows))
+                
+            elif operator == 'csv_to_xml':
+                f = io.StringIO(current_data)
+                reader = csv.DictReader(f)
+                rows = list(reader)
+                current_data = converter.json_to_xml(json.dumps(rows))
+
+            elif operator == 'json_to_xml':
+                current_data = converter.json_to_xml(current_data)
+                
+            elif operator == 'json_to_yaml':
+                current_data = converter.json_to_yaml(current_data)
+                
+            elif operator == 'json_to_toml':
+                if not tomli_w:
+                    return {'error': 'tomli-w library not installed', 'step_index': i}
+                obj = json.loads(current_data)
+                current_data = tomli_w.dumps(obj)
+                
+            elif operator == 'toml_to_json':
+                if not tomllib:
+                    return {'error': 'tomllib (or tomli) library not installed', 'step_index': i}
+                obj = tomllib.loads(current_data)
+                current_data = json.dumps(obj, indent=2)
                 
             elif operator == 'jsonpath':
                 # Basic JSONPath implementation if jsonpath-ng is missing
@@ -1702,11 +1799,30 @@ def process_workflow_logic(content, workflow):
                     
                 except json.JSONDecodeError:
                     return {'error': 'Data is not valid JSON, cannot apply custom function', 'step_index': i}
+            
+            # Save intermediate result
+            if run_id:
+                step_result_id = f"{run_id}_step_{i}"
+                step_file = WORKFLOW_RESULT_DIR / f"{step_result_id}.txt"
+                
+                try:
+                    mode = 'w' if isinstance(current_data, str) else 'wb'
+                    encoding = 'utf-8' if isinstance(current_data, str) else None
+                    with open(step_file, mode, encoding=encoding) as f:
+                        f.write(current_data)
                     
+                    step_results.append({
+                        'step_index': i,
+                        'result_id': step_result_id,
+                        'size': len(current_data)
+                    })
+                except Exception as save_err:
+                    print(f"Failed to save step result: {save_err}")
+
         except Exception as e:
             return {'error': f'Step {operator} ({param}) failed: {str(e)}', 'step_index': i}
             
-    return {'result': current_data}
+    return {'result': current_data, 'step_results': step_results}
 
 # Format Conversion API Routes
 @app.route('/api/convert', methods=['POST'])

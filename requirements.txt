@@ -27,4 +27,4 @@ colorama==0.4.6
 jsonschema==4.17.3
 xmlschema==2.5.1
 
-jsonpath-ng
+jsonpath-ngtomli-w==1.2.0
